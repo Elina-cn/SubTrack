@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">SubTrack</string>
+    <string name="welcome_message">Welcome to SubTrack!</string>
+    <string name="my_subscriptions">My Subscriptions</string>
+    <string name="total_monthly">Total Monthly</string>
+    <string name="add_subscription">Add Subscription</string>
+</resources>

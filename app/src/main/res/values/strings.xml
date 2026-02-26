@@ -1,0 +1,9 @@
+<resources>
+
+    <string name="app_name">SubTrack</string>
+    <string name="welcome_message">SubTrack\'e Hoş Geldin!</string>
+    <string name="my_subscriptions">Aboneliklerim</string>
+    <string name="total_monthly">Aylık Toplam</string>
+    <string name="add_subscription">Abonelik Ekle</string>
+
+</resources>
