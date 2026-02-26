@@ -114,8 +114,6 @@ fun SubscriptionCard(name: String, price: String) {
         ){
             Text(text = name, color = DarkText, fontWeight = FontWeight.Medium)
             Text(text = price, color = PastelBlue, fontWeight = FontWeight.Bold)
-
-        //selam
         }
     }
 }
