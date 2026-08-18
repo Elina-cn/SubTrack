@@ -22,8 +22,8 @@ Claude Code'a gider. Claude Code kendi başına mimari karar almaz.
    → varsa belirsizlikler netleştirilir
    → Claude Code promptu üretilir
 
-2. Kullanıcı branch açar
-   git checkout -b feat/phase-N-kisa-ad
+2. Kullanıcı `Elina` branch'inde olduğunu doğrular
+   git status
 
 3. Prompt Claude Code'a yapıştırılır
    → CC kısa açıklama yapar, kodu yazar, derler, özet verir
@@ -37,7 +37,10 @@ Claude Code'a gider. Claude Code kendi başına mimari karar almaz.
 
 6. Sonuç sohbete bildirilir
    → sorun varsa düzeltme promptu üretilir
-   → sorun yoksa PROGRESS.md güncellenir, faz kapanır, merge
+   → sorun yoksa PROGRESS.md güncellenir, faz kapanır
+
+7. Kullanıcı tag atar
+   git tag phase-N-done
 ```
 
 ---
@@ -102,13 +105,21 @@ Belgeler kodla çelişirse **belge güncellenir** — kod belgeye uydurulmaz,
 
 ## 6. Git Düzeni
 
-- `main` — daima çalışan sürüm
-- `feat/phase-N-*` — faz branch'i, bitince merge
+- `Elina` — ana ve tek çalışma branch'i. Tüm commit'ler buraya gider.
+- **Branch açılmaz.** Faz başına ayrı branch kuralı kaldırıldı; tek kişilik
+  geliştirmede gereksiz sürtünme yaratıyordu.
+- Faz bitince **kullanıcı** tag atar: `git tag phase-N-done`
+  Örnek: `git tag phase-2-done`
 - Commit: Conventional Commits, İngilizce, imperative
 - Küçük adımlarda birkaç adımda bir commit; büyük/riskli adımdan sonra mutlaka
 - İçerik taşımayan commit atılmaz
 
-Faz merge edildikten sonra branch silinebilir.
+**Tag neden önemli:** Branch olmadığı için "son çalışan sürüm" garantisi yok.
+Tag'ler bu boşluğu dolduruyor — bir faz bozulursa `git log phase-3-done..HEAD`
+ile ne değiştiğini görür, gerekirse o noktaya dönersin.
+
+Tag'i Claude Code atmaz, kullanıcı atar. CC'nin git geçmişini değiştiren
+işlem yapması yasaktır (bkz. CLAUDE.md §5).
 
 ---
 
@@ -117,8 +128,9 @@ Faz merge edildikten sonra branch silinebilir.
 **Claude Code bir şeyi yanlış anladıysa:** Düzeltme promptu yaz, sıfırdan
 başlatma. `git diff` ile ne yaptığını gör, gerekirse `git restore`.
 
-**İki faz birbirine karıştıysa:** Branch'i bırak, `main`'e dön, fazı daha
-küçük parçalara bölüp yeniden başla.
+**İki faz birbirine karıştıysa:** Son faz tag'ine bak
+(`git log phase-N-done..HEAD --oneline`), nereden dağıldığını gör. Gerekirse
+o tag'e dön ve fazı daha küçük parçalara bölüp yeniden başla.
 
 **Bir kavramı anlamadıysan:** Claude Code'a değil, sohbete sor. CC'nin işi
 kod yazmak, kavram anlatmak değil.

@@ -1,22 +1,26 @@
 # ROADMAP.md — SubTrack Yol Haritası
 
 Fazlar sırayla yapılır. Bir fazın "Bitti" kriterleri sağlanmadan sonrakine
-geçilmez. Her faz kendi branch'inde çalışılır: `feat/phase-N-kisa-ad`.
+geçilmez. Tüm çalışma `Elina` branch'inde yapılır; branch açılmaz. Faz bitince
+kullanıcı `git tag phase-N-done` ile işaretler.
 
 **Durum işaretleri:** ⬜ başlanmadı · 🟡 devam ediyor · ✅ bitti
 
 ---
 
-## ✅ Faz 0 — Acil Düzeltmeler
+## ⬜ Faz 0 — Acil Düzeltmeler
 
-Uygulama şu an fiilen kullanılamaz durumda. Önce çalışır hale getiriyoruz.
+Uygulama fiilen kullanılamaz durumdaydı; bu fazda çalışır hale getirildi.
 
-- [x] `onDismissRequest` boş — bottom sheet kapanmıyor (MainActivity.kt:159)
-- [x] Kaydet butonu sheet'i kapatmıyor (MainActivity.kt:194)
-- [x] Kaydetme sonrası form alanları temizlensin
-- [x] `remember` → `rememberSaveable` (ekran döndürmede veri kaybı) — geçici,
+- [ ] `onDismissRequest` boş — bottom sheet kapanmıyor (MainActivity.kt:159)
+- [ ] Kaydet butonu sheet'i kapatmıyor (MainActivity.kt:194)
+- [ ] Kaydetme sonrası form alanları temizlensin
+- [ ] `remember` → `rememberSaveable` (ekran döndürmede veri kaybı) — geçici,
       Faz 5'te Room devralacak
-- [x] `ANALYSIS_REPORT.md` → `docs/archive/` altına taşınsın
+- [ ] `ANALYSIS_REPORT.md` → `docs/archive/` altına taşınsın
+
+> `SubTrack.md` maddesi kaldırıldı: bu dosya hiç repoya eklenmemişti, içeriği
+> gerçeği yansıtmadığı için kullanıcı bilerek dışarıda bıraktı.
 
 **Bitti:** Uygulama açılıyor, abonelik eklenebiliyor, sheet kapanıyor,
 ekran döndürmede liste duruyor.
@@ -28,17 +32,21 @@ ekran döndürmede liste duruyor.
 - [ ] `gradle/libs.versions.toml` (version catalog) kurulumu/doğrulaması
 - [ ] Compose BOM ↔ `activity-compose` ↔ `lifecycle` sürüm çakışması
       `./gradlew :app:dependencies` ile doğrulansın, gerekirse hizalansın
-- [x] AGP 9 Kotlin plugin'lerini yerleşik getiriyor, sürüm belirtmeden
-      uygulanmalı (Faz 0'da doğrulandı). KSP eklenirken aynı kısıt
-      geçerli olabilir.
-- [ ] KSP eklentisi eklensin (kapt kullanılmayacak)
+- [x] Kotlin plugin durumu netleşti — **Faz 0'da doğrulandı:** AGP 9 Kotlin
+      plugin'lerini yerleşik getiriyor, `version.ref` verilirse *"already on
+      the classpath with an unknown version"* hatası çıkıyor. Sürümsüz alias
+      ile uygulanmalı.
+- [ ] KSP eklentisi eklensin (kapt kullanılmayacak) — **dikkat:** yukarıdaki
+      kısıt burada da geçerli olabilir, sürüm çakışması beklenmeli
+- [ ] Kod içi Türkçe yorumlar İngilizceye çevrilsin (CLAUDE.md §2)
 - [ ] `Theme.kt` gerçekten devreye alınsın: hardcoded renkler →
       `MaterialTheme.colorScheme`
 - [ ] `Type.kt` `MaterialTheme(typography = ...)` ile bağlansın
 - [ ] `Dimens.kt` oluşturulsun, hardcoded `dp` değerleri oradan gelsin
 - [ ] Tüm kullanıcı metinleri `strings.xml`'e taşınsın + `values-en/`
 - [ ] Kullanılmayan import/kod temizliği
-- [ ] Kod içi Türkçe yorumlar İngilizceye çevrilsin (CLAUDE.md §2)
+- [ ] `.gitignore`: `.idea/` altındaki makineye özel dosyalar
+      (`emulatorDisplays.xml` vb.) hariç tutulsun
 
 **Bitti:** Sıfır hardcoded metin, sıfır hardcoded renk. Koyu tema fiilen
 çalışıyor. Temiz derleme, sıfır uyarı.

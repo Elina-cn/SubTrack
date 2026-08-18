@@ -95,7 +95,7 @@ döneceğini söyler — böylece veritabanı yazarken arayüz donmaz."
 - İçerik taşımayan commit atma (boş yorum satırı ekle/sil gibi).
 - `git add .` yerine ilgili dosyaları açıkça ekle.
 - **Asla** `git push --force`, `git reset --hard`, branch silme yapma — sorulmadıkça.
-- Faz başına branch: `feat/phase-3-repository`. Faz bitince kullanıcı merge eder.
+- **Branch açma.** Tüm commit'ler `Elina` branch'ine gider. Faz sonu tag'ini kullanıcı atar, sen atma.
 
 ---
 
