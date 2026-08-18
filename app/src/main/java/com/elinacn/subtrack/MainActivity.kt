@@ -24,8 +24,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.listSaver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.text.input.KeyboardType
+import kotlinx.coroutines.launch
 import java.util.Locale
 import com.elinacn.subtrack.ui.theme.*
 
@@ -34,6 +39,19 @@ data class Subscription(
     val id: Int,
     val name: String,
     val price: Double
+)
+
+/**
+ * Keeps the subscription list alive across configuration changes by flattening each item into
+ * Bundle-native values. Temporary: Room replaces this in phase 5.
+ */
+private val SubscriptionListSaver: Saver<SnapshotStateList<Subscription>, *> = listSaver(
+    save = { list -> list.flatMap { listOf(it.id, it.name, it.price) } },
+    restore = { flat ->
+        flat.chunked(3)
+            .map { (id, name, price) -> Subscription(id as Int, name as String, price as Double) }
+            .toMutableStateList()
+    }
 )
 
 class MainActivity : ComponentActivity() {
@@ -55,9 +73,10 @@ fun MainScreen() {
     var subscriptionName by remember { mutableStateOf("") }
     var subscriptionPrice by remember { mutableStateOf("") }
     val sheetState = rememberModalBottomSheetState()
+    val scope = rememberCoroutineScope()
 
     // Dinamik Liste (Tip güvenliği sağlandı)
-    val subscriptionList = remember {
+    val subscriptionList = rememberSaveable(saver = SubscriptionListSaver) {
         mutableStateListOf(
             Subscription(1, "Netflix", 159.99),
             Subscription(2, "Spotify", 59.90)
@@ -156,7 +175,7 @@ fun MainScreen() {
     // EKLEME MENÜSÜ
     if (showBottomSheet) {
         ModalBottomSheet(
-            onDismissRequest = { },
+            onDismissRequest = { showBottomSheet = false },
             sheetState = sheetState,
             containerColor = Color.White
         ) {
@@ -202,9 +221,11 @@ fun MainScreen() {
                                     price = priceDouble
                                 )
                             )
-                            // Resetle ve Kapat
                             subscriptionName = ""
                             subscriptionPrice = ""
+                            scope.launch { sheetState.hide() }.invokeOnCompletion {
+                                if (!sheetState.isVisible) showBottomSheet = false
+                            }
                         }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = PastelBlue),
