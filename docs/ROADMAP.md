@@ -7,17 +7,16 @@ geçilmez. Her faz kendi branch'inde çalışılır: `feat/phase-N-kisa-ad`.
 
 ---
 
-## ⬜ Faz 0 — Acil Düzeltmeler
+## ✅ Faz 0 — Acil Düzeltmeler
 
 Uygulama şu an fiilen kullanılamaz durumda. Önce çalışır hale getiriyoruz.
 
-- [ ] `onDismissRequest` boş — bottom sheet kapanmıyor (MainActivity.kt:159)
-- [ ] Kaydet butonu sheet'i kapatmıyor (MainActivity.kt:194)
-- [ ] Kaydetme sonrası form alanları temizlensin
-- [ ] `remember` → `rememberSaveable` (ekran döndürmede veri kaybı) — geçici,
+- [x] `onDismissRequest` boş — bottom sheet kapanmıyor (MainActivity.kt:159)
+- [x] Kaydet butonu sheet'i kapatmıyor (MainActivity.kt:194)
+- [x] Kaydetme sonrası form alanları temizlensin
+- [x] `remember` → `rememberSaveable` (ekran döndürmede veri kaybı) — geçici,
       Faz 5'te Room devralacak
-- [ ] `SubTrack.md` → `docs/archive/SubTrack_2026-08.md` olarak taşınsın
-- [ ] `ANALYSIS_REPORT.md` → `docs/archive/` altına taşınsın
+- [x] `ANALYSIS_REPORT.md` → `docs/archive/` altına taşınsın
 
 **Bitti:** Uygulama açılıyor, abonelik eklenebiliyor, sheet kapanıyor,
 ekran döndürmede liste duruyor.
@@ -29,7 +28,9 @@ ekran döndürmede liste duruyor.
 - [ ] `gradle/libs.versions.toml` (version catalog) kurulumu/doğrulaması
 - [ ] Compose BOM ↔ `activity-compose` ↔ `lifecycle` sürüm çakışması
       `./gradlew :app:dependencies` ile doğrulansın, gerekirse hizalansın
-- [ ] Kotlin plugin durumu netleşsin (AGP 9 yerleşik desteği mi?)
+- [x] AGP 9 Kotlin plugin'lerini yerleşik getiriyor, sürüm belirtmeden
+      uygulanmalı (Faz 0'da doğrulandı). KSP eklenirken aynı kısıt
+      geçerli olabilir.
 - [ ] KSP eklentisi eklensin (kapt kullanılmayacak)
 - [ ] `Theme.kt` gerçekten devreye alınsın: hardcoded renkler →
       `MaterialTheme.colorScheme`
@@ -37,6 +38,7 @@ ekran döndürmede liste duruyor.
 - [ ] `Dimens.kt` oluşturulsun, hardcoded `dp` değerleri oradan gelsin
 - [ ] Tüm kullanıcı metinleri `strings.xml`'e taşınsın + `values-en/`
 - [ ] Kullanılmayan import/kod temizliği
+- [ ] Kod içi Türkçe yorumlar İngilizceye çevrilsin (CLAUDE.md §2)
 
 **Bitti:** Sıfır hardcoded metin, sıfır hardcoded renk. Koyu tema fiilen
 çalışıyor. Temiz derleme, sıfır uyarı.
