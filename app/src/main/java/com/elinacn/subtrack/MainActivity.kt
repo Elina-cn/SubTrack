@@ -135,14 +135,18 @@ fun MainScreen() {
                 items = subscriptionList,
                 key = { it.id } // Silme işlemlerinde görsel hataları önleyen kritik nokta
             ) { sub ->
-                val dismissState = rememberSwipeToDismissBoxState(
-                    confirmValueChange = { value ->
-                        if (value == SwipeToDismissBoxValue.EndToStart) {
-                            subscriptionList.remove(sub)
-                            true
-                        } else true
+                val dismissState = rememberSwipeToDismissBoxState()
+
+                // Delete once the swipe has settled, never from confirmValueChange: that callback
+                // only answers whether a transition is allowed and can run several times while the
+                // gesture settles. Removing the row there tore it out of composition mid-animation
+                // and left the dismiss state behind. currentValue reaches EndToStart only after the
+                // positional threshold is passed, so a short swipe springs back untouched.
+                LaunchedEffect(dismissState.currentValue) {
+                    if (dismissState.currentValue == SwipeToDismissBoxValue.EndToStart) {
+                        subscriptionList.remove(sub)
                     }
-                )
+                }
 
                 SwipeToDismissBox(
                     state = dismissState,
