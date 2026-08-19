@@ -83,6 +83,11 @@ fun MainScreen() {
         )
     }
 
+    // Monotonic id source. Deriving ids from max+1 handed a removed row's id straight back to
+    // the next one, so the LazyColumn key stopped being unique and swipe state leaked across
+    // rows. Starts past the seed ids above. Temporary: Room's autoGenerate replaces it in phase 5.
+    var nextSubscriptionId by rememberSaveable { mutableIntStateOf(3) }
+
     // Toplam Tutar Hesaplama (Daha performanslı ve temiz)
     val totalMonthlyPrice by remember(subscriptionList.size) {
         derivedStateOf {
@@ -135,7 +140,7 @@ fun MainScreen() {
                         if (value == SwipeToDismissBoxValue.EndToStart) {
                             subscriptionList.remove(sub)
                             true
-                        } else false
+                        } else true
                     }
                 )
 
@@ -143,23 +148,23 @@ fun MainScreen() {
                     state = dismissState,
                     enableDismissFromStartToEnd = false,
                     backgroundContent = {
-                        val color = if (dismissState.dismissDirection == SwipeToDismissBoxValue.EndToStart) {
-                            Color.Red.copy(alpha = 0.2f)
-                        } else Color.Transparent
-
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(horizontal = 16.dp, vertical = 8.dp)
-                                .background(color, RoundedCornerShape(12.dp)),
-                            contentAlignment = Alignment.CenterEnd
-                        ) {
-                            Icon(
-                                Icons.Default.Delete,
-                                contentDescription = null,
-                                tint = Color.Red,
-                                modifier = Modifier.padding(end = 16.dp)
-                            )
+                        // Drawn only while a swipe is in progress; at rest the row must show
+                        // nothing behind the card.
+                        if (dismissState.dismissDirection == SwipeToDismissBoxValue.EndToStart) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                                    .background(Color.Red.copy(alpha = 0.2f), RoundedCornerShape(12.dp)),
+                                contentAlignment = Alignment.CenterEnd
+                            ) {
+                                Icon(
+                                    Icons.Default.Delete,
+                                    contentDescription = null,
+                                    tint = Color.Red,
+                                    modifier = Modifier.padding(end = 16.dp)
+                                )
+                            }
                         }
                     }
                 ) {
@@ -216,11 +221,12 @@ fun MainScreen() {
                             val priceDouble = subscriptionPrice.replace(",", ".").toDoubleOrNull() ?: 0.0
                             subscriptionList.add(
                                 Subscription(
-                                    id = (subscriptionList.maxOfOrNull { it.id } ?: 0) + 1,
+                                    id = nextSubscriptionId,
                                     name = subscriptionName,
                                     price = priceDouble
                                 )
                             )
+                            nextSubscriptionId++
                             subscriptionName = ""
                             subscriptionPrice = ""
                             scope.launch { sheetState.hide() }.invokeOnCompletion {
