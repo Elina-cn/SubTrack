@@ -96,8 +96,10 @@ döneceğini söyler — böylece veritabanı yazarken arayüz donmaz."
 - `git add .` yerine ilgili dosyaları açıkça ekle.
 - **Asla** `git push --force`, `git reset --hard`, branch silme yapma — sorulmadıkça.
 - **Branch açma.** Tüm commit'ler `Elina` branch'ine gider.
-- Faz sonu tag'ini (`git tag phase-N-done`) kullanıcı isteyince sen atarsın.
-  Tag eklemek geçmişi değiştirmez; tag **silme/taşıma** yine sorulmadan yapılmaz.
+- Faz sonu tag'ini (`git tag phase-N-done`) **sadece prompt açıkça istediğinde** at.
+  Faz bitti diye kendiliğinden tag atma — fazın gerçekten bittiğini elle test
+  belirler, sen bunu doğrulayamazsın.
+- Tag eklemek geçmişi değiştirmez; tag **silme/taşıma** yine sorulmadan yapılmaz.
 
 ---
 
