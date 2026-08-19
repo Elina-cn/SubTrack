@@ -2,7 +2,7 @@
 
 Fazlar sırayla yapılır. Bir fazın "Bitti" kriterleri sağlanmadan sonrakine
 geçilmez. Tüm çalışma `Elina` branch'inde yapılır; branch açılmaz. Faz bitince
-kullanıcı `git tag phase-N-done` ile işaretler.
+CC, prompt açıkça istediğinde `git tag phase-N-done` atar.
 
 **Durum işaretleri:** ⬜ başlanmadı · 🟡 devam ediyor · ✅ bitti
 
