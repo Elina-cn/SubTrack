@@ -29,7 +29,7 @@ Her faz sonunda **en üste** yeni kayıt eklenir. Eski kayıtlar silinmez.
 
 ## [Faz 0] Acil Düzeltmeler — 2026-08-18
 
-**Durum:** Tamamlandı (elle test sonucu bekleniyor)
+**Durum:** Tamamlandı
 
 **Yapılanlar**
 - `onDismissRequest` dolduruldu — scrim'e dokunma, geri tuşu ve aşağı
@@ -53,6 +53,9 @@ Her faz sonunda **en üste** yeni kayıt eklenir. Eski kayıtlar silinmez.
 - `af011bf` fix: close bottom sheet and preserve state on rotation
 - `998bc4a` docs: add project documentation and working rules
 
+**Tag**
+- `phase-0-done` = `ec4789d`
+
 **Karşılaşılan sorunlar**
 - `@Parcelize` denendi, AGP 9 ile çalışmadı. İki ayrı hata alındı:
   sürüm belirtilince *"plugin is already on the classpath with an unknown
@@ -67,7 +70,8 @@ Her faz sonunda **en üste** yeni kayıt eklenir. Eski kayıtlar silinmez.
   `stripDebugDebugSymbols` görevini çalıştırdığı için ortaya çıktı.
 
 **Elle test sonucu**
-- (doldurulacak)
+- Elle test: 10 adımın hepsi cihazda (OPPO A15s, Android 10) beklendiği
+  gibi çalıştı. Ekran döndürme ve process death dahil, veri kaybı yok.
 
 **Bilinen eksikler**
 - Boş isimle Kaydet'e basınca sessizce başarısız oluyor, sheet açık kalıyor

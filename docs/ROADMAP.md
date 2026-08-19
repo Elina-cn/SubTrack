@@ -8,16 +8,16 @@ kullanıcı `git tag phase-N-done` ile işaretler.
 
 ---
 
-## ⬜ Faz 0 — Acil Düzeltmeler
+## ✅ Faz 0 — Acil Düzeltmeler
 
 Uygulama fiilen kullanılamaz durumdaydı; bu fazda çalışır hale getirildi.
 
-- [ ] `onDismissRequest` boş — bottom sheet kapanmıyor (MainActivity.kt:159)
-- [ ] Kaydet butonu sheet'i kapatmıyor (MainActivity.kt:194)
-- [ ] Kaydetme sonrası form alanları temizlensin
-- [ ] `remember` → `rememberSaveable` (ekran döndürmede veri kaybı) — geçici,
+- [x] `onDismissRequest` boş — bottom sheet kapanmıyor (MainActivity.kt:159)
+- [x] Kaydet butonu sheet'i kapatmıyor (MainActivity.kt:194)
+- [x] Kaydetme sonrası form alanları temizlensin
+- [x] `remember` → `rememberSaveable` (ekran döndürmede veri kaybı) — geçici,
       Faz 5'te Room devralacak
-- [ ] `ANALYSIS_REPORT.md` → `docs/archive/` altına taşınsın
+- [x] `ANALYSIS_REPORT.md` → `docs/archive/` altına taşınsın
 
 > `SubTrack.md` maddesi kaldırıldı: bu dosya hiç repoya eklenmemişti, içeriği
 > gerçeği yansıtmadığı için kullanıcı bilerek dışarıda bıraktı.
