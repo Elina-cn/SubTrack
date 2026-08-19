@@ -95,7 +95,9 @@ döneceğini söyler — böylece veritabanı yazarken arayüz donmaz."
 - İçerik taşımayan commit atma (boş yorum satırı ekle/sil gibi).
 - `git add .` yerine ilgili dosyaları açıkça ekle.
 - **Asla** `git push --force`, `git reset --hard`, branch silme yapma — sorulmadıkça.
-- **Branch açma.** Tüm commit'ler `Elina` branch'ine gider. Faz sonu tag'ini kullanıcı atar, sen atma.
+- **Branch açma.** Tüm commit'ler `Elina` branch'ine gider.
+- Faz sonu tag'ini (`git tag phase-N-done`) kullanıcı isteyince sen atarsın.
+  Tag eklemek geçmişi değiştirmez; tag **silme/taşıma** yine sorulmadan yapılmaz.
 
 ---
 
