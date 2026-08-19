@@ -138,9 +138,21 @@ fun MainScreen() {
                 // The default positional threshold is a flat 56.dp that ignores the card width -
                 // roughly a sixth of a phone screen, so light swipes deleted rows. Require half the
                 // card instead. Found by manual test (e): repeated short swipes each deleted a row.
-                val dismissState = rememberSwipeToDismissBoxState(
-                    positionalThreshold = { totalDistance -> totalDistance * 0.5f }
-                )
+                // The lambda has to keep its identity across recompositions: flingBehavior is built
+                // with remember(density, state, positionalThreshold, animationSpec), so a fresh
+                // lambda each time rebuilds the fling behavior in the middle of a gesture.
+                val positionalThreshold = remember<(Float) -> Float> {
+                    { totalDistance -> totalDistance * 0.5f }
+                }
+
+                // Plain remember, not rememberSwipeToDismissBoxState: that one is rememberSaveable
+                // and its Saver stores currentValue. LazySaveableStateHolder only drops a row's
+                // saved state in performSave, never when the row is removed, so within a session a
+                // dismissed EndToStart value stays behind and can paint the red strip on a row
+                // nobody swiped. A half-finished swipe is not worth surviving rotation anyway.
+                val dismissState = remember {
+                    SwipeToDismissBoxState(SwipeToDismissBoxValue.Settled, positionalThreshold)
+                }
 
                 // Delete on settledValue, not currentValue: currentValue jumps to the nearest anchor
                 // while the finger is still down, which fired this effect mid-gesture. settledValue
