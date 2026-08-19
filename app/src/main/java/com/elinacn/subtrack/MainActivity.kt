@@ -135,15 +135,18 @@ fun MainScreen() {
                 items = subscriptionList,
                 key = { it.id } // Silme işlemlerinde görsel hataları önleyen kritik nokta
             ) { sub ->
-                val dismissState = rememberSwipeToDismissBoxState()
+                // The default positional threshold is a flat 56.dp that ignores the card width -
+                // roughly a sixth of a phone screen, so light swipes deleted rows. Require half the
+                // card instead. Found by manual test (e): repeated short swipes each deleted a row.
+                val dismissState = rememberSwipeToDismissBoxState(
+                    positionalThreshold = { totalDistance -> totalDistance * 0.5f }
+                )
 
-                // Delete once the swipe has settled, never from confirmValueChange: that callback
-                // only answers whether a transition is allowed and can run several times while the
-                // gesture settles. Removing the row there tore it out of composition mid-animation
-                // and left the dismiss state behind. currentValue reaches EndToStart only after the
-                // positional threshold is passed, so a short swipe springs back untouched.
-                LaunchedEffect(dismissState.currentValue) {
-                    if (dismissState.currentValue == SwipeToDismissBoxValue.EndToStart) {
+                // Delete on settledValue, not currentValue: currentValue jumps to the nearest anchor
+                // while the finger is still down, which fired this effect mid-gesture. settledValue
+                // only changes once the swipe has come to rest on an anchor.
+                LaunchedEffect(dismissState.settledValue) {
+                    if (dismissState.settledValue == SwipeToDismissBoxValue.EndToStart) {
                         subscriptionList.remove(sub)
                     }
                 }
