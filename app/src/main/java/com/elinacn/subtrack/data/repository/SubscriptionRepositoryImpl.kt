@@ -7,6 +7,7 @@ import com.elinacn.subtrack.domain.model.Subscription
 import com.elinacn.subtrack.domain.repository.SubscriptionRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import javax.inject.Inject
 
 /**
  * Room-backed implementation.
@@ -17,7 +18,7 @@ import kotlinx.coroutines.flow.map
  * No withContext anywhere - Room already runs suspend queries and Flow queries off the main
  * thread, so adding a dispatcher would only move work twice (ARCHITECTURE section 8).
  */
-class SubscriptionRepositoryImpl(
+class SubscriptionRepositoryImpl @Inject constructor(
     private val dao: SubscriptionDao
 ) : SubscriptionRepository {
 
