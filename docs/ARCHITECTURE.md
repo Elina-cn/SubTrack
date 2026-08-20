@@ -285,6 +285,33 @@ sıfırlanıyor (`onDragStarted`), böylece birikme yapısal olarak imkânsız.
 oy kullanmıyor. (`computeTarget`'ın üç dalından ikisi `positionalThreshold`'u
 hiç okumuyordu; hızlı fiskenin silmesinin sebebi buydu.)
 
+### Mimari karar: şema dışa aktarılır
+
+`SubTrackDatabase` `exportSchema = true` ile tanımlıdır. Room her sürüm için
+`app/schemas/` altına bir JSON yazar ve **bu dosyalar commit'e dahildir.**
+
+**Gerekçe:** Migration doğrulaması bu JSON'a dayanır. Kapalı olsaydı Room,
+entity ilerledikten sonra önceki sürümün nasıl göründüğünü bilemez ve yazılan
+migration'ın doğru olduğunu denetleyemezdi. Faz 7'deki DAO enstrümantasyon
+testlerinin de referansı bu dosya olacak. Bedeli sürüm başına tek bir JSON.
+
+Şema konumu `app/build.gradle.kts` içinde KSP argümanıyla verilir
+(`room.schemaLocation`). Room Gradle plugin'i kullanılmadı — AGP 9 ile yaşanan
+plugin sürüm çakışmalarından sonra bir eklenti daha eklemek yerine, mevcut KSP
+argümanı tercih edildi.
+
+### Mimari karar: enum dönüşümü fallback ile yapılır
+
+`SubscriptionMapper`, veritabanındaki metni enum'a çevirirken **`enumValueOf`
+kullanmaz.** O fonksiyon tanımadığı bir isimde exception fırlatır; elle
+düzenlenmiş ya da daha yeni bir uygulama sürümünün yazdığı tek bir bozuk satır,
+tüm listenin okunmasını çökertirdi.
+
+Bunun yerine isim eşleştirilir ve eşleşme yoksa varsayılana düşülür
+(`BillingPeriod.MONTHLY`, `SubscriptionCategory.OTHER`). Bu, §9'un yasakladığı
+sessiz `try/catch` değildir: davranış kodda açıkça yazılıdır ve kaybedilen şey
+yalnızca o tek alandır, satırın tamamı değil.
+
 ### Mimari karar: mavi iki role bölünmüştür
 
 | Rol | Renk | Kullanım |

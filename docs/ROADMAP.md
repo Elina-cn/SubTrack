@@ -71,17 +71,18 @@ ekran döndürmede liste duruyor.
 
 ---
 
-## ⬜ Faz 2 — Domain + Room Şeması
+## ✅ Faz 2 — Domain + Room Şeması
 
-- [ ] `domain/model/`: `Subscription`, `Money`, `BillingPeriod`,
-      `SubscriptionCategory`
-- [ ] `data/local/entity/SubscriptionEntity` — v1.5'e kadar tüm alanlar dahil:
+- [x] `domain/model/`: `Subscription`, `Money`, `BillingPeriod`,
+      `SubscriptionCategory` — katmanda tek bir `import` yok, saf Kotlin
+- [x] `data/local/entity/SubscriptionEntity` — v1.5'e kadar tüm alanlar dahil:
       `id`, `name`, `priceInCents`, `currencyCode`, `billingPeriod`,
       `nextPaymentDate`, `category`, `iconKey`, `createdAt`
-- [ ] `SubscriptionDao`: `observeAll(): Flow<List<...>>`, `insert`, `deleteById`,
+- [x] `SubscriptionDao`: `observeAll(): Flow<List<...>>`, `insert`, `deleteById`,
       `getById`, `update`
-- [ ] `SubTrackDatabase` (`@Database`, version 1)
-- [ ] `SubscriptionMapper` — Entity ↔ Domain
+- [x] `SubTrackDatabase` (`@Database`, version 1, `exportSchema = true`)
+- [x] `SubscriptionMapper` — Entity ↔ Domain
+- [x] Room 2.8.4 katalogda yoktu, eklendi; `room-compiler` `ksp()` ile bağlandı
 
 **Bitti:** Room derleniyor, KSP kod üretiyor, henüz UI'a bağlı değil.
 

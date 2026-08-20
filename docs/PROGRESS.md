@@ -27,6 +27,92 @@ Her faz sonunda **en üste** yeni kayıt eklenir. Eski kayıtlar silinmez.
 
 ---
 
+## [Faz 2] Domain Modelleri + Room Şeması — 2026-08-20
+
+**Durum:** Tamamlandı
+
+**Yapılanlar**
+- **Domain katmanı kuruldu.** `Money` (value class, `Long` kuruş), `BillingPeriod`,
+  `SubscriptionCategory`, `Subscription`. Katmanda **tek bir `import` satırı
+  yok** — `android.*` sızması yapısal olarak imkânsız, taramayla doğrulandı.
+  `Money` içinde `plus`, `minus`, `times`, `compareTo` ve `ZERO`; `Double`/`Float`
+  hiçbir yerde geçmiyor.
+- **`SubscriptionEntity` dokuz alanla oluşturuldu:** `id`, `name`, `priceInCents`,
+  `currencyCode`, `billingPeriod`, `nextPaymentDate`, `category`, `iconKey`,
+  `createdAt`. v1.5'e kadarki tüm alanlar baştan dahil (PROJECT_SPEC §4 şema
+  notu), böylece sonraki sürümler migration gerektirmeyecek. Entity yalnızca
+  ilkel tiplerden oluşuyor — enum'lar isimle, para kuruş cinsinden — bu yüzden
+  type converter gerekmedi.
+- **`SubscriptionDao`:** `observeAll(): Flow<List<SubscriptionEntity>>` (suspend
+  değil, akış), `getById`, `insert`, `update`, `deleteById` (hepsi `suspend`).
+  ARCHITECTURE §8'e uygun: Room ikisini de kendi arka planına alıyor.
+- **`SubTrackDatabase`** version 1, `exportSchema = true`. Instance kurulmadı —
+  Faz 3 elle, Faz 4 Hilt ile kuracak.
+- **`SubscriptionMapper`:** saf fonksiyonlar, Entity ↔ Domain. Bağımlılığı yok,
+  doğrudan test edilebilir.
+- **Room 2.8.4 katalogda yoktu, eklendi.** `room-runtime`, `room-ktx` ve
+  `room-compiler`. Derleyici **`ksp()`** ile bağlandı, kapt kullanılmadı.
+
+**Doğrulamalar**
+- **KSP artık gerçekten çalışıyor.** Faz 1a'da `kspDebugKotlin SKIPPED` idi;
+  şimdi görev koşuyor ve iki dosya üretiyor: `SubscriptionDao_Impl.kt`,
+  `SubTrackDatabase_Impl.kt`. Üretilen DAO'da `observeAll`,
+  `createFlow(__db, false, arrayOf("subscriptions"))` kullanıyor — tabloyu
+  dinleyip değişince yeniden yayınlıyor.
+- **Şema JSON'u okundu ve doğrulandı**
+  (`app/schemas/com.elinacn.subtrack.data.local.SubTrackDatabase/1.json`):
+  dokuz alanın hepsi yerinde, nullable'lık Kotlin tipleriyle birebir örtüşüyor
+  (yalnızca `nextPaymentDate` ve `iconKey` `NOT NULL` almamış), ve
+  **`AUTOINCREMENT` üretilmiş.** Bu son madde Faz 1'deki *"Room gelince id
+  geri dönüşümü kendiliğinden çözülür"* öngörüsünü kanıtlıyor — SQLite
+  AUTOINCREMENT silinen id'leri asla yeniden kullanmaz, dolayısıyla
+  `MainActivity`'deki monoton sayaç Faz 5'te gereksiz kalacak.
+- Domain katmanında `android`/`androidx` import taraması: **temiz.**
+
+**Değişen dosyalar**
+- `app/src/main/java/com/elinacn/subtrack/domain/model/` — `Money.kt`,
+  `BillingPeriod.kt`, `SubscriptionCategory.kt`, `Subscription.kt` (yeni)
+- `app/src/main/java/com/elinacn/subtrack/data/local/entity/SubscriptionEntity.kt` (yeni)
+- `app/src/main/java/com/elinacn/subtrack/data/local/dao/SubscriptionDao.kt` (yeni)
+- `app/src/main/java/com/elinacn/subtrack/data/local/SubTrackDatabase.kt` (yeni)
+- `app/src/main/java/com/elinacn/subtrack/data/mapper/SubscriptionMapper.kt` (yeni)
+- `app/schemas/.../1.json` — Room'un ürettiği şema, commit'e dahil
+- `gradle/libs.versions.toml`, `app/build.gradle.kts` — Room 2.8.4 ve
+  `room.schemaLocation` KSP argümanı
+
+**Commit'ler**
+- `72a9e78` feat: add domain models
+- `f29a512` feat: add Room entity and dao
+- `fd26d43` feat: add database and mapper
+
+**Tag**
+- `phase-2-done`
+
+**Karşılaşılan sorunlar**
+- Kayda değer bir sorun çıkmadı. Faz 1a'da kurulan KSP altyapısı ilk denemede
+  çalıştı.
+
+**Alınan kararlar**
+- **`enumValueOf` kullanılmadı.** Tanımadığı bir isimde exception fırlatıyor;
+  elle düzenlenmiş veya daha yeni bir sürümün yazdığı tek bir bozuk satır tüm
+  listeyi çökertirdi. İsim eşleştirilip varsayılana düşülüyor — sessiz
+  `try/catch` değil, açık bir fallback (ARCHITECTURE §9).
+- **`exportSchema = true`.** Kapalı olsaydı Room, entity ilerledikten sonra
+  sürüm 1'in nasıl göründüğünü bilemez ve migration'ı doğrulayamazdı.
+
+**Elle test sonucu**
+- Bu fazda elle test yok: kod hiçbir ekrana bağlı değil, uygulamanın davranışı
+  değişmedi. Doğrulama KSP çıktısı, domain saflık taraması ve şema JSON'u
+  üzerinden yapıldı.
+
+**Sonraki faz için not**
+- Faz 3: `SubscriptionRepository` arayüzü domain'e, gerçeklemesi data'ya.
+  Nesneler `SubTrackApplication` içinde elle kurulacak.
+- `SubscriptionMapper` saf fonksiyonlardan oluşuyor ve testi yok; Faz 7'de
+  yazılacak, ama bağımlılığı olmadığı için daha erken de alınabilir.
+
+---
+
 ## [Faz 1b + 1c] Tema, Metinler ve Kontrast — 2026-08-20
 
 **Durum:** Tamamlandı
