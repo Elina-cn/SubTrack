@@ -5,6 +5,7 @@ import androidx.room.Room
 import com.elinacn.subtrack.data.local.SubTrackDatabase
 import com.elinacn.subtrack.data.repository.SubscriptionRepositoryImpl
 import com.elinacn.subtrack.domain.repository.SubscriptionRepository
+import dagger.hilt.android.HiltAndroidApp
 
 /**
  * Builds the object graph by hand.
@@ -15,6 +16,7 @@ import com.elinacn.subtrack.domain.repository.SubscriptionRepository
  * Phase 4 replaces this class body with Hilt. Keeping it manual first is deliberate: the wiring
  * below is what @Module and @Provides will be doing, and doing it by hand once makes it visible.
  */
+@HiltAndroidApp
 class SubTrackApplication : Application() {
 
     private val database: SubTrackDatabase by lazy {
