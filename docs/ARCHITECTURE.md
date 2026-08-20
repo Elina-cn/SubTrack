@@ -285,6 +285,28 @@ sıfırlanıyor (`onDragStarted`), böylece birikme yapısal olarak imkânsız.
 oy kullanmıyor. (`computeTarget`'ın üç dalından ikisi `positionalThreshold`'u
 hiç okumuyordu; hızlı fiskenin silmesinin sebebi buydu.)
 
+### Mimari karar: mavi iki role bölünmüştür
+
+| Rol | Renk | Kullanım |
+|---|---|---|
+| `primary` | `DeepBlue` #46707F | Metin ve ikon aksanı: abonelik fiyatı, kart ikonu |
+| `primaryContainer` | `PastelBlue` #AEC6CF | Dolu yüzeyler: dashboard kartı, FAB, Kaydet butonu |
+| `onPrimaryContainer` | `DarkText` #2D3436 | O yüzeylerin üstündeki yazı ve ikon |
+
+**Bu ayrım kasıtlıdır.** `PastelBlue` dolu bir yüzey olarak güzel çalışıyor
+(üstünde `DarkText` ile 7.11:1), ama *metin rengi* olarak beyaz kart üzerinde
+yalnızca **1.78:1** veriyordu — fiyatlar silik görünüyordu. Tek bir maviyi
+koyulaştırmak dashboard kartını ve FAB'ı da değiştirirdi; ikiye bölmek pastel
+kimliği yüzeylerde korurken metnin WCAG AA eşiğini geçmesini sağlıyor.
+
+**Yeni renk eklenirken bu ayrıma uyulmalı:** metin/ikon olarak kullanılacak bir
+renk `primary` ailesinden ve kontrast hesabı yapılmış olmalı; dolu bir yüzey
+gerekiyorsa `*Container` rolleri kullanılmalı. Bir rengi hem zemin hem metin
+olarak kullanmak bu paletle çalışmıyor.
+
+Koyu şemada `primary` `PastelBlue` olarak kalır — koyu yüzey üstünde zaten
+7.11:1 veriyor, koyulaştırmaya gerek yok.
+
 **Sürükleme `Animatable` ile değil düz `mutableFloatStateOf` ile yapılır.**
 `Animatable`, `snapTo` ve `animateTo` çağrılarını tek mutex ile koruyor;
 sürükleme deltaları kuyruğa girdiğinde bekleyen bir `snapTo`, yerleşme

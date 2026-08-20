@@ -27,6 +27,110 @@ Her faz sonunda **en üste** yeni kayıt eklenir. Eski kayıtlar silinmez.
 
 ---
 
+## [Faz 1b + 1c] Tema, Metinler ve Kontrast — 2026-08-20
+
+**Durum:** Tamamlandı
+
+**Yapılanlar — Faz 1b (yedi commit)**
+- **Kotlin sürüm tutarsızlığı giderildi.** `libs.versions.toml` 2.0.21 diyordu,
+  AGP 9 gerçekte 2.2.10 kullanıyordu; Compose compiler plugin'i eklendiği
+  derleyiciden bir minör sürüm geride kalıyordu. Alias gerçek sürüme
+  çevrildi, **sorunsuz geçti** (riskli madde olarak işaretlenmişti).
+- **`Theme.kt` devreye alındı.** Tüm hardcoded renkler
+  `MaterialTheme.colorScheme` üzerinden okunuyor; tanımlı olduğu halde UI'a
+  hiç ulaşmayan koyu şema nihayet uygulanıyor.
+- **`Type.kt` bağlandı.** `MaterialTheme(typography = Typography)` geçildi —
+  dosya proje şablonundan beri ölü koddu. Kullanılan stiller tanımlandı:
+  `headlineMedium`, `titleLarge`, `titleMedium`, `bodyLarge`.
+- **`Dimens.kt` oluşturuldu.** `MainActivity`'deki her `dp` sabiti anlamlı
+  isimli bir alana taşındı (`ListBottomSpacing`, `SectionTitleStart`,
+  `DashboardCorner` vb.).
+- **Tüm kullanıcı metinleri `strings.xml`'e taşındı**, `values-en` karşılıkları
+  girildi. Faz 1a'dan kalan `CustomAccessibilityAction("Sil")` borcu kapandı.
+- **Kod içi Türkçe yorumlar İngilizceye çevrildi** (CLAUDE.md §2). Veri modeli
+  yorumu ayrıca gerçeğe uyduruldu: `Double`'ın "hesaplamalar için kritik"
+  olduğunu söylüyordu, tam tersi doğru.
+- **`.gitignore` tamamlandı.** `local.properties` iki kez yazılıydı, tekilleşti;
+  `.kotlin/`, `*.apk`, `*.aab`, `*.jks`, `*.keystore` eklendi.
+- **Ölü kaynak temizliği.** `colors.xml` tamamen silindi — 7 şablon rengi, kodda
+  ve XML'de **sıfır** referans. `welcome_message` string'i de hiç
+  gösterilmiyordu, iki dilden kaldırıldı.
+- **Koyu temaya `DarkBackground` (#1C2022) eklendi.** Eski şemada `background`
+  ve `surface` ikisi de `DarkText`'ti; kartlar arka planla aynı renk olurdu,
+  yani koyu tema fiilen kullanılamazdı.
+
+**Yapılanlar — Faz 1c (tek commit)**
+- Faz 1b elle testinde iki sorun çıktı: **fiyatlar silik görünüyordu** ve
+  **kartlar arka plandan yeterince ayrışmıyordu.** Ölçüldü: fiyat metni
+  (PastelBlue / beyaz) **1.78:1**, kart↔arka plan **1.05:1**.
+- **Çözüm: palet değiştirilmedi, mavi iki role bölündü.**
+  `primary` artık `DeepBlue` (#46707F) — metin ve ikon aksanı, beyaz üzerinde
+  **5.41:1**. `primaryContainer` eski `PastelBlue` (#AEC6CF) olarak kaldı;
+  dashboard kartı, FAB ve Kaydet butonu **birebir aynı** görünüyor.
+- `background`: `PastelGray` → `SoftBlueGray` (#D5DEE2). Kart ayrışması
+  **1.05:1 → 1.37:1**.
+- Dashboard etiketindeki `0.7f` alfa kaldırıldı; kontrastı **3.64:1**'e
+  düşürüyordu. Hiyerarşiyi 16sp normal ↔ 32sp ExtraBold farkı zaten taşıyor.
+- Koyu şemaya `primaryContainer` / `onPrimaryContainer` rolleri eklendi,
+  değerleri eskiden `primary` / `onPrimary` üzerinden kullandığıyla aynı —
+  yani koyu tema **görsel olarak değişmedi**, sadece Material varsayılanlarına
+  düşmesi engellendi.
+- **`PastelBlue`, `PastelMint`, `PastelGray`, `DarkText` değerleri değişmedi.**
+  Pastel kimlik korundu; `DeepBlue` de aynı hue ailesinin (~197°) koyu ucu.
+- Açık ve koyu temada **tüm metin/zemin çiftleri WCAG AA eşiğini geçiyor.**
+
+**Değişen dosyalar**
+- `gradle/libs.versions.toml` — Kotlin 2.0.21 → 2.2.10
+- `app/src/main/java/com/elinacn/subtrack/ui/theme/Color.kt` — `DarkBackground`,
+  `DeepBlue`, `SoftBlueGray`
+- `app/src/main/java/com/elinacn/subtrack/ui/theme/Theme.kt` — eksiksiz `on*`
+  rolleri, container rolleri, typography bağlandı
+- `app/src/main/java/com/elinacn/subtrack/ui/theme/Type.kt` — kullanılan stiller
+- `app/src/main/java/com/elinacn/subtrack/ui/theme/Dimens.kt` — yeni
+- `app/src/main/java/com/elinacn/subtrack/MainActivity.kt` — renk/tipografi/ölçü
+  kaynakları, `stringResource`, İngilizce yorumlar
+- `app/src/main/res/values/strings.xml`, `values-en/strings.xml` — yeni metinler
+- `app/src/main/res/values/colors.xml` — silindi
+- `.gitignore` — tamamlandı
+
+**Commit'ler**
+- `e273587` build: align Kotlin and Compose compiler versions
+- `2b91379` refactor: use MaterialTheme colors and typography
+- `37c1187` refactor: extract dimensions to Dimens
+- `a585cd5` feat: move user-facing strings to resources
+- `09e328f` refactor: translate code comments to English
+- `41f89af` chore: complete gitignore
+- `0db78df` chore: remove dead resources
+- `d70dbdc` refactor: improve light theme contrast
+
+**Tag**
+- `phase-1-done`
+
+**Elle test sonucu**
+- Açık temada fiyatlar net okunuyor, kartlar arka plandan ayrışıyor.
+- Koyu tema değişmemiş (regresyon yok).
+- İngilizce dil doğru çalışıyor.
+- Kaydırarak silme, ekleme ve toplam hesabı regresyonsuz.
+- **Doğrulanamayan:** TalkBack yerel eylemler menüsü ColorOS'ta açılamadığı
+  için "Delete" etiketi cihazda görülemedi. Kaynak (`values-en/strings.xml`)
+  ve kod (`stringResource(R.string.delete)`) tarafı doğru.
+
+**İki bulgu — uygulama hatası değil**
+- TalkBack'in silme için "Sil" demesi **Gboard'un backspace tuşundan** geliyor,
+  bizim custom action'ımızdan değil. Klavye ayrı bir uygulama ve kendi dil
+  ayarını kullanıyor.
+- Fiyat girerken sayıların karışık dilde okunması TTS'in otomatik dil
+  algılaması. Muhtemel katkı: fiyatı `Locale.US` ile biçimlendiriyoruz
+  (`159.99`), Türkçe locale virgül bekliyor. Faz 9'a madde olarak eklendi.
+
+**Sonraki faz için not**
+- Faz 2: domain modelleri ve Room şeması. `Money` value class'ı `Double`'ı
+  devralacak.
+- Yeni renk eklenirken `primary` (metin aksanı) ↔ `primaryContainer` (dolu
+  yüzey) ayrımına uyulmalı; gerekçesi ARCHITECTURE §12'de.
+
+---
+
 ## [Faz 1a] Build Altyapısı + Kaydırarak Silme Yeniden Yazımı — 2026-08-20
 
 **Durum:** Tamamlandı

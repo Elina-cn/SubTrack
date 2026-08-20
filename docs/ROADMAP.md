@@ -27,9 +27,10 @@ ekran döndürmede liste duruyor.
 
 ---
 
-## ⬜ Faz 1 — Altyapı Temizliği
+## ✅ Faz 1 — Altyapı Temizliği
 
-Faz 1 iki promptta yürütüldü: **1a build altyapısı (bitti)**, **1b tema ve metinler.**
+Üç promptta yürütüldü: **1a build altyapısı**, **1b tema ve metinler**,
+**1c kontrast düzeltmeleri.**
 
 - [x] `gradle/libs.versions.toml` (version catalog) kurulumu/doğrulaması
 - [x] Compose BOM ↔ `activity-compose` ↔ `lifecycle` sürüm çakışması
@@ -44,20 +45,26 @@ Faz 1 iki promptta yürütüldü: **1a build altyapısı (bitti)**, **1b tema ve
       `2.2.10-2.0.2`. Ayrıca `gradle.properties`'e
       `android.disallowKotlinSourceSets=false` eklendi (geçici, bkz.
       ARCHITECTURE §12).
-- [ ] Kod içi Türkçe yorumlar İngilizceye çevrilsin (CLAUDE.md §2)
-- [ ] Kotlin sürüm tutarsızlığı: `libs.versions.toml` 2.0.21 diyor ama
-      AGP 9 gerçekte 2.2.10 kullanıyor, hizalansın
-- [ ] `Theme.kt` gerçekten devreye alınsın: hardcoded renkler →
-      `MaterialTheme.colorScheme`
-- [ ] `Type.kt` `MaterialTheme(typography = ...)` ile bağlansın
-- [ ] `Dimens.kt` oluşturulsun, hardcoded `dp` değerleri oradan gelsin
-- [ ] Tüm kullanıcı metinleri `strings.xml`'e taşınsın + `values-en/`
-- [ ] `SwipeToDeleteRow`'daki "Sil" metni `strings.xml`'e taşınsın
-- [ ] Kullanılmayan import/kod temizliği
+- [x] Kod içi Türkçe yorumlar İngilizceye çevrildi (CLAUDE.md §2)
+- [x] Kotlin sürüm tutarsızlığı giderildi: `libs.versions.toml` 2.0.21 →
+      2.2.10, AGP 9'un gerçekten kullandığı derleyiciyle hizalandı
+- [x] `Theme.kt` devreye alındı: hardcoded renkler →
+      `MaterialTheme.colorScheme`. Koyu temaya `DarkBackground` eklendi,
+      eskiden `background` ve `surface` aynı renkti.
+- [x] `Type.kt` `MaterialTheme(typography = ...)` ile bağlandı
+- [x] `Dimens.kt` oluşturuldu, hardcoded `dp` değerleri oradan geliyor
+- [x] Tüm kullanıcı metinleri `strings.xml`'e taşındı + `values-en/`
+- [x] `SwipeToDeleteRow`'daki "Sil" metni `strings.xml`'e taşındı
+- [x] Kullanılmayan import/kod temizliği — `colors.xml` tamamen silindi
+      (sıfır referans), `welcome_message` kaldırıldı
 - [x] `.gitignore`: `.idea/` altındaki makineye özel dosyalar
       (`emulatorDisplays.xml` vb.) hariç tutuldu
-- [ ] `.gitignore` tamamlansın: `local.properties` iki kez yazılı,
-      `.kotlin/`, `*.apk`, `*.jks` eklensin
+- [x] `.gitignore` tamamlandı: `local.properties` tekilleşti, `.kotlin/`,
+      `*.apk`, `*.aab`, `*.jks`, `*.keystore` eklendi
+- [x] **1c:** açık tema kontrastı düzeltildi. `primary` → `DeepBlue`
+      (metin aksanı, 1.78:1 → 5.41:1), `primaryContainer` → `PastelBlue`
+      (dolu yüzeyler, görünüm aynı), `background` → `SoftBlueGray`
+      (kart ayrışması 1.05:1 → 1.37:1). Tüm çiftler WCAG AA geçiyor.
 
 **Bitti:** Sıfır hardcoded metin, sıfır hardcoded renk. Koyu tema fiilen
 çalışıyor. Temiz derleme, sıfır uyarı.
@@ -161,6 +168,8 @@ geri alınabiliyor.
 
 - [ ] Ekleme formuna para birimi seçici (TRY, USD, EUR, GBP)
 - [ ] Locale'e göre para formatlama
+- [ ] Fiyat biçimlendirmesi `Locale.US`'tan cihaz locale'ine geçsin
+      (Türkçede virgül). TalkBack'in karışık dil okumasına da katkısı olabilir.
 - [ ] Sabit kur tablosu ile toplam normalizasyonu
 - [ ] Ana para birimi tercihi (DataStore)
 
@@ -205,6 +214,7 @@ geri alınabiliyor.
 
 - [ ] Dynamic color (Material You, Android 12+)
 - [ ] Manuel tema tercihi (sistem/açık/koyu)
+- [ ] Koyu temada kart ↔ arka plan ayrımı 1.29:1, gözden geçirilsin
 
 ---
 
