@@ -88,11 +88,13 @@ ekran döndürmede liste duruyor.
 
 ---
 
-## ⬜ Faz 3 — Repository Katmanı (manuel DI)
+## ✅ Faz 3 — Repository Katmanı (manuel DI)
 
-- [ ] `domain/repository/SubscriptionRepository` arayüzü
-- [ ] `data/repository/SubscriptionRepositoryImpl`
-- [ ] Nesneler `SubTrackApplication` içinde elle kurulsun
+- [x] `domain/repository/SubscriptionRepository` arayüzü
+- [x] `data/repository/SubscriptionRepositoryImpl` — entity sınırı burada
+      kapanıyor, `data/` dışında hiç bahsi yok
+- [x] Nesneler `SubTrackApplication` içinde elle kuruldu (`by lazy`),
+      manifest'e `android:name` ile kaydedildi
 
 **Bitti:** Repository çalışıyor. Manuel DI'ın ne kadar hantal olduğu görülmüş
 durumda — Hilt'in gerekçesi anlaşıldı.
@@ -133,6 +135,9 @@ durumda — Hilt'in gerekçesi anlaşıldı.
       `SwipeToDeleteRow` yazıldı. Kalan iş: `onDelete` callback'ini
       `HomeEvent.Delete`'e bağlamak ve undo eklemek.
 - [ ] Silme sonrası Snackbar ile geri al (undo)
+- [ ] Repository hata yönetimi karara bağlansın: `Result<T>`, `DataError`
+      tipi, veya exception + ViewModel'da yakalama. ARCHITECTURE §9
+      güncellensin. (Faz 3'ten ertelendi.)
 
 **Bitti:** Ekleme/silme kalıcı, hatalı girdi engelleniyor, yanlış silme
 geri alınabiliyor.

@@ -27,6 +27,99 @@ Her faz sonunda **en üste** yeni kayıt eklenir. Eski kayıtlar silinmez.
 
 ---
 
+## [Faz 3] Repository Katmanı (manuel DI) — 2026-08-20
+
+**Durum:** Tamamlandı
+
+**Yapılanlar**
+- **`SubscriptionRepository` arayüzü domain'e**, `SubscriptionRepositoryImpl`
+  gerçeklemesi data'ya eklendi. DAO'dan gelen `Flow<List<SubscriptionEntity>>`,
+  `Flow.map` ile mapper'dan geçirilip `Flow<List<Subscription>>` olarak yukarı
+  veriliyor. Akış bozulmuyor: tabloda bir değişiklik olduğunda liste
+  kendiliğinden yeniden yayınlanıyor.
+- **`SubTrackApplication` oluşturuldu.** Veritabanı ve repository `by lazy` ile
+  elle kuruluyor, `AndroidManifest.xml`'e `android:name` ile kaydedildi.
+- Hilt kullanılmadı; `@Inject`/`@Module`/`@Provides` yok. Bu kasıtlı — Faz 4'ün
+  neyi çözdüğünü görebilmek için kurulum önce elle yapıldı.
+- `withContext` eklenmedi: Room hem `suspend` hem `Flow` sorgularını zaten kendi
+  arka planına alıyor (ARCHITECTURE §8).
+
+**Doğrulamalar**
+- **Domain katmanında `android`/`androidx` import'u yok.** Yeni eklenen tek
+  dosyada iki import var, ikisi de meşru: `domain.model.Subscription` ve
+  `kotlinx.coroutines.flow.Flow`.
+- **Sınır kapalı.** `SubscriptionEntity`, `domain/` altında **sıfır** kez
+  geçiyor; `data/` dışında hiçbir dosyada bahsi yok. Entity gerçekten
+  `SubscriptionRepositoryImpl`'de duruyor.
+- **Veritabanı dosyası bu fazda oluşmuyor.** `by lazy` sayesinde kimse
+  repository'yi istemediği sürece Room hiç açılmıyor. Kasıtlı — şimdi açmak boş
+  bir dosya yaratmaktan başka işe yaramazdı. Faz 5'te UI'a bağlanınca oluşacak.
+
+**Değişen dosyalar**
+- `app/src/main/java/com/elinacn/subtrack/domain/repository/SubscriptionRepository.kt` (yeni)
+- `app/src/main/java/com/elinacn/subtrack/data/repository/SubscriptionRepositoryImpl.kt` (yeni)
+- `app/src/main/java/com/elinacn/subtrack/SubTrackApplication.kt` (yeni)
+- `app/src/main/AndroidManifest.xml` — `android:name=".SubTrackApplication"`
+
+**Commit'ler**
+- `16063f0` feat: add subscription repository interface and implementation
+- `5c7c5fa` feat: wire dependencies manually in application class
+
+**Tag**
+- `phase-3-done`
+
+**Elle test sonucu**
+- Uygulama açılıyor, çökme yok (`Application` sınıfı eklenmesi açılış yolunu
+  değiştirdiği için asıl risk buydu).
+- UI değişmemiş; ekleme, silme, toplam hesabı ve ekran döndürme regresyonsuz.
+- Kapat–aç sonrası liste Netflix/Spotify'a dönüyor — **beklenen davranış**,
+  kalıcılık Faz 5'te geliyor.
+
+### Manuel DI'ın hantal noktaları — Faz 4'ün gerekçesi
+
+İki nesne için mevcut hali masum görünüyor; sorun bundan sonrasında başlıyor.
+
+1. **Erişim cast gerektiriyor.**
+   `(context.applicationContext as SubTrackApplication).subscriptionRepository`
+   Bu cast derleme zamanında doğrulanmıyor. Manifest'teki `android:name` satırı
+   silinse kod hâlâ derlenir, uygulama **çalışma zamanında**
+   `ClassCastException` ile çöker. Hilt'te böyle bir cast yok; bağımlılık
+   derleme zamanında doğrulanır.
+2. **ViewModel'a bağımlılık geçirmek elle `ViewModelProvider.Factory` yazmayı
+   gerektiriyor** — her ViewModel için ayrı, her yeni bağımlılıkta güncellenen
+   ~15 satır boilerplate. Faz 5'te `HomeViewModel(repository)` yazarken
+   doğrudan karşımıza çıkacak.
+3. **Graf büyüdükçe kurulum sırası elle yönetiliyor.** Zincir şu an iki halkalı
+   (`database → dao → repository`). DataStore (Faz 9) ve WorkManager (Faz 10)
+   eklendikçe `SubTrackApplication` şişecek, `by lazy` zincirleri elle takip
+   edilecek.
+4. **Testte sahte repository koymak üretim kodunu değiştirmeyi gerektiriyor.**
+   Hilt'te `@TestInstallIn` ile modül değiştirilir, üretim kodu ellenmez.
+   Faz 7'de fake'lerle test yazarken bedeli görülecek.
+
+**Özet:** Faz 4'ün kazancı "daha az kod" değil; **cast'in ve fabrika
+boilerplate'inin kalkması, grafın derleme zamanında doğrulanması.** 1. ve 2.
+maddeler Faz 5'e başlar başlamaz somut olarak canımızı yakacak.
+
+### Açık karar — ARCHITECTURE §9 sapması
+
+Repository imzaları `Result<T>` döndürmüyor; ARCHITECTURE §9 ise *"Repository,
+`Result<T>` döndürür ya da özel bir `DataError` tipi kullanır"* diyor.
+
+**Şu an bir ihlal doğurmuyor:** Room hata durumunda exception fırlatıyor, bu da
+`viewModelScope` içinde yakalanıp `UiState.errorMessage`'a çevrilebilir — §9'un
+asıl yasakladığı *sessiz* `try/catch` bu değil. Ama §9'un lafzına da uymuyor.
+
+**Karar Faz 6'ya ertelendi** (girdi doğrulama fazı), çünkü hata yönetiminin
+somut ihtiyacı orada ortaya çıkacak; şimdi soyut karar vermek erken olurdu.
+ROADMAP Faz 6'ya madde olarak eklendi.
+
+**Sonraki faz için not**
+- Faz 4: Hilt. `SubTrackApplication`'ın gövdesi `@Module`/`@Provides`'a taşınacak,
+  cast kalkacak.
+
+---
+
 ## [Faz 2] Domain Modelleri + Room Şeması — 2026-08-20
 
 **Durum:** Tamamlandı
