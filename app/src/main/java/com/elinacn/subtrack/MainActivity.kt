@@ -30,6 +30,19 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.animation.core.Animatable
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.LayoutDirection
+import kotlin.math.abs
+import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 import java.util.Locale
 import com.elinacn.subtrack.ui.theme.*
@@ -135,58 +148,7 @@ fun MainScreen() {
                 items = subscriptionList,
                 key = { it.id } // Silme işlemlerinde görsel hataları önleyen kritik nokta
             ) { sub ->
-                // The default positional threshold is a flat 56.dp that ignores the card width -
-                // roughly a sixth of a phone screen, so light swipes deleted rows. Require half the
-                // card instead. Found by manual test (e): repeated short swipes each deleted a row.
-                // The lambda has to keep its identity across recompositions: flingBehavior is built
-                // with remember(density, state, positionalThreshold, animationSpec), so a fresh
-                // lambda each time rebuilds the fling behavior in the middle of a gesture.
-                val positionalThreshold = remember<(Float) -> Float> {
-                    { totalDistance -> totalDistance * 0.5f }
-                }
-
-                // Plain remember, not rememberSwipeToDismissBoxState: that one is rememberSaveable
-                // and its Saver stores currentValue. LazySaveableStateHolder only drops a row's
-                // saved state in performSave, never when the row is removed, so within a session a
-                // dismissed EndToStart value stays behind and can paint the red strip on a row
-                // nobody swiped. A half-finished swipe is not worth surviving rotation anyway.
-                val dismissState = remember {
-                    SwipeToDismissBoxState(SwipeToDismissBoxValue.Settled, positionalThreshold)
-                }
-
-                // Delete on settledValue, not currentValue: currentValue jumps to the nearest anchor
-                // while the finger is still down, which fired this effect mid-gesture. settledValue
-                // only changes once the swipe has come to rest on an anchor.
-                LaunchedEffect(dismissState.settledValue) {
-                    if (dismissState.settledValue == SwipeToDismissBoxValue.EndToStart) {
-                        subscriptionList.remove(sub)
-                    }
-                }
-
-                SwipeToDismissBox(
-                    state = dismissState,
-                    enableDismissFromStartToEnd = false,
-                    backgroundContent = {
-                        // Drawn only while a swipe is in progress; at rest the row must show
-                        // nothing behind the card.
-                        if (dismissState.dismissDirection == SwipeToDismissBoxValue.EndToStart) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .padding(horizontal = 16.dp, vertical = 8.dp)
-                                    .background(Color.Red.copy(alpha = 0.2f), RoundedCornerShape(12.dp)),
-                                contentAlignment = Alignment.CenterEnd
-                            ) {
-                                Icon(
-                                    Icons.Default.Delete,
-                                    contentDescription = null,
-                                    tint = Color.Red,
-                                    modifier = Modifier.padding(end = 16.dp)
-                                )
-                            }
-                        }
-                    }
-                ) {
+                SwipeToDeleteRow(onDelete = { subscriptionList.remove(sub) }) {
                     SubscriptionCard(
                         name = sub.name,
                         price = String.format(Locale.US, "%.2f TL", sub.price)
@@ -265,6 +227,98 @@ fun MainScreen() {
 }
 
 // YARDIMCI BİLEŞENLER
+
+/** Fraction of the row width a swipe must cover before it deletes. */
+private const val DeleteThresholdFraction = 0.5f
+
+/**
+ * A row that deletes itself when swiped past half its width toward the end edge.
+ *
+ * Written by hand instead of using SwipeToDismissBox: that component settles a below-threshold
+ * swipe with an animation that a new gesture cancels at whatever offset it had reached, and the
+ * offsets accumulate across successive swipes until the row crosses the anchor and disappears.
+ * Owning the Animatable lets the gesture start from a guaranteed zero.
+ *
+ * Velocity is deliberately ignored - distance alone decides. A fast flick that covers little
+ * ground must not delete, which is what repeatedly went wrong with the library component.
+ */
+@Composable
+private fun SwipeToDeleteRow(
+    onDelete: () -> Unit,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit
+) {
+    val offsetX = remember { Animatable(0f) }
+    val scope = rememberCoroutineScope()
+    var rowWidth by remember { mutableIntStateOf(0) }
+
+    // Swiping goes toward the end edge: leftwards in LTR, rightwards in RTL.
+    val towardsEnd = if (LocalLayoutDirection.current == LayoutDirection.Rtl) 1f else -1f
+
+    // Reading offsetX.value straight in the condition would recompose on every animation frame.
+    val isSwiping by remember { derivedStateOf { offsetX.value != 0f } }
+
+    val dragState = rememberDraggableState { delta ->
+        scope.launch {
+            val dragged = offsetX.value + delta
+            val limit = rowWidth.toFloat()
+            // Only allow travel toward the end edge; the other direction stays pinned at rest.
+            val bounded = if (towardsEnd < 0f) dragged.coerceIn(-limit, 0f) else dragged.coerceIn(0f, limit)
+            offsetX.snapTo(bounded)
+        }
+    }
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .onSizeChanged { rowWidth = it.width }
+            .semantics {
+                // Swiping is unreachable with TalkBack, so expose deletion as an explicit action.
+                // TODO: move the label to strings.xml once phase 1b touches res/.
+                customActions = listOf(CustomAccessibilityAction("Sil") { onDelete(); true })
+            }
+    ) {
+        if (isSwiping) {
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                    .background(Color.Red.copy(alpha = 0.2f), RoundedCornerShape(12.dp)),
+                contentAlignment = if (towardsEnd < 0f) Alignment.CenterEnd else Alignment.CenterStart
+            ) {
+                Icon(
+                    Icons.Default.Delete,
+                    contentDescription = null,
+                    tint = Color.Red,
+                    modifier = Modifier.padding(horizontal = 16.dp)
+                )
+            }
+        }
+
+        Box(
+            modifier = Modifier
+                .offset { IntOffset(offsetX.value.roundToInt(), 0) }
+                .draggable(
+                    state = dragState,
+                    orientation = Orientation.Horizontal,
+                    // Every gesture starts from rest. This is what makes accumulation impossible:
+                    // a leftover offset from an interrupted settle is wiped before the drag reads it.
+                    onDragStarted = { offsetX.snapTo(0f) },
+                    onDragStopped = {
+                        val travelled = abs(offsetX.value)
+                        if (rowWidth > 0 && travelled >= rowWidth * DeleteThresholdFraction) {
+                            offsetX.animateTo(towardsEnd * rowWidth)
+                            onDelete()
+                        } else {
+                            offsetX.animateTo(0f)
+                        }
+                    }
+                )
+        ) {
+            content()
+        }
+    }
+}
 
 @Composable
 fun getIconForSubscription(name: String): ImageVector {
