@@ -18,7 +18,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.listSaver
@@ -110,7 +109,7 @@ fun MainScreen() {
                 onClick = { showBottomSheet = true },
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.onPrimary,
-                shape = RoundedCornerShape(16.dp)
+                shape = RoundedCornerShape(Dimens.FabCorner)
             ) {
                 Icon(Icons.Default.Add, contentDescription = "Ekle")
             }
@@ -121,7 +120,7 @@ fun MainScreen() {
             modifier = Modifier
                 .padding(paddingValues)
                 .fillMaxSize(),
-            contentPadding = PaddingValues(bottom = 80.dp) // FAB için boşluk
+            contentPadding = PaddingValues(bottom = Dimens.ListBottomSpacing) // FAB için boşluk
         ) {
             // Sabit Üst Kısım
             item {
@@ -131,7 +130,11 @@ fun MainScreen() {
 
                 Text(
                     text = stringResource(id = R.string.my_subscriptions),
-                    modifier = Modifier.padding(start = 20.dp, top = 16.dp, bottom = 8.dp),
+                    modifier = Modifier.padding(
+                        start = Dimens.SectionTitleStart,
+                        top = Dimens.SectionTitleTop,
+                        bottom = Dimens.SectionTitleBottom
+                    ),
                     style = MaterialTheme.typography.titleLarge,
                     color = MaterialTheme.colorScheme.onBackground
                 )
@@ -162,12 +165,12 @@ fun MainScreen() {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 24.dp)
-                    .padding(bottom = 40.dp),
+                    .padding(horizontal = Dimens.SheetPadding)
+                    .padding(bottom = Dimens.SheetBottomPadding),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text("Yeni Abonelik Ekle", style = MaterialTheme.typography.titleLarge)
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(Dimens.SpacerLarge))
 
                 OutlinedTextField(
                     value = subscriptionName,
@@ -177,7 +180,7 @@ fun MainScreen() {
                     singleLine = true
                 )
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(Dimens.SpacerMedium))
 
                 OutlinedTextField(
                     value = subscriptionPrice,
@@ -188,7 +191,7 @@ fun MainScreen() {
                     singleLine = true
                 )
 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(Dimens.SpacerXLarge))
 
                 Button(
                     onClick = {
@@ -214,7 +217,7 @@ fun MainScreen() {
                         contentColor = MaterialTheme.colorScheme.onPrimary
                     ),
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(Dimens.CardCorner)
                 ) {
                     Text("Kaydet")
                 }
@@ -282,10 +285,10 @@ private fun SwipeToDeleteRow(
             Box(
                 modifier = Modifier
                     .matchParentSize()
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                    .padding(horizontal = Dimens.ScreenPadding, vertical = Dimens.RowSpacing)
                     .background(
                         MaterialTheme.colorScheme.error.copy(alpha = 0.2f),
-                        RoundedCornerShape(12.dp)
+                        RoundedCornerShape(Dimens.CardCorner)
                     ),
                 contentAlignment = if (towardsEnd < 0f) Alignment.CenterEnd else Alignment.CenterStart
             ) {
@@ -293,7 +296,7 @@ private fun SwipeToDeleteRow(
                     Icons.Default.Delete,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.padding(horizontal = 16.dp)
+                    modifier = Modifier.padding(horizontal = Dimens.ScreenPadding)
                 )
             }
         }
@@ -339,18 +342,18 @@ fun DashboardCard(totalAmount: String) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(16.dp),
-        shape = RoundedCornerShape(24.dp),
+            .padding(Dimens.ScreenPadding),
+        shape = RoundedCornerShape(Dimens.DashboardCorner),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary),
-        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = Dimens.DashboardElevation)
     ) {
-        Column(modifier = Modifier.padding(24.dp)) {
+        Column(modifier = Modifier.padding(Dimens.DashboardPadding)) {
             Text(
                 text = stringResource(id = R.string.total_monthly),
                 color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f),
                 style = MaterialTheme.typography.bodyLarge
             )
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(Dimens.SpacerSmall))
             Text(
                 text = totalAmount,
                 color = MaterialTheme.colorScheme.onPrimary,
@@ -365,21 +368,21 @@ fun SubscriptionCard(name: String, price: String) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            .padding(horizontal = Dimens.ScreenPadding, vertical = Dimens.RowSpacing),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = Dimens.CardElevation)
     ) {
         Row(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(Dimens.CardPadding),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
                 getIconForSubscription(name),
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(24.dp)
+                modifier = Modifier.size(Dimens.IconSize)
             )
-            Spacer(modifier = Modifier.width(16.dp))
+            Spacer(modifier = Modifier.width(Dimens.IconSpacing))
             Text(
                 text = name,
                 modifier = Modifier.weight(1f),
