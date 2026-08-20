@@ -111,7 +111,10 @@ fun MainScreen() {
                 contentColor = MaterialTheme.colorScheme.onPrimary,
                 shape = RoundedCornerShape(Dimens.FabCorner)
             ) {
-                Icon(Icons.Default.Add, contentDescription = "Ekle")
+                Icon(
+                    Icons.Default.Add,
+                    contentDescription = stringResource(id = R.string.add_subscription)
+                )
             }
         }
     ) { paddingValues ->
@@ -125,7 +128,11 @@ fun MainScreen() {
             // Sabit Üst Kısım
             item {
                 DashboardCard(
-                    totalAmount = String.format(Locale.US, "%.2f TL", totalMonthlyPrice)
+                    totalAmount = String.format(
+                        Locale.US,
+                        stringResource(id = R.string.price_format),
+                        totalMonthlyPrice
+                    )
                 )
 
                 Text(
@@ -148,7 +155,11 @@ fun MainScreen() {
                 SwipeToDeleteRow(onDelete = { subscriptionList.remove(sub) }) {
                     SubscriptionCard(
                         name = sub.name,
-                        price = String.format(Locale.US, "%.2f TL", sub.price)
+                        price = String.format(
+                            Locale.US,
+                            stringResource(id = R.string.price_format),
+                            sub.price
+                        )
                     )
                 }
             }
@@ -169,13 +180,16 @@ fun MainScreen() {
                     .padding(bottom = Dimens.SheetBottomPadding),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text("Yeni Abonelik Ekle", style = MaterialTheme.typography.titleLarge)
+                Text(
+                    text = stringResource(id = R.string.add_subscription_title),
+                    style = MaterialTheme.typography.titleLarge
+                )
                 Spacer(modifier = Modifier.height(Dimens.SpacerLarge))
 
                 OutlinedTextField(
                     value = subscriptionName,
                     onValueChange = { subscriptionName = it },
-                    label = { Text("Abonelik Adı") },
+                    label = { Text(stringResource(id = R.string.subscription_name_label)) },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
@@ -185,7 +199,7 @@ fun MainScreen() {
                 OutlinedTextField(
                     value = subscriptionPrice,
                     onValueChange = { subscriptionPrice = it },
-                    label = { Text("Fiyat (Örn: 159.99)") },
+                    label = { Text(stringResource(id = R.string.subscription_price_label)) },
                     modifier = Modifier.fillMaxWidth(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     singleLine = true
@@ -219,7 +233,7 @@ fun MainScreen() {
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(Dimens.CardCorner)
                 ) {
-                    Text("Kaydet")
+                    Text(stringResource(id = R.string.save))
                 }
             }
         }
@@ -261,6 +275,9 @@ private fun SwipeToDeleteRow(
     // Reading offsetX straight in the condition would recompose on every animation frame.
     val isSwiping by remember { derivedStateOf { offsetX != 0f } }
 
+    // Hoisted out of the semantics lambda, which is not a composable scope.
+    val deleteLabel = stringResource(id = R.string.delete)
+
     val dragState = rememberDraggableState { delta ->
         val dragged = offsetX + delta
         val limit = rowWidth.toFloat()
@@ -277,8 +294,7 @@ private fun SwipeToDeleteRow(
             // TalkBack never offers it. Merging turns the row into one focusable node.
             .semantics(mergeDescendants = true) {
                 // Swiping is unreachable with TalkBack, so expose deletion as an explicit action.
-                // TODO: move the label to strings.xml once phase 1b touches res/.
-                customActions = listOf(CustomAccessibilityAction("Sil") { onDelete(); true })
+                customActions = listOf(CustomAccessibilityAction(deleteLabel) { onDelete(); true })
             }
     ) {
         if (isSwiping) {

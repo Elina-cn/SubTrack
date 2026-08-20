@@ -6,4 +6,15 @@
     <string name="total_monthly">Aylık Toplam</string>
     <string name="add_subscription">Abonelik Ekle</string>
 
+    <!-- Add sheet -->
+    <string name="add_subscription_title">Yeni Abonelik Ekle</string>
+    <string name="subscription_name_label">Abonelik Adı</string>
+    <string name="subscription_price_label">Fiyat (Örn: 159.99)</string>
+    <string name="save">Kaydet</string>
+
+    <!-- Subscription row -->
+    <string name="delete">Sil</string>
+    <!-- Amount followed by the currency. Phase 9 replaces this with locale-aware formatting. -->
+    <string name="price_format">%1$.2f TL</string>
+
 </resources>

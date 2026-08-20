@@ -5,4 +5,15 @@
     <string name="my_subscriptions">My Subscriptions</string>
     <string name="total_monthly">Total Monthly</string>
     <string name="add_subscription">Add Subscription</string>
+
+    <!-- Add sheet -->
+    <string name="add_subscription_title">New Subscription</string>
+    <string name="subscription_name_label">Subscription Name</string>
+    <string name="subscription_price_label">Price (e.g. 159.99)</string>
+    <string name="save">Save</string>
+
+    <!-- Subscription row -->
+    <string name="delete">Delete</string>
+    <!-- Currency stays TL until phase 9 introduces currency selection. -->
+    <string name="price_format">%1$.2f TL</string>
 </resources>
