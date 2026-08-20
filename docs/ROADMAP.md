@@ -29,24 +29,35 @@ ekran döndürmede liste duruyor.
 
 ## ⬜ Faz 1 — Altyapı Temizliği
 
-- [ ] `gradle/libs.versions.toml` (version catalog) kurulumu/doğrulaması
-- [ ] Compose BOM ↔ `activity-compose` ↔ `lifecycle` sürüm çakışması
-      `./gradlew :app:dependencies` ile doğrulansın, gerekirse hizalansın
+Faz 1 iki promptta yürütüldü: **1a build altyapısı (bitti)**, **1b tema ve metinler.**
+
+- [x] `gradle/libs.versions.toml` (version catalog) kurulumu/doğrulaması
+- [x] Compose BOM ↔ `activity-compose` ↔ `lifecycle` sürüm çakışması
+      `./gradlew :app:dependencies` ile doğrulandı — **çakışma gerçekti.**
+      BOM 2025.11.01'e alındı, her şey Compose 1.9.5 / material3 1.4.0'a hizalandı.
 - [x] Kotlin plugin durumu netleşti — **Faz 0'da doğrulandı:** AGP 9 Kotlin
       plugin'lerini yerleşik getiriyor, `version.ref` verilirse *"already on
       the classpath with an unknown version"* hatası çıkıyor. Sürümsüz alias
       ile uygulanmalı.
-- [ ] KSP eklentisi eklensin (kapt kullanılmayacak) — **dikkat:** yukarıdaki
-      kısıt burada da geçerli olabilir, sürüm çakışması beklenmeli
+- [x] KSP eklentisi eklendi (kapt kullanılmadı) — **not:** yukarıdaki kısıt
+      KSP için geçerli değilmiş, AGP 9 KSP'yi getirmiyor. Açık sürüm gerekti:
+      `2.2.10-2.0.2`. Ayrıca `gradle.properties`'e
+      `android.disallowKotlinSourceSets=false` eklendi (geçici, bkz.
+      ARCHITECTURE §12).
 - [ ] Kod içi Türkçe yorumlar İngilizceye çevrilsin (CLAUDE.md §2)
+- [ ] Kotlin sürüm tutarsızlığı: `libs.versions.toml` 2.0.21 diyor ama
+      AGP 9 gerçekte 2.2.10 kullanıyor, hizalansın
 - [ ] `Theme.kt` gerçekten devreye alınsın: hardcoded renkler →
       `MaterialTheme.colorScheme`
 - [ ] `Type.kt` `MaterialTheme(typography = ...)` ile bağlansın
 - [ ] `Dimens.kt` oluşturulsun, hardcoded `dp` değerleri oradan gelsin
 - [ ] Tüm kullanıcı metinleri `strings.xml`'e taşınsın + `values-en/`
+- [ ] `SwipeToDeleteRow`'daki "Sil" metni `strings.xml`'e taşınsın
 - [ ] Kullanılmayan import/kod temizliği
-- [ ] `.gitignore`: `.idea/` altındaki makineye özel dosyalar
-      (`emulatorDisplays.xml` vb.) hariç tutulsun
+- [x] `.gitignore`: `.idea/` altındaki makineye özel dosyalar
+      (`emulatorDisplays.xml` vb.) hariç tutuldu
+- [ ] `.gitignore` tamamlansın: `local.properties` iki kez yazılı,
+      `.kotlin/`, `*.apk`, `*.jks` eklensin
 
 **Bitti:** Sıfır hardcoded metin, sıfır hardcoded renk. Koyu tema fiilen
 çalışıyor. Temiz derleme, sıfır uyarı.
@@ -110,7 +121,9 @@ durumda — Hilt'in gerekçesi anlaşıldı.
 - [ ] Ekleme repository üzerinden
 - [ ] Girdi doğrulama: boş ad, geçersiz/negatif fiyat → hata mesajı
 - [ ] Fiyat parse mantığı ViewModel'da (`String` → `Long` kuruş)
-- [ ] Kaydırarak silme repository'yi tetiklesin
+- [ ] Kaydırarak silme repository'yi tetiklesin — **not:** hotfix serisinde
+      `SwipeToDeleteRow` yazıldı. Kalan iş: `onDelete` callback'ini
+      `HomeEvent.Delete`'e bağlamak ve undo eklemek.
 - [ ] Silme sonrası Snackbar ile geri al (undo)
 
 **Bitti:** Ekleme/silme kalıcı, hatalı girdi engelleniyor, yanlış silme
@@ -135,7 +148,9 @@ geri alınabiliyor.
 - [ ] Boş durum ekranı
 - [ ] Yükleme durumu
 - [ ] Hata gösterimi (Snackbar)
-- [ ] Erişilebilirlik: `contentDescription`, dokunma alanı ≥ 48dp
+- [ ] Erişilebilirlik: `contentDescription`, dokunma alanı ≥ 48dp — **not:**
+      `SwipeToDeleteRow`'un semantics'i (custom "Sil" eylemi +
+      `mergeDescendants`) hotfix serisinde baştan kondu.
 - [ ] Koyu tema tüm ekranlarda gözden geçirilsin
 
 **Bitti:** Hiçbir durumda boş/kırık ekran yok.

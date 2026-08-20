@@ -251,3 +251,42 @@ Analiz raporundan (Ağustos 2026) gelen, mimariyi ilgilendiren maddeler:
 - Form ekranında 5 hardcoded Türkçe metin
 - Compose BOM 2024.09.00 ile `activity-compose` 1.12.4 arasında olası sürüm
   uyuşmazlığı — `./gradlew :app:dependencies` ile doğrulanacak
+
+### Faz 1a'da eklenen teknik borç
+
+- `gradle.properties`'teki `android.disallowKotlinSourceSets=false` geçicidir.
+  KSP 2.0.2 ürettiği kaynakları `kotlin.sourceSets` ile kaydediyor, AGP 9'un
+  yerleşik Kotlin'i bunu yasaklıyor; bu anahtar AGP'nin kendi önerdiği geçiş
+  yolu. KSP `android.sourceSets` DSL'ine geçince kaldırılıp denenmeli.
+- `MainActivity`'deki monoton id sayacı geçicidir. Faz 5'te Room'un
+  `@PrimaryKey(autoGenerate = true)` alanı devralacak — `AUTOINCREMENT`
+  silinen id'leri asla geri kullanmadığı için sayaç gereksiz kalacak.
+
+### Mimari karar: kaydırarak silme kendi bileşenimizde
+
+material3'ün `SwipeToDismissBox`'ı **kullanılmıyor**. Yerine `SwipeToDeleteRow`
+adlı özel bileşen var (şimdilik `MainActivity.kt` içinde, Faz 5'te
+`ui/home/components/` altına taşınacak).
+
+**Gerekçe:** `AnchoredDraggable`'ın fling/anchor mantığı ardışık kaydırmada
+offset biriktiriyor. Eşik altı kaydırmada `settledValue` hiç değişmediği için
+kütüphanenin `enabled = settledValue == Settled` koruması devreye girmiyor;
+geri yaslanma animasyonu ile kullanıcı sürüklemesi aynı
+`MutatePriority.Default`'ta olduğundan yeni jest animasyonu bulunduğu yerde
+iptal ediyor ve kalan offset bir sonraki kaydırmanın üstüne biniyor. Public
+API'de bunu engellemenin yolu yok: `gesturesEnabled`'ı offset'e bağlamak
+devam eden jesti öldürüyor, effect'ten `snapTo` kullanıcının parmağını
+eziyor, `flingBehavior` da dışarıdan enjekte edilemiyor.
+
+Kendi bileşenimizde animasyonun sahibi biz olduğumuz için jest başında offset
+sıfırlanıyor (`onDragStarted`), böylece birikme yapısal olarak imkânsız.
+
+**Silme kuralı:** tek şart, kart genişliğinin **%50**'si kadar mesafe. Hız hiç
+oy kullanmıyor. (`computeTarget`'ın üç dalından ikisi `positionalThreshold`'u
+hiç okumuyordu; hızlı fiskenin silmesinin sebebi buydu.)
+
+**Sürükleme `Animatable` ile değil düz `mutableFloatStateOf` ile yapılır.**
+`Animatable`, `snapTo` ve `animateTo` çağrılarını tek mutex ile koruyor;
+sürükleme deltaları kuyruğa girdiğinde bekleyen bir `snapTo`, yerleşme
+animasyonunu iptal edip `onDelete`'i düşürüyordu. Yerleşme için `animate()`
+suspend fonksiyonu kullanılır — tek doğruluk kaynağı, yarış yok.
