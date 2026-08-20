@@ -7,19 +7,30 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
+// The `on*` roles are spelled out on purpose: the UI reads every colour through the scheme, so a
+// missing role would silently fall back to a Material default that does not match the palette.
 private val DarkColorScheme = darkColorScheme(
     primary = PastelBlue,
+    onPrimary = DarkText,
     secondary = PastelMint,
+    onSecondary = DarkText,
     tertiary = PastelGray,
-    background = DarkText,
-    surface = DarkText
+    background = DarkBackground,
+    onBackground = PastelGray,
+    surface = DarkText,
+    onSurface = PastelGray
 )
+
 private val LightColorScheme = lightColorScheme(
     primary = PastelBlue,
+    onPrimary = DarkText,
     secondary = PastelMint,
+    onSecondary = DarkText,
     tertiary = PastelGray,
     background = PastelGray,
-    surface = Color.White
+    onBackground = DarkText,
+    surface = Color.White,
+    onSurface = DarkText
 )
 
 @Composable
@@ -31,6 +42,7 @@ fun SubTrackTheme(
 
     MaterialTheme(
         colorScheme = colorScheme,
+        typography = Typography,
         content = content
     )
 }

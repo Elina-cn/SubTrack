@@ -15,19 +15,14 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.animation.core.animate
@@ -109,12 +104,12 @@ fun MainScreen() {
     }
 
     Scaffold(
-        containerColor = PastelGray,
+        containerColor = MaterialTheme.colorScheme.background,
         floatingActionButton = {
             FloatingActionButton(
                 onClick = { showBottomSheet = true },
-                containerColor = PastelBlue,
-                contentColor = Color.White,
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
                 shape = RoundedCornerShape(16.dp)
             ) {
                 Icon(Icons.Default.Add, contentDescription = "Ekle")
@@ -137,9 +132,8 @@ fun MainScreen() {
                 Text(
                     text = stringResource(id = R.string.my_subscriptions),
                     modifier = Modifier.padding(start = 20.dp, top = 16.dp, bottom = 8.dp),
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = DarkText
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onBackground
                 )
             }
 
@@ -163,7 +157,7 @@ fun MainScreen() {
         ModalBottomSheet(
             onDismissRequest = { showBottomSheet = false },
             sheetState = sheetState,
-            containerColor = Color.White
+            containerColor = MaterialTheme.colorScheme.surface
         ) {
             Column(
                 modifier = Modifier
@@ -172,7 +166,7 @@ fun MainScreen() {
                     .padding(bottom = 40.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text("Yeni Abonelik Ekle", fontWeight = FontWeight.Bold, fontSize = 20.sp)
+                Text("Yeni Abonelik Ekle", style = MaterialTheme.typography.titleLarge)
                 Spacer(modifier = Modifier.height(20.dp))
 
                 OutlinedTextField(
@@ -215,11 +209,14 @@ fun MainScreen() {
                             }
                         }
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = PastelBlue),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
+                    ),
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp)
                 ) {
-                    Text("Kaydet", color = Color.White)
+                    Text("Kaydet")
                 }
             }
         }
@@ -286,13 +283,16 @@ private fun SwipeToDeleteRow(
                 modifier = Modifier
                     .matchParentSize()
                     .padding(horizontal = 16.dp, vertical = 8.dp)
-                    .background(Color.Red.copy(alpha = 0.2f), RoundedCornerShape(12.dp)),
+                    .background(
+                        MaterialTheme.colorScheme.error.copy(alpha = 0.2f),
+                        RoundedCornerShape(12.dp)
+                    ),
                 contentAlignment = if (towardsEnd < 0f) Alignment.CenterEnd else Alignment.CenterStart
             ) {
                 Icon(
                     Icons.Default.Delete,
                     contentDescription = null,
-                    tint = Color.Red,
+                    tint = MaterialTheme.colorScheme.error,
                     modifier = Modifier.padding(horizontal = 16.dp)
                 )
             }
@@ -341,21 +341,20 @@ fun DashboardCard(totalAmount: String) {
             .fillMaxWidth()
             .padding(16.dp),
         shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = PastelBlue),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary),
         elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
     ) {
         Column(modifier = Modifier.padding(24.dp)) {
             Text(
                 text = stringResource(id = R.string.total_monthly),
-                color = DarkText.copy(alpha = 0.7f),
-                fontSize = 16.sp
+                color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f),
+                style = MaterialTheme.typography.bodyLarge
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = totalAmount,
-                color = DarkText,
-                fontSize = 32.sp,
-                fontWeight = FontWeight.ExtraBold
+                color = MaterialTheme.colorScheme.onPrimary,
+                style = MaterialTheme.typography.headlineMedium
             )
         }
     }
@@ -367,7 +366,7 @@ fun SubscriptionCard(name: String, price: String) {
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Row(
@@ -377,12 +376,21 @@ fun SubscriptionCard(name: String, price: String) {
             Icon(
                 getIconForSubscription(name),
                 contentDescription = null,
-                tint = PastelBlue,
+                tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(24.dp)
             )
             Spacer(modifier = Modifier.width(16.dp))
-            Text(text = name, modifier = Modifier.weight(1f), color = DarkText)
-            Text(text = price, color = PastelBlue, fontWeight = FontWeight.Bold)
+            Text(
+                text = name,
+                modifier = Modifier.weight(1f),
+                color = MaterialTheme.colorScheme.onSurface,
+                style = MaterialTheme.typography.bodyLarge
+            )
+            Text(
+                text = price,
+                color = MaterialTheme.colorScheme.primary,
+                style = MaterialTheme.typography.titleMedium
+            )
         }
     }
 }
