@@ -41,7 +41,8 @@ import kotlinx.coroutines.launch
 import java.util.Locale
 import com.elinacn.subtrack.ui.theme.*
 
-// 1. VERİ MODELİ (Double kullanımı hesaplamalar için kritiktir)
+// Double is wrong for money and CLAUDE.md forbids it; phase 2 replaces this with a Money
+// value class holding Long minor units.
 data class Subscription(
     val id: Int,
     val name: String,
@@ -75,14 +76,14 @@ class MainActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen() {
-    // DURUM TANIMLARI
+    // Screen state
     var showBottomSheet by remember { mutableStateOf(false) }
     var subscriptionName by remember { mutableStateOf("") }
     var subscriptionPrice by remember { mutableStateOf("") }
     val sheetState = rememberModalBottomSheetState()
     val scope = rememberCoroutineScope()
 
-    // Dinamik Liste (Tip güvenliği sağlandı)
+    // Session-local subscription list. Room takes over in phase 5.
     val subscriptionList = rememberSaveable(saver = SubscriptionListSaver) {
         mutableStateListOf(
             Subscription(1, "Netflix", 159.99),
@@ -95,7 +96,7 @@ fun MainScreen() {
     // rows. Starts past the seed ids above. Temporary: Room's autoGenerate replaces it in phase 5.
     var nextSubscriptionId by rememberSaveable { mutableIntStateOf(3) }
 
-    // Toplam Tutar Hesaplama (Daha performanslı ve temiz)
+    // Monthly total, recomputed only when the list actually changes.
     val totalMonthlyPrice by remember(subscriptionList.size) {
         derivedStateOf {
             subscriptionList.sumOf { it.price }
@@ -118,14 +119,14 @@ fun MainScreen() {
             }
         }
     ) { paddingValues ->
-        // Column yerine LazyColumn: Büyük listelerde performans sağlar
+        // LazyColumn rather than Column so long lists only compose what is on screen.
         LazyColumn(
             modifier = Modifier
                 .padding(paddingValues)
                 .fillMaxSize(),
-            contentPadding = PaddingValues(bottom = Dimens.ListBottomSpacing) // FAB için boşluk
+            contentPadding = PaddingValues(bottom = Dimens.ListBottomSpacing) // room for the FAB
         ) {
-            // Sabit Üst Kısım
+            // Fixed header
             item {
                 DashboardCard(
                     totalAmount = String.format(
@@ -147,10 +148,10 @@ fun MainScreen() {
                 )
             }
 
-            // Dinamik Liste Elemanları
+            // Subscription rows
             items(
                 items = subscriptionList,
-                key = { it.id } // Silme işlemlerinde görsel hataları önleyen kritik nokta
+                key = { it.id } // Stable identity, so a deletion does not shuffle state between rows
             ) { sub ->
                 SwipeToDeleteRow(onDelete = { subscriptionList.remove(sub) }) {
                     SubscriptionCard(
@@ -166,7 +167,7 @@ fun MainScreen() {
         }
     }
 
-    // EKLEME MENÜSÜ
+    // Add sheet
     if (showBottomSheet) {
         ModalBottomSheet(
             onDismissRequest = { showBottomSheet = false },
@@ -240,7 +241,7 @@ fun MainScreen() {
     }
 }
 
-// YARDIMCI BİLEŞENLER
+// Building blocks
 
 /** Fraction of the row width a swipe must cover before it deletes. */
 private const val DeleteThresholdFraction = 0.5f
