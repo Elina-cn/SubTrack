@@ -1,6 +1,7 @@
 *.iml
 .gradle
-/local.properties
+.kotlin
+local.properties
 /.idea/caches
 /.idea/libraries
 /.idea/modules.xml
@@ -17,4 +18,8 @@
 /captures
 .externalNativeBuild
 .cxx
-local.properties
+# Build outputs and signing material must never be committed
+*.apk
+*.aab
+*.jks
+*.keystore
