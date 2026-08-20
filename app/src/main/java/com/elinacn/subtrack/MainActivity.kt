@@ -108,8 +108,8 @@ fun MainScreen() {
         floatingActionButton = {
             FloatingActionButton(
                 onClick = { showBottomSheet = true },
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
                 shape = RoundedCornerShape(Dimens.FabCorner)
             ) {
                 Icon(
@@ -228,8 +228,8 @@ fun MainScreen() {
                         }
                     },
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
                     ),
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(Dimens.CardCorner)
@@ -361,19 +361,21 @@ fun DashboardCard(totalAmount: String) {
             .fillMaxWidth()
             .padding(Dimens.ScreenPadding),
         shape = RoundedCornerShape(Dimens.DashboardCorner),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
         elevation = CardDefaults.cardElevation(defaultElevation = Dimens.DashboardElevation)
     ) {
         Column(modifier = Modifier.padding(Dimens.DashboardPadding)) {
             Text(
                 text = stringResource(id = R.string.total_monthly),
-                color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f),
+                // No alpha: dimming this to 0.7 dropped it to 3.6:1. The size and weight gap
+                // against the amount below already carries the hierarchy.
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
                 style = MaterialTheme.typography.bodyLarge
             )
             Spacer(modifier = Modifier.height(Dimens.SpacerSmall))
             Text(
                 text = totalAmount,
-                color = MaterialTheme.colorScheme.onPrimary,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
                 style = MaterialTheme.typography.headlineMedium
             )
         }
