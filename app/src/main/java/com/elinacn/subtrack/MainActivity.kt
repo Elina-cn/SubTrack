@@ -30,7 +30,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.animate
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
@@ -248,31 +248,34 @@ private fun SwipeToDeleteRow(
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit
 ) {
-    val offsetX = remember { Animatable(0f) }
-    val scope = rememberCoroutineScope()
+    // Plain state, not an Animatable. Animatable guards snapTo and animateTo with one mutex, and
+    // the drag deltas had to reach it through scope.launch, so a queued snapTo landed after the
+    // dismissal animation had started and cancelled it - taking the onDelete call down with it.
+    // Driving the offset synchronously removes the race entirely.
+    var offsetX by remember { mutableFloatStateOf(0f) }
     var rowWidth by remember { mutableIntStateOf(0) }
 
     // Swiping goes toward the end edge: leftwards in LTR, rightwards in RTL.
     val towardsEnd = if (LocalLayoutDirection.current == LayoutDirection.Rtl) 1f else -1f
 
-    // Reading offsetX.value straight in the condition would recompose on every animation frame.
-    val isSwiping by remember { derivedStateOf { offsetX.value != 0f } }
+    // Reading offsetX straight in the condition would recompose on every animation frame.
+    val isSwiping by remember { derivedStateOf { offsetX != 0f } }
 
     val dragState = rememberDraggableState { delta ->
-        scope.launch {
-            val dragged = offsetX.value + delta
-            val limit = rowWidth.toFloat()
-            // Only allow travel toward the end edge; the other direction stays pinned at rest.
-            val bounded = if (towardsEnd < 0f) dragged.coerceIn(-limit, 0f) else dragged.coerceIn(0f, limit)
-            offsetX.snapTo(bounded)
-        }
+        val dragged = offsetX + delta
+        val limit = rowWidth.toFloat()
+        // Only allow travel toward the end edge; the other direction stays pinned at rest.
+        offsetX = if (towardsEnd < 0f) dragged.coerceIn(-limit, 0f) else dragged.coerceIn(0f, limit)
     }
 
     Box(
         modifier = modifier
             .fillMaxWidth()
             .onSizeChanged { rowWidth = it.width }
-            .semantics {
+            // mergeDescendants is what makes this reachable: without it the card's own text nodes
+            // take the accessibility focus and the action stays on an unfocusable parent, so
+            // TalkBack never offers it. Merging turns the row into one focusable node.
+            .semantics(mergeDescendants = true) {
                 // Swiping is unreachable with TalkBack, so expose deletion as an explicit action.
                 // TODO: move the label to strings.xml once phase 1b touches res/.
                 customActions = listOf(CustomAccessibilityAction("Sil") { onDelete(); true })
@@ -297,20 +300,20 @@ private fun SwipeToDeleteRow(
 
         Box(
             modifier = Modifier
-                .offset { IntOffset(offsetX.value.roundToInt(), 0) }
+                .offset { IntOffset(offsetX.roundToInt(), 0) }
                 .draggable(
                     state = dragState,
                     orientation = Orientation.Horizontal,
                     // Every gesture starts from rest. This is what makes accumulation impossible:
                     // a leftover offset from an interrupted settle is wiped before the drag reads it.
-                    onDragStarted = { offsetX.snapTo(0f) },
+                    onDragStarted = { offsetX = 0f },
                     onDragStopped = {
-                        val travelled = abs(offsetX.value)
+                        val travelled = abs(offsetX)
                         if (rowWidth > 0 && travelled >= rowWidth * DeleteThresholdFraction) {
-                            offsetX.animateTo(towardsEnd * rowWidth)
+                            animate(offsetX, towardsEnd * rowWidth) { value, _ -> offsetX = value }
                             onDelete()
                         } else {
-                            offsetX.animateTo(0f)
+                            animate(offsetX, 0f) { value, _ -> offsetX = value }
                         }
                     }
                 )
