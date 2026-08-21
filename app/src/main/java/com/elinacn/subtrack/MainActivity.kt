@@ -19,10 +19,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.runtime.saveable.Saver
-import androidx.compose.runtime.saveable.listSaver
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.animation.core.animate
 import androidx.compose.foundation.gestures.Orientation
@@ -35,33 +31,26 @@ import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.elinacn.subtrack.domain.model.Money
+import com.elinacn.subtrack.domain.model.Subscription
+import com.elinacn.subtrack.ui.home.HomeEvent
+import com.elinacn.subtrack.ui.home.HomeViewModel
 import dagger.hilt.android.AndroidEntryPoint
 import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
+import java.math.BigDecimal
 import java.util.Locale
 import com.elinacn.subtrack.ui.theme.*
 
-// Double is wrong for money and CLAUDE.md forbids it; phase 2 replaces this with a Money
-// value class holding Long minor units.
-data class Subscription(
-    val id: Int,
-    val name: String,
-    val price: Double
-)
-
 /**
- * Keeps the subscription list alive across configuration changes by flattening each item into
- * Bundle-native values. Temporary: Room replaces this in phase 5.
+ * Renders an amount with the localized pattern. Display only - the value itself stays in whole
+ * minor units, and BigDecimal keeps the conversion exact.
  */
-private val SubscriptionListSaver: Saver<SnapshotStateList<Subscription>, *> = listSaver(
-    save = { list -> list.flatMap { listOf(it.id, it.name, it.price) } },
-    restore = { flat ->
-        flat.chunked(3)
-            .map { (id, name, price) -> Subscription(id as Int, name as String, price as Double) }
-            .toMutableStateList()
-    }
-)
+private fun Money.format(pattern: String): String =
+    String.format(Locale.US, pattern, BigDecimal(cents).movePointLeft(2))
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -77,33 +66,18 @@ class MainActivity : ComponentActivity() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MainScreen() {
-    // Screen state
+fun MainScreen(viewModel: HomeViewModel = hiltViewModel()) {
+    // The screen renders this and holds no data of its own; the list lives in Room.
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
+    // Transient view state only: whether the sheet is open and what is typed into it.
     var showBottomSheet by remember { mutableStateOf(false) }
     var subscriptionName by remember { mutableStateOf("") }
     var subscriptionPrice by remember { mutableStateOf("") }
     val sheetState = rememberModalBottomSheetState()
     val scope = rememberCoroutineScope()
 
-    // Session-local subscription list. Room takes over in phase 5.
-    val subscriptionList = rememberSaveable(saver = SubscriptionListSaver) {
-        mutableStateListOf(
-            Subscription(1, "Netflix", 159.99),
-            Subscription(2, "Spotify", 59.90)
-        )
-    }
-
-    // Monotonic id source. Deriving ids from max+1 handed a removed row's id straight back to
-    // the next one, so the LazyColumn key stopped being unique and swipe state leaked across
-    // rows. Starts past the seed ids above. Temporary: Room's autoGenerate replaces it in phase 5.
-    var nextSubscriptionId by rememberSaveable { mutableIntStateOf(3) }
-
-    // Monthly total, recomputed only when the list actually changes.
-    val totalMonthlyPrice by remember(subscriptionList.size) {
-        derivedStateOf {
-            subscriptionList.sumOf { it.price }
-        }
-    }
+    val priceFormat = stringResource(id = R.string.price_format)
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -130,13 +104,7 @@ fun MainScreen() {
         ) {
             // Fixed header
             item {
-                DashboardCard(
-                    totalAmount = String.format(
-                        Locale.US,
-                        stringResource(id = R.string.price_format),
-                        totalMonthlyPrice
-                    )
-                )
+                DashboardCard(totalAmount = uiState.monthlyTotal.format(priceFormat))
 
                 Text(
                     text = stringResource(id = R.string.my_subscriptions),
@@ -152,17 +120,13 @@ fun MainScreen() {
 
             // Subscription rows
             items(
-                items = subscriptionList,
-                key = { it.id } // Stable identity, so a deletion does not shuffle state between rows
+                items = uiState.subscriptions,
+                key = { it.id } // Room's AUTOINCREMENT never reuses an id, so this stays unique
             ) { sub ->
-                SwipeToDeleteRow(onDelete = { subscriptionList.remove(sub) }) {
+                SwipeToDeleteRow(onDelete = { viewModel.onEvent(HomeEvent.Delete(sub.id)) }) {
                     SubscriptionCard(
                         name = sub.name,
-                        price = String.format(
-                            Locale.US,
-                            stringResource(id = R.string.price_format),
-                            sub.price
-                        )
+                        price = sub.price.format(priceFormat)
                     )
                 }
             }
@@ -212,21 +176,13 @@ fun MainScreen() {
 
                 Button(
                     onClick = {
-                        if (subscriptionName.isNotBlank()) {
-                            val priceDouble = subscriptionPrice.replace(",", ".").toDoubleOrNull() ?: 0.0
-                            subscriptionList.add(
-                                Subscription(
-                                    id = nextSubscriptionId,
-                                    name = subscriptionName,
-                                    price = priceDouble
-                                )
-                            )
-                            nextSubscriptionId++
-                            subscriptionName = ""
-                            subscriptionPrice = ""
-                            scope.launch { sheetState.hide() }.invokeOnCompletion {
-                                if (!sheetState.isVisible) showBottomSheet = false
-                            }
+                        // Parsing and validation belong to the ViewModel; the screen only reports
+                        // what was typed.
+                        viewModel.onEvent(HomeEvent.Save(subscriptionName, subscriptionPrice))
+                        subscriptionName = ""
+                        subscriptionPrice = ""
+                        scope.launch { sheetState.hide() }.invokeOnCompletion {
+                            if (!sheetState.isVisible) showBottomSheet = false
                         }
                     },
                     colors = ButtonDefaults.buttonColors(
