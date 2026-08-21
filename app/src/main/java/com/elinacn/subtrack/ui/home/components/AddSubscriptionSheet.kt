@@ -19,7 +19,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -33,8 +33,9 @@ import kotlinx.coroutines.launch
  * Form for a new subscription.
  *
  * Owns what is typed into it - transient view state, which ARCHITECTURE section 3 allows a
- * composable to hold. Closing the sheet takes the composable out of composition, which clears
- * the fields for the next open without anyone resetting them.
+ * composable to hold. rememberSaveable so a rotation mid-entry does not throw the text away.
+ * Closing the sheet takes the composable out of composition, which clears the fields for the
+ * next open without anyone resetting them.
  *
  * The raw price string is handed over untouched; parsing and validation belong to the ViewModel.
  */
@@ -45,8 +46,8 @@ fun AddSubscriptionSheet(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var name by remember { mutableStateOf("") }
-    var rawPrice by remember { mutableStateOf("") }
+    var name by rememberSaveable { mutableStateOf("") }
+    var rawPrice by rememberSaveable { mutableStateOf("") }
     val sheetState = rememberModalBottomSheetState()
     val scope = rememberCoroutineScope()
 

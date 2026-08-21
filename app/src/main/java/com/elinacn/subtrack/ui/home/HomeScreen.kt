@@ -16,7 +16,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -40,7 +40,9 @@ fun HomeScreen(
     onEvent: (HomeEvent) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var showAddSheet by remember { mutableStateOf(false) }
+    // rememberSaveable, not remember: rotating with the sheet open used to close it and discard
+    // whatever had been typed.
+    var showAddSheet by rememberSaveable { mutableStateOf(false) }
 
     val priceFormat = stringResource(id = R.string.price_format)
 
