@@ -20,7 +20,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.tooling.preview.Preview
 import com.elinacn.subtrack.ui.theme.Dimens
+import com.elinacn.subtrack.ui.theme.SubTrackTheme
 
 /**
  * One subscription: icon, name and the already formatted price.
@@ -75,4 +77,20 @@ private fun iconFor(name: String): ImageVector = when (name.lowercase()) {
     "youtube" -> Icons.Default.PlayArrow
     "icloud", "drive" -> Icons.Default.Cloud
     else -> Icons.Default.Star
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun SubscriptionCardPreview() {
+    SubTrackTheme {
+        SubscriptionCard(name = "Netflix", price = "159.99 TL")
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun SubscriptionCardUnknownServicePreview() {
+    SubTrackTheme {
+        SubscriptionCard(name = "Bir Başka Servis", price = "1299.00 TL")
+    }
 }

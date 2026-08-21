@@ -13,8 +13,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.tooling.preview.Preview
 import com.elinacn.subtrack.R
 import com.elinacn.subtrack.ui.theme.Dimens
+import com.elinacn.subtrack.ui.theme.SubTrackTheme
 
 /** The monthly total, already formatted by the caller. */
 @Composable
@@ -45,5 +47,21 @@ fun DashboardCard(
                 style = MaterialTheme.typography.headlineMedium
             )
         }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun DashboardCardPreview() {
+    SubTrackTheme {
+        DashboardCard(totalAmount = "219.89 TL")
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun DashboardCardEmptyPreview() {
+    SubTrackTheme {
+        DashboardCard(totalAmount = "0.00 TL")
     }
 }

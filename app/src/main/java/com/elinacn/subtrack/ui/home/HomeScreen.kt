@@ -20,13 +20,18 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.tooling.preview.Preview
 import com.elinacn.subtrack.R
+import com.elinacn.subtrack.domain.model.BillingPeriod
 import com.elinacn.subtrack.domain.model.Money
+import com.elinacn.subtrack.domain.model.Subscription
+import com.elinacn.subtrack.domain.model.SubscriptionCategory
 import com.elinacn.subtrack.ui.home.components.AddSubscriptionSheet
 import com.elinacn.subtrack.ui.home.components.DashboardCard
 import com.elinacn.subtrack.ui.home.components.SubscriptionCard
 import com.elinacn.subtrack.ui.home.components.SwipeToDeleteRow
 import com.elinacn.subtrack.ui.theme.Dimens
+import com.elinacn.subtrack.ui.theme.SubTrackTheme
 import java.math.BigDecimal
 import java.util.Locale
 
@@ -113,3 +118,42 @@ fun HomeScreen(
  */
 private fun Money.format(pattern: String): String =
     String.format(Locale.US, pattern, BigDecimal(cents).movePointLeft(2))
+
+private fun previewSubscription(id: Long, name: String, cents: Long) = Subscription(
+    id = id,
+    name = name,
+    price = Money(cents),
+    currencyCode = "TRY",
+    billingPeriod = BillingPeriod.MONTHLY,
+    nextPaymentDate = null,
+    category = SubscriptionCategory.OTHER,
+    iconKey = null,
+    createdAt = 0L
+)
+
+@Preview(showBackground = true, showSystemUi = true)
+@Composable
+private fun HomeScreenEmptyPreview() {
+    SubTrackTheme {
+        HomeScreen(uiState = HomeUiState(isLoading = false), onEvent = {})
+    }
+}
+
+@Preview(showBackground = true, showSystemUi = true)
+@Composable
+private fun HomeScreenPopulatedPreview() {
+    val subscriptions = listOf(
+        previewSubscription(1, "Netflix", 15999),
+        previewSubscription(2, "Spotify", 5990)
+    )
+    SubTrackTheme {
+        HomeScreen(
+            uiState = HomeUiState(
+                subscriptions = subscriptions,
+                monthlyTotal = Money(21989),
+                isLoading = false
+            ),
+            onEvent = {}
+        )
+    }
+}
