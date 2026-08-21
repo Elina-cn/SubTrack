@@ -135,3 +135,28 @@ kullanıcıya elle test etmesi gereken adımları söyle.
 - Kullanıcının isteği hatalıysa veya belgelerle çelişiyorsa **söyle**,
   sessizce uygulama.
 - "Tamamlandı" demeden önce gerçekten tamamlandığından emin ol.
+
+---
+
+## 9. UI UX Pro Max skill kullanımı
+
+Kurulum: `~/.claude/skills/ui-ux-pro-max/` (kullanıcı düzeyi, projede değil).
+Script tam yolla çağrılır, `${CLAUDE_PLUGIN_ROOT}` yoktur.
+
+**Kullanılacak sorgular:**
+- `--domain ux` — erişilebilirlik, dokunma alanı, form, navigasyon,
+  boş durum, hata metni, anti-pattern taraması
+- `--stack jetpack-compose` — stack'e özel öneriler
+- `--domain icons` — ikon erişilebilirliği
+
+**YASAK: `--design-system` modu.** Palet, tipografi ve efekt üretir.
+Bunlar `docs/ARCHITECTURE.md`'de karara bağlandı ve kontrast
+değerleriyle ölçüldü (primary = DeepBlue #46707F, primaryContainer =
+PastelBlue #AEC6CF). `--persist` da kullanılmaz.
+
+Skill'den somut renk veya font önerisi gelirse **uygulama**, sohbete ilet.
+Yapısal kurallar (semantic token kullanımı, satır yüksekliği oranları,
+dokunma alanı ölçüleri) uygulanabilir.
+
+Skill'in kendi kuralı da bunu destekliyor: çıktısı tavsiyedir, repo
+kurallarını ezmez.
