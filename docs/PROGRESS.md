@@ -27,6 +27,82 @@ Her faz sonunda **en üste** yeni kayıt eklenir. Eski kayıtlar silinmez.
 
 ---
 
+## [Faz 5a] ViewModel, UiState ve Room Bağlantısı — 2026-08-21
+
+**Durum:** Tamamlandı
+
+**Yapılanlar**
+- **`HomeUiState` ve `HomeEvent` oluşturuldu.** Ekran tek bir state nesnesi
+  çiziyor, tek bir `onEvent` kanalıyla geri konuşuyor (ARCHITECTURE §5).
+  `errorMessage` alanı bilerek eklenmedi — onu üretebilecek doğrulama Faz 6'da
+  geliyor.
+- **`HomeViewModel` (`@HiltViewModel`).** `repository.observeAll()` Flow'u
+  `stateIn` ile `StateFlow<HomeUiState>`'e çevriliyor (`viewModelScope`,
+  `SharingStarted.WhileSubscribed(5_000)`). Aylık toplam burada hesaplanıyor,
+  composable'da değil. Dışarıya yalnızca `uiState` ve `onEvent` açık; mutable
+  hiçbir şey sızmıyor.
+- **`MainActivity` ViewModel'a bağlandı**, `collectAsStateWithLifecycle` ile.
+  Kaldırılanlar: `mutableStateListOf`, monoton id sayacı, toplam
+  `derivedStateOf`'u, yerel `Subscription` data class'ı, `SubscriptionListSaver`
+  ve koda gömülü Netflix/Spotify verisi. **`MainActivity.kt`: 29 satır eklendi,
+  73 silindi.**
+- **Silme mecburen bu faza geldi.** `mutableStateListOf` kalkınca
+  `subscriptionList.remove(sub)` de kalkmak zorundaydı; `onDelete` artık
+  `HomeEvent.Delete(id)` gönderiyor. ROADMAP Faz 6'daki "kaydırarak silme
+  repository'yi tetiklesin" maddesi burada karşılandı.
+- **Para hassasiyeti: `Double` hiç kullanılmadı.** Parse `BigDecimal` üzerinden
+  (`"159,99"` → virgül noktaya → `movePointRight(2)` → `15999L`), gösterimde ters
+  yön (`movePointLeft(2)`). Tam sayı aritmetiği, yuvarlama hatası yok.
+- `SwipeToDeleteRow`'un jest/animasyon koduna dokunulmadı; yalnızca `onDelete`'in
+  ne çağırdığı değişti.
+
+**İki sorun, ikisi de çözüldü**
+- **`hilt-navigation-compose:1.4.0` derlemeyi durdurdu.**
+  `checkDebugAarMetadata` sekiz sorun buldu: sürüm **compileSdk 37 ve AGP
+  9.1.0** istiyor, proje 36.1 / 9.0.1'de. **1.3.0**'a düşürüldü — AGP
+  yükseltmek ayrı bir karar, veri akışı fazına sıkıştırılacak iş değil.
+- **`hiltViewModel()` deprecated çıktı.** Import
+  `androidx.hilt.navigation.compose`'dan
+  `androidx.hilt.lifecycle.viewmodel.compose`'a taşındı, uyarı gitti.
+
+**Bilinen eksik**
+- **`SubTrackPreview` çalışmıyor.** `MainScreen()` varsayılan olarak
+  `hiltViewModel()` çağırıyor, Compose preview'da Hilt grafı yok. Derlemeyi
+  etkilemiyor. **5b**'de `HomeScreen(uiState, onEvent)` durumsuz hâle gelince
+  kendiliğinden düzelecek; yarım düzeltme yapılmadı.
+
+**Değişen dosyalar**
+- `gradle/libs.versions.toml`, `app/build.gradle.kts` — `hilt-navigation-compose` 1.3.0
+- `app/src/main/java/com/elinacn/subtrack/ui/home/HomeUiState.kt` (yeni)
+- `app/src/main/java/com/elinacn/subtrack/ui/home/HomeViewModel.kt` (yeni)
+- `app/src/main/java/com/elinacn/subtrack/MainActivity.kt` — ViewModel bağlantısı
+
+**Commit'ler**
+- `019765e` build: add hilt-navigation-compose
+- `18c5570` feat: add home ui state and events
+- `7db9968` feat: add home view model with room-backed flow
+- `7e1b215` refactor: connect ui to view model and remove in-memory state
+
+**Tag**
+- `phase-5a-done`
+
+**Elle test sonucu**
+- Hepsi geçti. İlk açılışta liste boş — **beklenen**, seed data eklenmedi.
+- Ekleme çalışıyor; **kapat–aç sonrası liste duruyor.** Bu, Room → DAO →
+  mapper → repository → ViewModel → UI zincirinin **ilk kez uçtan uca
+  doğrulanması** demek; `subtrack.db` de bu adımda yaratıldı.
+- Silme kalıcı, ekran döndürmede liste titremiyor
+  (`WhileSubscribed(5_000)` bunun için), kuruş hassasiyeti doğru
+  (159,99 + 59,90 = 219,89), kaydırma regresyonu yok.
+
+**Sonraki faz için not**
+- 5b: `MainActivity` parçalanacak. Durumsuzlaştırma, `SubTrackPreview`'i ve
+  döndürmede kapanan sheet sorununu birlikte çözecek.
+- Faz 6'da kalan iş daraldı: girdi doğrulama, hata mesajı ve undo. Şu an
+  geçersiz girdi sessizce reddediliyor, kodda bunun geçici olduğu yazılı.
+
+---
+
 ## [Faz 4] Hilt — 2026-08-21
 
 **Durum:** Tamamlandı

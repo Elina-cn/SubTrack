@@ -114,16 +114,24 @@ durumda — Hilt'in gerekçesi anlaşıldı.
 
 ---
 
-## ⬜ Faz 5 — ViewModel + UiState + UI Bağlama
+## 🟡 Faz 5 — ViewModel + UiState + UI Bağlama
 
-- [ ] `HomeUiState` ve `HomeEvent`
-- [ ] `HomeViewModel` (`@HiltViewModel`), `stateIn` ile Flow → StateFlow
-- [ ] Aylık toplam hesabı ViewModel'a taşınsın (`derivedStateOf` kaldırılsın)
-- [ ] `MainActivity`'deki `mutableStateListOf` tamamen kaldırılsın
-- [ ] `collectAsStateWithLifecycle` ile bağlantı
-- [ ] `MainActivity` parçalansın: `HomeScreen`, `SubscriptionCard`, `AddSheet`
-- [ ] `androidx.hilt:hilt-navigation-compose` bağımlılığı eklensin
-      (`hiltViewModel()` fonksiyonu için gerekli)
+İki promptta yürütülüyor: **5a veri akışı (bitti)**, **5b dosya parçalama.**
+
+- [x] `HomeUiState` ve `HomeEvent`
+- [x] `HomeViewModel` (`@HiltViewModel`), `stateIn` ile Flow → StateFlow
+- [x] Aylık toplam hesabı ViewModel'a taşındı (`derivedStateOf` kaldırıldı)
+- [x] `MainActivity`'deki `mutableStateListOf` tamamen kaldırıldı — monoton id
+      sayacı, yerel `Subscription` data class'ı ve seed veri de gitti
+- [x] `collectAsStateWithLifecycle` ile bağlantı
+- [x] `androidx.hilt:hilt-navigation-compose` eklendi — **1.3.0**, çünkü 1.4.0
+      compileSdk 37 / AGP 9.1.0 istiyor (bkz. ARCHITECTURE §12)
+- [ ] **5b:** `MainActivity` parçalansın: `HomeScreen`, `SubscriptionCard`, `AddSheet`
+- [ ] **5b:** `showBottomSheet` `rememberSaveable`'a çevrilsin (döndürmede sheet
+      kapanıyor, yazılan metin gidiyor)
+- [ ] **5b:** `SubTrackPreview` çalışır hale gelsin (`HomeScreen` durumsuzlaşınca)
+- [ ] **5b:** `SubscriptionCard` dokunma alanı ölçülsün, 48dp altındaysa
+      yükseltilsin
 
 **Bitti:** Veri Room'dan geliyor, uygulama kapanıp açılınca duruyor,
 `MainActivity` 50 satırın altında.
@@ -132,12 +140,15 @@ durumda — Hilt'in gerekçesi anlaşıldı.
 
 ## ⬜ Faz 6 — CRUD Tamamlama
 
+**Kalan iş:** girdi doğrulama, hata mesajı ve undo. Şu an geçersiz girdi
+sessizce reddediliyor.
+
 - [ ] Ekleme repository üzerinden
 - [ ] Girdi doğrulama: boş ad, geçersiz/negatif fiyat → hata mesajı
 - [ ] Fiyat parse mantığı ViewModel'da (`String` → `Long` kuruş)
-- [ ] Kaydırarak silme repository'yi tetiklesin — **not:** hotfix serisinde
-      `SwipeToDeleteRow` yazıldı. Kalan iş: `onDelete` callback'ini
-      `HomeEvent.Delete`'e bağlamak ve undo eklemek.
+- [x] Kaydırarak silme repository'yi tetikliyor — **Faz 5a'da mecburen
+      yapıldı:** `mutableStateListOf` kalkınca `remove(sub)` de kalkmak
+      zorundaydı.
 - [ ] Silme sonrası Snackbar ile geri al (undo)
 - [ ] Repository hata yönetimi karara bağlansın: `Result<T>`, `DataError`
       tipi, veya exception + ViewModel'da yakalama. ARCHITECTURE §9
@@ -169,6 +180,10 @@ geri alınabiliyor.
       `SwipeToDeleteRow`'un semantics'i (custom "Sil" eylemi +
       `mergeDescendants`) hotfix serisinde baştan kondu.
 - [ ] Koyu tema tüm ekranlarda gözden geçirilsin
+- [ ] `HomeUiState.isLoading` UI'a bağlansın. Şu an hesaplanıyor ama hiç
+      okunmuyor; açılışta "yükleniyor" ile "hiç abonelik yok" ayırt edilemiyor.
+- [ ] Dashboard toplamı ekran okuyucuya bağlamlı okunsun (şu an etiket ve tutar
+      ayrı düğüm, "0.00 TL" bağlamsız okunuyor)
 
 **Bitti:** Hiçbir durumda boş/kırık ekran yok.
 
@@ -231,6 +246,8 @@ geri alınabiliyor.
 ## ⬜ Faz 15 — Düzenleme Ekranı
 
 - [ ] Karta tıklayınca düzenleme, Navigation ile ikinci ekran
+- [ ] Satır tıklanabilir olsun; şu an silme dışında eylem yok, TalkBack için
+      tek yol custom action
 
 ---
 

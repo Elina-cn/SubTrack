@@ -285,6 +285,20 @@ sıfırlanıyor (`onDragStarted`), böylece birikme yapısal olarak imkânsız.
 oy kullanmıyor. (`computeTarget`'ın üç dalından ikisi `positionalThreshold`'u
 hiç okumuyordu; hızlı fiskenin silmesinin sebebi buydu.)
 
+### Bağımlılık sürüm tabanı ve AGP eşiği
+
+Proje **AGP 9.0.1 / compileSdk 36.1** üzerinde duruyor.
+
+`hilt-navigation-compose` **1.3.0**'da tutuluyor: 1.4.0, `checkDebugAarMetadata`
+aşamasında derlemeyi durduruyor ve **compileSdk 37 ile AGP 9.1.0** istiyor.
+
+**Bu tek bir kütüphanenin sorunu değil, bir eşik.** Yeni androidx sürümleri
+giderek aynı tabanı isteyecek. Faz 9 (DataStore) veya Faz 10 (WorkManager)
+bunu zorunlu kılarsa, ROADMAP'te Faz 16'da duran **AGP yükseltmesi öne
+çekilecek.** Yükseltme kendi başına bir faz gibi ele alınmalı: AGP 9.0 → 9.1
+geçişi Faz 1a ve Faz 4'te yaşadığımız plugin sürümü/scope sorunlarını yeniden
+açabilir.
+
 ### Mimari karar: Hilt plugin'i sadece `:app`'te tanımlıdır
 
 Hilt Gradle plugin'i **root build dosyasında bildirilmez** — diğer plugin'lerin
