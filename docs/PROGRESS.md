@@ -27,6 +27,115 @@ Her faz sonunda **en üste** yeni kayıt eklenir. Eski kayıtlar silinmez.
 
 ---
 
+## [Faz 4] Hilt — 2026-08-21
+
+**Durum:** Tamamlandı
+
+**Yapılanlar**
+- **Hilt 2.60.1 seçildi.** Dagger 2.51'den beri KSP2 destekli ve
+  `hilt-android-compiler` KSP işlemcisi olarak yayınlanıyor; mevcut
+  Kotlin 2.2.10 / KSP `2.2.10-2.0.2` zincirine kapt'a hiç dokunmadan giriyor.
+- `@HiltAndroidApp` (`SubTrackApplication`) ve `@AndroidEntryPoint`
+  (`MainActivity`) eklendi. `MainActivity`'ye tek satır bile başka değişiklik
+  yapılmadı.
+- **`DatabaseModule`** (`@Provides`): veritabanı `@Singleton` ve
+  `@ApplicationContext` ile sağlanıyor — instance her Activity'den uzun
+  yaşadığı için Activity context'i sızıntı olurdu. DAO ise veritabanının
+  üzerine bir görünüm, kendi scope'u yok.
+- **`RepositoryModule`** (`@Binds`): arayüz → gerçekleme bağlaması.
+  `SubscriptionRepositoryImpl`'e `@Inject constructor` eklendi.
+- **`SubTrackApplication`'daki elle kurulum tamamen silindi.** `by lazy`
+  property'ler, `Room.databaseBuilder` çağrısı ve elle repository oluşturma
+  gitti; sınıf yalnızca `@HiltAndroidApp` taşıyan boş bir gövde.
+
+**Karşılaşılan sorun — yeni bir hata sınıfı**
+
+Plugin'i diğer ikisi gibi root'a `apply false` ile koyunca yapılandırma
+patladı:
+
+> `The KSP plugin was detected to be applied but its task class could not be
+> found. This is an indicator that the Hilt Gradle Plugin is using a different
+> class loader because it was declared at the root while KSP was declared in a
+> sub-project.` (google/dagger#3965)
+
+**Sebep:** Hilt'in Gradle plugin'i KSP'nin task sınıfını arıyor; ikisi farklı
+scope'ta tanımlanınca farklı class loader'lara düşüyor ve arama boşa çıkıyor.
+
+**Çözüm:** Hilt root'tan çıkarılıp KSP'nin durduğu yere — sadece `:app`'e —
+alındı. Root'a, birinin "tutarlılık" adına geri eklememesi için gerekçe yorumu
+bırakıldı.
+
+**Faz 1a'daki AGP 9 sorunlarıyla aynı sınıftan ama farklı:** orada plugin
+**sürümü** çakışıyordu, burada plugin'in **bildirim yeri**.
+
+**Doğrulamalar**
+- **KSP artık 13 dosya üretiyor** (Faz 2'de 2 idi): Room'un iki `_Impl`'i ve
+  11 Hilt dosyası (`Hilt_MainActivity`, iki `_GeneratedInjector`,
+  `SubscriptionRepositoryImpl_Factory`, iki `DatabaseModule_*Factory`,
+  aggregated root ve `hilt_aggregated_deps`).
+- **`@Binds` seçiminin somut kanıtı üretilen dosya listesinde:**
+  `DatabaseModule`'ün iki `@Provides`'ı için ikişer factory üretilmiş, ama
+  `RepositoryModule` için **hiçbir factory yok.** Dagger `@Binds`'ı bir cast'e
+  indiriyor; `@Provides` olsaydı çağrılacak bir metot ve onu saran bir factory
+  daha olurdu.
+- **Domain katmanı hâlâ saf:** `dagger` / `javax.inject` / `Hilt` taraması
+  **sıfır eşleşme**, import sayısı hâlâ iki
+  (`domain.model.Subscription`, `kotlinx.coroutines.flow.Flow`).
+
+**Değişen dosyalar**
+- `gradle/libs.versions.toml` — Hilt 2.60.1, `hilt-android`, `hilt-compiler`
+- `build.gradle.kts` — Hilt **bilerek eklenmedi**, gerekçe yorumu
+- `app/build.gradle.kts` — plugin alias'ı ve bağımlılıklar
+- `app/src/main/java/com/elinacn/subtrack/SubTrackApplication.kt` — boş gövde
+- `app/src/main/java/com/elinacn/subtrack/MainActivity.kt` — sadece annotation
+- `app/src/main/java/com/elinacn/subtrack/di/DatabaseModule.kt` (yeni)
+- `app/src/main/java/com/elinacn/subtrack/di/RepositoryModule.kt` (yeni)
+- `app/src/main/java/com/elinacn/subtrack/data/repository/SubscriptionRepositoryImpl.kt`
+  — `@Inject constructor`
+
+**Commit'ler**
+- `07e9aaa` build: add Hilt plugin and dependencies
+- `58a4cbe` feat: enable Hilt in application and activity
+- `d99e906` feat: add database and repository Hilt modules
+- `b8cfc52` refactor: remove manual dependency wiring
+
+**Tag**
+- `phase-4-done`
+
+**Elle test sonucu**
+- Uygulama açılıyor — bu fazın asıl sınavıydı, çünkü Hilt grafı çalışma
+  zamanında kuruyor ve derlemenin geçmesi kanıt değil.
+- UI değişmemiş; ekleme, silme, toplam, ekran döndürme ve kapat–aç doğru.
+- Kaydırarak silmede regresyon yok.
+
+### Faz 3'teki dört hantal noktanın durumu
+
+**Çözüldü (2/4):**
+1. **Cast kalktı.** `(context.applicationContext as SubTrackApplication)` diye
+   bir şey yok. Bağımlılık derleme zamanında doğrulanıyor: bir modül eksik olsa
+   Hilt **derlemeyi** durdurur, uygulama çalışma zamanında çökmez.
+3. **Graf sırası elle yönetilmiyor.** `SubTrackApplication` boş gövde. DataStore
+   (Faz 9) veya WorkManager (Faz 10) eklendiğinde yeni bir `@Provides` yazılacak,
+   kurulum sırasını Dagger çözecek.
+
+**Faz 5'te çözülecek (1/4):**
+2. **ViewModel fabrikası.** `@HiltViewModel` + `@Inject constructor` altyapısı
+   hazır ama henüz ViewModel yok. Kazanç `HomeViewModel` yazılınca somutlaşacak.
+
+**Faz 7'de çözülecek (1/4):**
+4. **Test edilebilirlik.** `@TestInstallIn` ile modül değiştirme altyapısı
+   mevcut, bedeli fake'lerle test yazarken görülecek.
+
+**Sonraki faz için not**
+- Faz 5 `hiltViewModel()` fonksiyonunu kullanacak; bunun için
+  `androidx.hilt:hilt-navigation-compose` bağımlılığı gerekiyor, ROADMAP'e
+  madde olarak eklendi.
+- Veritabanı dosyası hâlâ oluşmadı: Hilt `@Provides` metotlarını tembel çağırır,
+  kimse repository istemediği için Room açılmadı. Faz 5'te ViewModel isteyince
+  `subtrack.db` ilk kez yaratılacak.
+
+---
+
 ## [Faz 3] Repository Katmanı (manuel DI) — 2026-08-20
 
 **Durum:** Tamamlandı

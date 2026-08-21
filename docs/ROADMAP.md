@@ -101,12 +101,14 @@ durumda — Hilt'in gerekçesi anlaşıldı.
 
 ---
 
-## ⬜ Faz 4 — Hilt
+## ✅ Faz 4 — Hilt
 
-- [ ] Hilt eklentisi ve bağımlılıkları
-- [ ] `@HiltAndroidApp`, `@AndroidEntryPoint`
-- [ ] `DatabaseModule` (`@Provides`), `RepositoryModule` (`@Binds`)
-- [ ] Manuel kurulum kodu silinsin
+- [x] Hilt eklentisi ve bağımlılıkları — 2.60.1, `hilt-compiler` `ksp()` ile.
+      **Not:** plugin sadece `:app`'te tanımlı, root'ta değil; KSP ile aynı
+      scope'ta olması zorunlu (bkz. ARCHITECTURE §12).
+- [x] `@HiltAndroidApp`, `@AndroidEntryPoint`
+- [x] `DatabaseModule` (`@Provides`), `RepositoryModule` (`@Binds`)
+- [x] Manuel kurulum kodu silindi — `SubTrackApplication` boş gövde
 
 **Bitti:** Uygulama Hilt üzerinden ayağa kalkıyor, elle nesne kurulumu yok.
 
@@ -120,6 +122,8 @@ durumda — Hilt'in gerekçesi anlaşıldı.
 - [ ] `MainActivity`'deki `mutableStateListOf` tamamen kaldırılsın
 - [ ] `collectAsStateWithLifecycle` ile bağlantı
 - [ ] `MainActivity` parçalansın: `HomeScreen`, `SubscriptionCard`, `AddSheet`
+- [ ] `androidx.hilt:hilt-navigation-compose` bağımlılığı eklensin
+      (`hiltViewModel()` fonksiyonu için gerekli)
 
 **Bitti:** Veri Room'dan geliyor, uygulama kapanıp açılınca duruyor,
 `MainActivity` 50 satırın altında.

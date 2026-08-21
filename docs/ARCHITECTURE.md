@@ -285,6 +285,23 @@ sıfırlanıyor (`onDragStarted`), böylece birikme yapısal olarak imkânsız.
 oy kullanmıyor. (`computeTarget`'ın üç dalından ikisi `positionalThreshold`'u
 hiç okumuyordu; hızlı fiskenin silmesinin sebebi buydu.)
 
+### Mimari karar: Hilt plugin'i sadece `:app`'te tanımlıdır
+
+Hilt Gradle plugin'i **root build dosyasında bildirilmez** — diğer plugin'lerin
+aksine `apply false` satırı yoktur. Yalnızca `app/build.gradle.kts` içinde.
+
+**Gerekçe:** Hilt'in plugin'i KSP'nin task sınıfını arıyor. İkisi farklı
+scope'ta tanımlanırsa farklı class loader'lara düşüyorlar ve arama boşa
+çıkıyor; yapılandırma şu hatayla patlıyor:
+
+> `The KSP plugin was detected to be applied but its task class could not be
+> found. ... the Hilt Gradle Plugin is using a different class loader because
+> it was declared at the root while KSP was declared in a sub-project.`
+> ([google/dagger#3965](https://github.com/google/dagger/issues/3965))
+
+KSP `:app`'te durduğu için Hilt de orada duruyor. **Root'a "tutarlılık" adına
+geri eklenmemeli** — root dosyasında bunu hatırlatan bir yorum var.
+
 ### Mimari karar: şema dışa aktarılır
 
 `SubTrackDatabase` `exportSchema = true` ile tanımlıdır. Room her sürüm için
