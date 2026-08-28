@@ -28,8 +28,8 @@ Claude Code'a gider. Claude Code kendi başına mimari karar almaz.
 3. Prompt Claude Code'a yapıştırılır
    → CC kısa açıklama yapar, kodu yazar, derler, özet verir
 
-4. Kullanıcı elle test eder
-   → CC'nin söylediği test adımları uygulanır
+4. Kullanıcı elle test eder: önce docs/TESTING.md'deki sabit
+   regresyon listesi, sonra CC'nin söylediği faza özel adımlar
 
 5. Commit
    → küçük adımlarda birkaç adımda bir
