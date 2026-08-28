@@ -13,6 +13,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
@@ -59,11 +60,22 @@ fun HomeScreen(
     val errorText = uiState.errorMessage?.asString()
 
     // Offer the undo for as long as the snackbar is up; whichever way it ends, tell the ViewModel.
+    //
+    // duration is passed explicitly and must stay that way: showSnackbar defaults to Short only
+    // when there is no action label, and to Indefinite when there is one. Leaving it out here left
+    // the bar on screen forever, because its timer never started.
+    //
+    // A rotation re-runs this effect against a fresh host and shows the bar again, restarting the
+    // timer. That is deliberate. The undo window is a promise to the user, and turning the phone is
+    // not a decision to give it up; erring towards more time to reverse a deletion is the safe way
+    // round. The row is already gone from the database either way - pendingUndo only holds what it
+    // would take to put it back.
     LaunchedEffect(uiState.pendingUndo) {
         if (uiState.pendingUndo == null) return@LaunchedEffect
         val result = snackbarHostState.showSnackbar(
             message = deletedMessage,
-            actionLabel = undoLabel
+            actionLabel = undoLabel,
+            duration = SnackbarDuration.Short
         )
         onEvent(
             if (result == SnackbarResult.ActionPerformed) HomeEvent.UndoDelete
@@ -73,7 +85,7 @@ fun HomeScreen(
 
     LaunchedEffect(errorText) {
         if (errorText == null) return@LaunchedEffect
-        snackbarHostState.showSnackbar(errorText)
+        snackbarHostState.showSnackbar(message = errorText, duration = SnackbarDuration.Short)
         onEvent(HomeEvent.DismissError)
     }
 
