@@ -16,4 +16,19 @@
     <!-- Amount followed by the currency. Phase 9 replaces this with locale-aware formatting. -->
     <string name="price_format">%1$.2f TL</string>
 
+    <!-- Validation -->
+    <string name="error_name_empty">Abonelik adı boş olamaz</string>
+    <string name="error_price_empty">Fiyat boş olamaz</string>
+    <string name="error_price_invalid">Geçerli bir sayı girin</string>
+    <string name="error_price_not_positive">Fiyat sıfırdan büyük olmalı</string>
+    <string name="error_price_too_large">Fiyat çok büyük</string>
+
+    <!-- Failures -->
+    <string name="error_save_failed">Abonelik kaydedilemedi</string>
+    <string name="error_delete_failed">Abonelik silinemedi</string>
+
+    <!-- Undo -->
+    <string name="subscription_deleted">Abonelik silindi</string>
+    <string name="undo">Geri al</string>
+
 </resources>

@@ -2,25 +2,53 @@ package com.elinacn.subtrack.ui.home
 
 import com.elinacn.subtrack.domain.model.Money
 import com.elinacn.subtrack.domain.model.Subscription
+import com.elinacn.subtrack.ui.common.UiText
 
 /**
  * Everything the home screen draws, in one value.
  *
  * The screen renders this and nothing else - no second source of truth, no computation of its own.
- * An error field arrives in phase 6, together with input validation that can produce one.
+ *
+ * Field errors are separate from [errorMessage] on purpose: a bad name belongs under the name box,
+ * not in a banner that does not say which box is wrong. [errorMessage] is for failures with no
+ * field to point at, such as the database refusing a write.
  */
 data class HomeUiState(
     val subscriptions: List<Subscription> = emptyList(),
     val monthlyTotal: Money = Money.ZERO,
-    val isLoading: Boolean = true
+    val isLoading: Boolean = true,
+    /** Owned here rather than by the composable: whether it may close depends on validation. */
+    val isAddSheetOpen: Boolean = false,
+    val nameError: UiText? = null,
+    val priceError: UiText? = null,
+    val errorMessage: UiText? = null,
+    /** Set for as long as a deletion can still be undone; drives the snackbar. */
+    val pendingUndo: Subscription? = null
 )
 
 /** Everything the home screen can ask for. One channel instead of a lambda per action. */
 sealed interface HomeEvent {
 
-    /** Remove the subscription with this id. */
-    data class Delete(val id: Long) : HomeEvent
+    data object OpenAddSheet : HomeEvent
+
+    data object DismissAddSheet : HomeEvent
 
     /** Store a new subscription. The price arrives as typed; parsing belongs to the ViewModel. */
     data class Save(val name: String, val rawPrice: String) : HomeEvent
+
+    /** Sent as the user edits, so a stale error stops contradicting what is on screen. */
+    data object ClearNameError : HomeEvent
+
+    data object ClearPriceError : HomeEvent
+
+    /** Remove the subscription with this id. Undoable until the snackbar goes. */
+    data class Delete(val id: Long) : HomeEvent
+
+    /** Put the last deleted subscription back. */
+    data object UndoDelete : HomeEvent
+
+    /** The undo window closed without being used; the deletion is now final. */
+    data object DismissUndo : HomeEvent
+
+    data object DismissError : HomeEvent
 }
