@@ -172,8 +172,10 @@ class HomeViewModel @Inject constructor(
      * Reads what the user typed into whole minor units.
      *
      * BigDecimal, never Double: "159,99" has to come back out as exactly 15999 kuruş, and binary
-     * floating point cannot promise that. The magnitude is checked before the conversion, because
-     * BigDecimal.toLong truncates silently once the value no longer fits.
+     * floating point cannot promise that.
+     *
+     * Both the ceiling and the decimal count are checked before converting, so nothing is ever
+     * quietly reshaped on the way to storage.
      */
     private fun parsePrice(rawPrice: String): PriceResult {
         val normalized = rawPrice.trim().replace(',', '.')
@@ -187,6 +189,10 @@ class HomeViewModel @Inject constructor(
         }
         if (amount > MAX_PRICE) {
             return PriceResult.Invalid(UiText.Resource(R.string.error_price_too_large))
+        }
+        // Trailing zeros do not count: "159.990" is two decimals written long, "159.999" is three.
+        if (amount.stripTrailingZeros().scale() > MINOR_UNIT_DIGITS) {
+            return PriceResult.Invalid(UiText.Resource(R.string.error_price_too_many_decimals))
         }
         val cents = amount
             .movePointRight(MINOR_UNIT_DIGITS)
@@ -221,7 +227,15 @@ class HomeViewModel @Inject constructor(
 
         const val MINOR_UNIT_DIGITS = 2
 
-        /** Far above any real subscription, and far below where Long cents would overflow. */
-        val MAX_PRICE: BigDecimal = BigDecimal("99999999.99")
+        /**
+         * A product ceiling, not a Long limit.
+         *
+         * Long would not complain until roughly 92 quadrillion kuruş, so guarding against overflow
+         * catches nothing a person could plausibly type. One million per billing period is already
+         * three orders of magnitude above the priciest real subscription, and leaves room for
+         * weaker currencies when phase 9 adds the choice - while still rejecting a slipped keypress
+         * that adds digits.
+         */
+        val MAX_PRICE: BigDecimal = BigDecimal("1000000")
     }
 }

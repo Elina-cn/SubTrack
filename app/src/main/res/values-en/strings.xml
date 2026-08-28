@@ -21,6 +21,7 @@
     <string name="error_price_invalid">Enter a valid number</string>
     <string name="error_price_not_positive">Price must be greater than zero</string>
     <string name="error_price_too_large">Price is too large</string>
+    <string name="error_price_too_many_decimals">Use at most two decimal places</string>
 
     <!-- Failures -->
     <string name="error_save_failed">Could not save the subscription</string>
