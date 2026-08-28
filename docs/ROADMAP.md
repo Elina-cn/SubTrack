@@ -114,9 +114,9 @@ durumda — Hilt'in gerekçesi anlaşıldı.
 
 ---
 
-## 🟡 Faz 5 — ViewModel + UiState + UI Bağlama
+## ✅ Faz 5 — ViewModel + UiState + UI Bağlama
 
-İki promptta yürütülüyor: **5a veri akışı (bitti)**, **5b dosya parçalama.**
+İki promptta yürütüldü: **5a veri akışı**, **5b dosya parçalama.**
 
 - [x] `HomeUiState` ve `HomeEvent`
 - [x] `HomeViewModel` (`@HiltViewModel`), `stateIn` ile Flow → StateFlow
@@ -126,15 +126,19 @@ durumda — Hilt'in gerekçesi anlaşıldı.
 - [x] `collectAsStateWithLifecycle` ile bağlantı
 - [x] `androidx.hilt:hilt-navigation-compose` eklendi — **1.3.0**, çünkü 1.4.0
       compileSdk 37 / AGP 9.1.0 istiyor (bkz. ARCHITECTURE §12)
-- [ ] **5b:** `MainActivity` parçalansın: `HomeScreen`, `SubscriptionCard`, `AddSheet`
-- [ ] **5b:** `showBottomSheet` `rememberSaveable`'a çevrilsin (döndürmede sheet
-      kapanıyor, yazılan metin gidiyor)
-- [ ] **5b:** `SubTrackPreview` çalışır hale gelsin (`HomeScreen` durumsuzlaşınca)
-- [ ] **5b:** `SubscriptionCard` dokunma alanı ölçülsün, 48dp altındaysa
-      yükseltilsin
+- [x] **5b:** `MainActivity` parçalandı — 380 → **31 satır**. `HomeScreen`,
+      `DashboardCard`, `SubscriptionCard`, `AddSubscriptionSheet`,
+      `SwipeToDeleteRow` ayrı dosyalarda; hiçbiri 300 satırı geçmiyor.
+- [x] **5b:** `showBottomSheet` `rememberSaveable`'a çevrildi; form alanları da
+      döndürmede korunuyor
+- [x] **5b:** Preview'lar çalışıyor — `HomeScreen` durumsuzlaştı, altı preview
+      eklendi. Ayrıca `Theme.kt`'deki şemalar `by lazy`'ye alındı (class-init
+      hatası tüm preview'ları öldürüyordu, bkz. ARCHITECTURE §12).
+- [x] **5b:** `SubscriptionCard` dokunma alanı ölçüldü: **56dp**, 48dp eşiğini
+      8dp payla geçiyor. `Dimens` değiştirilmedi.
 
 **Bitti:** Veri Room'dan geliyor, uygulama kapanıp açılınca duruyor,
-`MainActivity` 50 satırın altında.
+`MainActivity` 50 satırın altında. ✅ (31 satır)
 
 ---
 

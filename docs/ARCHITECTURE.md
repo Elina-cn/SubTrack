@@ -285,6 +285,31 @@ sıfırlanıyor (`onDragStarted`), böylece birikme yapısal olarak imkânsız.
 oy kullanmıyor. (`computeTarget`'ın üç dalından ikisi `positionalThreshold`'u
 hiç okumuyordu; hızlı fiskenin silmesinin sebebi buydu.)
 
+### Mimari karar: renk şemaları `by lazy` ile kurulur
+
+`Theme.kt`'deki `DarkColorScheme` ve `LightColorScheme`, top-level `val` değil
+**`by lazy`**'dir. **Bu yapı bozulmamalı.**
+
+**Gerekçe:** Top-level `val` sınıf yüklenirken hemen çalışır. JVM'de bir static
+initializer bir kez patlarsa sınıf **kalıcı olarak** "hatalı" işaretlenir ve
+sonraki her erişim `NoClassDefFoundError: Could not initialize class ThemeKt`
+verir — asıl hata bir daha görünmez. Faz 5b'de altı preview'ın tamamı tam olarak
+böyle ölüyordu ve gerçek sebep maskeleniyordu.
+
+`by lazy` ile sınıf yüklenirken çalışacak bir şey kalmıyor; bir sorun varsa
+kendi mesajıyla, gerçekten oluştuğu yerde görünüyor. Davranış aynı: aynı
+renkler, aynı roller, şemalar yine bir kez üretilip önbelleğe alınıyor.
+
+### Preview bozulduğunda ilk yapılacak
+
+Compose preview'ları render olmuyorsa, koda dokunmadan önce Android Studio'da
+**Build → Clean Project**, ardından **File → Invalidate Caches / Restart**.
+
+Gradle derlemesi tertemiz geçerken Studio'nun sahte syntax hataları göstermesi
+veya *"No preview found"* demesi **indeks bozukluğudur**, kod hatası değil.
+Faz 5b'de tema düzeltmesinden sonra tam olarak bu yaşandı: 56 uydurma hata,
+Gradle tarafında sıfır sorun.
+
 ### Bağımlılık sürüm tabanı ve AGP eşiği
 
 Proje **AGP 9.0.1 / compileSdk 36.1** üzerinde duruyor.

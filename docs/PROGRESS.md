@@ -27,6 +27,101 @@ Her faz sonunda **en üste** yeni kayıt eklenir. Eski kayıtlar silinmez.
 
 ---
 
+## [Faz 5b] MainActivity Parçalama ve Durumsuzlaştırma — 2026-08-21
+
+**Durum:** Tamamlandı
+
+**Yapılanlar**
+- **`MainActivity` parçalandı: 380 satır → 31 satır.** Yalnızca `setContent`
+  kaldı; ViewModel'ı çözüyor, state'i topluyor ve durumsuz ekrana veriyor.
+
+  | Dosya | Satır |
+  |---|---:|
+  | `MainActivity.kt` | 31 |
+  | `ui/home/HomeScreen.kt` | 159 |
+  | `ui/home/HomeUiState.kt` | 26 |
+  | `ui/home/HomeViewModel.kt` | 107 |
+  | `ui/home/components/AddSubscriptionSheet.kt` | 113 |
+  | `ui/home/components/SwipeToDeleteRow.kt` | 137 |
+  | `ui/home/components/SubscriptionCard.kt` | 96 |
+  | `ui/home/components/DashboardCard.kt` | 67 |
+
+  Hiçbiri 300 satırı geçmiyor (CLAUDE.md §4).
+- **`HomeScreen` durumsuz hale getirildi:** `HomeScreen(uiState, onEvent)`.
+  `hiltViewModel()` çağrısı `MainActivity`'de kaldı, dolayısıyla altındaki
+  hiçbir composable render olmak için Hilt grafına ihtiyaç duymuyor.
+- **`showBottomSheet` `rememberSaveable`'a çevrildi** (skill denetimi #9).
+  Form alanlarındaki metin de öyle. Artık sheet açıkken ekran döndürülünce
+  sheet açık kalıyor ve yazılan metin korunuyor.
+- **Dokunma alanı ölçüldü** (skill denetimi #6): `SubscriptionCard` satırı
+  **56dp** — `CardPadding` 16dp × 2 + içerik 24dp (ikon ve satır yüksekliğinin
+  büyüğü). Android eşiği 48dp, **8dp payla geçiyor.** `Dimens`'e dokunulmadı;
+  ölçüm bileşenin KDoc'una yazıldı ki ileride padding değiştiren biri neyi
+  bozduğunu görsün.
+- **Altı preview eklendi**, `SubTrackPreview` kaldırıldı (skill denetimi #10):
+  `HomeScreen` boş/dolu, `SubscriptionCard` bilinen/bilinmeyen servis,
+  `DashboardCard` dolu/sıfır.
+- `getIconForSubscription` → `iconFor`, **`@Composable` işareti kaldırıldı.**
+  Fonksiyon composition'dan hiçbir şey okumuyordu; Faz 0 analizinde
+  işaretlenmişti. Davranış aynı, `when` bloğu birebir.
+- **Taşımada başka hiçbir mantık değişmedi.** Jest/animasyon kodu, renk, boyut
+  ve metin kaynakları harfi harfine taşındı.
+
+### Preview sorunu ve çözümü
+
+Altı preview'ın hiçbiri render olmuyordu:
+
+> `NoClassDefFoundError: Could not initialize class ui.theme.ThemeKt`
+
+**Kodda hata yoktu.** `ThemeKt`'nin başlatma zinciri okundu: `Context` erişimi,
+kaynak okuma veya `dynamicColorScheme` çağrısı yok; yapı Compose'un kendi
+şablonuyla aynıydı.
+
+**Mekanizma:** `Theme.kt`'deki iki top-level `val` (`DarkColorScheme`,
+`LightColorScheme`) sınıf yüklenirken hemen çalışıyordu. JVM'de bir static
+initializer bir kez patlarsa sınıf **kalıcı olarak** "hatalı" işaretlenir ve
+sonraki her erişim aynı opak mesajı verir — asıl hata bir daha görünmez. Altı
+preview'ın da aynı mesajla ölmesi ve gerçek sebebin görünmemesi buydu.
+
+**Çözüm (`392499e`):** şema kurulumu `by lazy` ile class-init'ten çıkarıldı.
+Sınıf yüklenirken artık patlayacak bir şey yok. Palet, roller ve koyu tema
+davranışı birebir aynı; şemalar yine bir kez üretilip önbelleğe alınıyor.
+
+**Ardından ikinci bir sorun çıktı:** Studio 56 sahte syntax hatası gösterdi ve
+"No preview found" dedi. Gradle derlemesi tertemizdi — sorun Studio'nun
+indeksiydi. **Build → Clean Project + Invalidate Caches / Restart** çözdü.
+
+**Değişen dosyalar**
+- `app/src/main/java/com/elinacn/subtrack/MainActivity.kt` — 380 → 31 satır
+- `app/src/main/java/com/elinacn/subtrack/ui/home/HomeScreen.kt` (yeni)
+- `app/src/main/java/com/elinacn/subtrack/ui/home/components/` — dört dosya (yeni)
+- `app/src/main/java/com/elinacn/subtrack/ui/theme/Theme.kt` — `by lazy`
+
+**Commit'ler**
+- `2b7d175` refactor: extract components from MainActivity
+- `1a0037f` fix: preserve bottom sheet state across rotation
+- `bd71368` feat: add previews for home components
+- `392499e` fix: build colour schemes lazily so previews can load the theme
+
+**Tag**
+- `phase-5-done`
+
+**Elle test sonucu**
+- Görsel regresyon yok — taşıma fazıydı, ekran birebir aynı.
+- Sheet açıkken ekran döndürülünce **açık kalıyor**, yazılan metin duruyor.
+- Ekleme, silme, toplam çalışıyor; kaydırma regresyonu yok; kapat–aç sağlam.
+- **Altı preview render oluyor.**
+- **Yapılamayan:** TalkBack testi. ColorOS'ta yerel eylemler menüsü açılmıyor,
+  cihaz kısıtı. Kod ve kaynak tarafı doğru (`mergeDescendants` + custom action
+  birebir taşındı), ama **cihazda doğrulanmadı** — Faz 5a'daki aynı kısıt.
+
+**Sonraki faz için not**
+- Faz 6: girdi doğrulama, hata mesajı ve undo. `HomeUiState`'e `errorMessage`
+  alanı eklenecek; repository hata yönetimi kararı da bu fazda verilecek
+  (Faz 3'ten ertelenmişti).
+
+---
+
 ## [Faz 5a] ViewModel, UiState ve Room Bağlantısı — 2026-08-21
 
 **Durum:** Tamamlandı
