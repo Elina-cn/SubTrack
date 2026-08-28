@@ -10,14 +10,17 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
@@ -39,24 +42,53 @@ import java.util.Locale
  * The home screen. Stateless with respect to data: it renders [uiState] and reports back through
  * [onEvent], holding nothing but whether the add sheet is open.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     uiState: HomeUiState,
     onEvent: (HomeEvent) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // rememberSaveable, not remember: rotating with the sheet open used to close it and discard
-    // whatever had been typed.
-    var showAddSheet by rememberSaveable { mutableStateOf(false) }
-
     val priceFormat = stringResource(id = R.string.price_format)
+    val snackbarHostState = remember { SnackbarHostState() }
+    val sheetState = rememberModalBottomSheetState()
+
+    // Resolved here rather than inside the effects below, which are not composable scopes.
+    val deletedMessage = stringResource(id = R.string.subscription_deleted)
+    val undoLabel = stringResource(id = R.string.undo)
+    val errorText = uiState.errorMessage?.asString()
+
+    // Offer the undo for as long as the snackbar is up; whichever way it ends, tell the ViewModel.
+    LaunchedEffect(uiState.pendingUndo) {
+        if (uiState.pendingUndo == null) return@LaunchedEffect
+        val result = snackbarHostState.showSnackbar(
+            message = deletedMessage,
+            actionLabel = undoLabel
+        )
+        onEvent(
+            if (result == SnackbarResult.ActionPerformed) HomeEvent.UndoDelete
+            else HomeEvent.DismissUndo
+        )
+    }
+
+    LaunchedEffect(errorText) {
+        if (errorText == null) return@LaunchedEffect
+        snackbarHostState.showSnackbar(errorText)
+        onEvent(HomeEvent.DismissError)
+    }
+
+    // Keep the sheet composed while it animates away, otherwise closing it is an instant cut.
+    LaunchedEffect(uiState.isAddSheetOpen) {
+        if (!uiState.isAddSheetOpen && sheetState.isVisible) sheetState.hide()
+    }
 
     Scaffold(
         modifier = modifier,
         containerColor = MaterialTheme.colorScheme.background,
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         floatingActionButton = {
             FloatingActionButton(
-                onClick = { showAddSheet = true },
+                onClick = { onEvent(HomeEvent.OpenAddSheet) },
                 containerColor = MaterialTheme.colorScheme.primaryContainer,
                 contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
                 shape = RoundedCornerShape(Dimens.FabCorner)
@@ -104,10 +136,15 @@ fun HomeScreen(
         }
     }
 
-    if (showAddSheet) {
+    if (uiState.isAddSheetOpen || sheetState.isVisible) {
         AddSubscriptionSheet(
+            sheetState = sheetState,
+            nameError = uiState.nameError,
+            priceError = uiState.priceError,
             onSave = { name, rawPrice -> onEvent(HomeEvent.Save(name, rawPrice)) },
-            onDismiss = { showAddSheet = false }
+            onNameEdited = { onEvent(HomeEvent.ClearNameError) },
+            onPriceEdited = { onEvent(HomeEvent.ClearPriceError) },
+            onDismiss = { onEvent(HomeEvent.DismissAddSheet) }
         )
     }
 }
