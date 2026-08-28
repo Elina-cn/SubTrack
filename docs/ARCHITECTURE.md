@@ -201,11 +201,32 @@ Repository bağlaması `@Binds` ile yapılır (interface → impl).
 
 ## 9. Hata Yönetimi
 
-- Repository, `Result<T>` döndürür ya da özel bir `DataError` tipi kullanır.
-- ViewModel bunu `UiState.errorMessage` alanına çevirir.
+**Repository `Result<T>` döndürmez.** (Karar Faz 6'da verildi, Faz 3'ten
+ertelenmişti.) İmzalar düz kalır: `suspend fun insert(...): Long` gibi.
+
+**Gerekçe:** Hatalarımızın çoğu veritabanı hatası değil, **girdi hatası** — boş
+ad, sayı olmayan fiyat, negatif tutar. Bunlar ViewModel'da, Room'a hiç
+ulaşmadan yakalanıyor. `Result<T>` bu hataların hiçbirine dokunmaz; yalnızca
+nadir DB hataları için her çağrı yerine bir sarmalayıcı açma yükü getirir.
+
+### Nerede ne yapılır
+
+| Hata türü | Nerede yakalanır | Nasıl gösterilir |
+|---|---|---|
+| Girdi hatası (boş ad, geçersiz fiyat) | ViewModel, doğrulama sırasında | `UiState.nameError` / `priceError` — **ilgili alanın altında** |
+| Veritabanı hatası | ViewModel, `try/catch` ile | `UiState.errorMessage` → Snackbar |
+
+- **Alan hatası ile genel hata ayrıdır.** Yanlış olan alan belliyse hata o alanın
+  altında görünür; tepede "bir şeyler yanlış" diyen tek bir mesaj yeterli değil.
 - Kullanıcıya gösterilecek metin `UiText` sarmalayıcısıyla taşınır
   (string resource ID'si veya düz metin) — ViewModel `Context` bilmez.
-- Sessiz `try/catch { }` yasaktır.
+  `UiText` `ui/common/` altındadır; çözümlemesi Compose'a bağlı olduğu için
+  domain'e konmadı.
+- **Sessiz `try/catch { }` yasaktır.** Yakalanan her hata `errorMessage`'a
+  dönüşüp kullanıcıya ulaşır.
+- `CancellationException` yakalanmaz, **yeniden fırlatılır.** Coroutine iptali
+  bir hata değildir; yutulursa iptal edilmiş bir iş veritabanı hatası gibi
+  raporlanır.
 
 ---
 
