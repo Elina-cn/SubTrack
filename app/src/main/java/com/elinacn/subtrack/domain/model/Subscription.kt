@@ -10,8 +10,8 @@ data class Subscription(
     val id: Long,
     val name: String,
     val price: Money,
-    /** ISO 4217 code, e.g. "TRY". */
-    val currencyCode: String,
+    /** What [price] is denominated in. Totals convert into a single currency for display. */
+    val currency: Currency,
     val billingPeriod: BillingPeriod,
     /** Null until the user sets a renewal date; the field ships in v1.0 to avoid a migration. */
     val nextPaymentDate: Long?,

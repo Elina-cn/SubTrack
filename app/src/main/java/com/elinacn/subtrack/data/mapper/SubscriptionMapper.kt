@@ -2,6 +2,7 @@ package com.elinacn.subtrack.data.mapper
 
 import com.elinacn.subtrack.data.local.entity.SubscriptionEntity
 import com.elinacn.subtrack.domain.model.BillingPeriod
+import com.elinacn.subtrack.domain.model.Currency
 import com.elinacn.subtrack.domain.model.Money
 import com.elinacn.subtrack.domain.model.Subscription
 import com.elinacn.subtrack.domain.model.SubscriptionCategory
@@ -17,7 +18,7 @@ fun SubscriptionEntity.toDomain(): Subscription = Subscription(
     id = id,
     name = name,
     price = Money(priceInCents),
-    currencyCode = currencyCode,
+    currency = Currency.fromCode(currencyCode),
     billingPeriod = billingPeriod.toBillingPeriod(),
     nextPaymentDate = nextPaymentDate,
     category = category.toCategory(),
@@ -30,7 +31,7 @@ fun Subscription.toEntity(): SubscriptionEntity = SubscriptionEntity(
     id = id,
     name = name,
     priceInCents = price.cents,
-    currencyCode = currencyCode,
+    currencyCode = currency.name,
     billingPeriod = billingPeriod.name,
     nextPaymentDate = nextPaymentDate,
     category = category.name,
