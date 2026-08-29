@@ -13,6 +13,7 @@ local.properties
 /.idea/deviceManager.xml
 /.idea/emulatorDisplays.xml
 /.idea/appInsightsSettings.xml
+/.idea/markdown.xml
 .DS_Store
 /build
 /captures
