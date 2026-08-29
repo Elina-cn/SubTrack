@@ -2,6 +2,7 @@ package com.elinacn.subtrack.data.mapper
 
 import com.elinacn.subtrack.data.local.entity.SubscriptionEntity
 import com.elinacn.subtrack.domain.model.BillingPeriod
+import com.elinacn.subtrack.domain.model.Currency
 import com.elinacn.subtrack.domain.model.Money
 import com.elinacn.subtrack.domain.model.Subscription
 import com.elinacn.subtrack.domain.model.SubscriptionCategory
@@ -29,7 +30,7 @@ class SubscriptionMapperTest {
         assertEquals(7L, domain.id)
         assertEquals("Netflix", domain.name)
         assertEquals(Money(15999), domain.price)
-        assertEquals("TRY", domain.currencyCode)
+        assertEquals(Currency.TRY, domain.currency)
         assertEquals(BillingPeriod.YEARLY, domain.billingPeriod)
         assertEquals(1_700_000_000_000, domain.nextPaymentDate)
         assertEquals(SubscriptionCategory.ENTERTAINMENT, domain.category)
@@ -148,7 +149,7 @@ class SubscriptionMapperTest {
         id: Long = 1,
         name: String = "Test",
         cents: Long = 1000,
-        currencyCode: String = "TRY",
+        currency: Currency = Currency.TRY,
         billingPeriod: BillingPeriod = BillingPeriod.MONTHLY,
         nextPaymentDate: Long? = null,
         category: SubscriptionCategory = SubscriptionCategory.OTHER,
@@ -158,7 +159,7 @@ class SubscriptionMapperTest {
         id = id,
         name = name,
         price = Money(cents),
-        currencyCode = currencyCode,
+        currency = currency,
         billingPeriod = billingPeriod,
         nextPaymentDate = nextPaymentDate,
         category = category,

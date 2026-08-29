@@ -3,6 +3,7 @@ package com.elinacn.subtrack.ui.home
 import app.cash.turbine.test
 import com.elinacn.subtrack.R
 import com.elinacn.subtrack.domain.model.BillingPeriod
+import com.elinacn.subtrack.domain.model.Currency
 import com.elinacn.subtrack.domain.model.Money
 import com.elinacn.subtrack.domain.model.Subscription
 import com.elinacn.subtrack.domain.model.SubscriptionCategory
@@ -89,6 +90,35 @@ class HomeViewModelTest {
         assertEquals(Money(21989), viewModel.uiState.value.monthlyTotal)
     }
 
+    @Test
+    fun uiState_mixedCurrencies_normalizesTheTotalAndFlagsTheConversion() = runTest {
+        repository.setSubscriptions(
+            listOf(
+                subscription(id = 1, cents = 15999), // 159,99 TRY
+                subscription(id = 2, cents = 1099, currency = Currency.USD), // 470,92 TRY
+                subscription(id = 3, cents = 2499, currency = Currency.EUR) // 1154,54 TRY
+            )
+        )
+        collectState()
+
+        assertEquals(Money(178545), viewModel.uiState.value.monthlyTotal)
+        assertEquals(Currency.TRY, viewModel.uiState.value.baseCurrency)
+        assertTrue(viewModel.uiState.value.isTotalConverted)
+    }
+
+    @Test
+    fun uiState_onlyBaseCurrency_doesNotClaimAConversionHappened() = runTest {
+        repository.setSubscriptions(
+            listOf(
+                subscription(id = 1, cents = 15999),
+                subscription(id = 2, cents = 5990)
+            )
+        )
+        collectState()
+
+        assertEquals(false, viewModel.uiState.value.isTotalConverted)
+    }
+
     // --- saving ---------------------------------------------------------------------------
 
     @Test
@@ -96,7 +126,7 @@ class HomeViewModelTest {
         collectState()
         viewModel.onEvent(HomeEvent.OpenAddSheet)
 
-        viewModel.onEvent(HomeEvent.Save("Netflix", "159,99"))
+        viewModel.onEvent(HomeEvent.Save("Netflix", "159,99", Currency.TRY))
         advanceUntilIdle()
 
         assertEquals(1, repository.inserted.size)
@@ -109,19 +139,30 @@ class HomeViewModelTest {
     fun save_price159_99_storesExactly15999Cents() = runTest {
         collectState()
 
-        viewModel.onEvent(HomeEvent.Save("Netflix", "159,99"))
+        viewModel.onEvent(HomeEvent.Save("Netflix", "159,99", Currency.TRY))
         advanceUntilIdle()
 
         assertEquals(Money(15999), repository.inserted.single().price)
     }
 
     @Test
+    fun save_foreignCurrency_storesWhatWasChosenRatherThanTheBase() = runTest {
+        collectState()
+
+        viewModel.onEvent(HomeEvent.Save("Spotify", "10,99", Currency.USD))
+        advanceUntilIdle()
+
+        assertEquals(Currency.USD, repository.inserted.single().currency)
+        assertEquals(Money(1099), repository.inserted.single().price)
+    }
+
+    @Test
     fun save_commaAndDotSeparator_produceTheSameAmount() = runTest {
         collectState()
 
-        viewModel.onEvent(HomeEvent.Save("Comma", "45,50"))
+        viewModel.onEvent(HomeEvent.Save("Comma", "45,50", Currency.TRY))
         advanceUntilIdle()
-        viewModel.onEvent(HomeEvent.Save("Dot", "45.50"))
+        viewModel.onEvent(HomeEvent.Save("Dot", "45.50", Currency.TRY))
         advanceUntilIdle()
 
         assertEquals(Money(4550), repository.inserted[0].price)
@@ -133,7 +174,7 @@ class HomeViewModelTest {
         collectState()
         viewModel.onEvent(HomeEvent.OpenAddSheet)
 
-        viewModel.onEvent(HomeEvent.Save("   ", "159,99"))
+        viewModel.onEvent(HomeEvent.Save("   ", "159,99", Currency.TRY))
         advanceUntilIdle()
 
         assertEquals(errorRes(R.string.error_name_empty), viewModel.uiState.value.nameError)
@@ -165,7 +206,7 @@ class HomeViewModelTest {
     fun save_priceAtCeiling_isAccepted() = runTest {
         collectState()
 
-        viewModel.onEvent(HomeEvent.Save("Expensive", "1000000"))
+        viewModel.onEvent(HomeEvent.Save("Expensive", "1000000", Currency.TRY))
         advanceUntilIdle()
 
         assertEquals(Money(100_000_000), repository.inserted.single().price)
@@ -185,7 +226,7 @@ class HomeViewModelTest {
     fun save_priceAboveCeiling_carriesTheLimitIntoTheMessage() = runTest {
         collectState()
 
-        viewModel.onEvent(HomeEvent.Save("Netflix", "5000000"))
+        viewModel.onEvent(HomeEvent.Save("Netflix", "5000000", Currency.TRY))
         advanceUntilIdle()
 
         // The number travels as an argument, so the string resource never has to repeat a limit
@@ -203,7 +244,7 @@ class HomeViewModelTest {
     fun save_trailingZeroAfterTwoDecimals_isAccepted() = runTest {
         collectState()
 
-        viewModel.onEvent(HomeEvent.Save("Netflix", "159,990"))
+        viewModel.onEvent(HomeEvent.Save("Netflix", "159,990", Currency.TRY))
         advanceUntilIdle()
 
         assertEquals(Money(15999), repository.inserted.single().price)
@@ -212,7 +253,7 @@ class HomeViewModelTest {
     @Test
     fun clearPriceError_afterRejection_removesTheMessage() = runTest {
         collectState()
-        viewModel.onEvent(HomeEvent.Save("Netflix", "abc"))
+        viewModel.onEvent(HomeEvent.Save("Netflix", "abc", Currency.TRY))
         advanceUntilIdle()
 
         viewModel.onEvent(HomeEvent.ClearPriceError)
@@ -286,7 +327,7 @@ class HomeViewModelTest {
         collectState()
         viewModel.onEvent(HomeEvent.OpenAddSheet)
 
-        viewModel.onEvent(HomeEvent.Save("Netflix", rawPrice))
+        viewModel.onEvent(HomeEvent.Save("Netflix", rawPrice, Currency.TRY))
         advanceUntilIdle()
 
         assertEquals(UiText.Resource(expected, args), viewModel.uiState.value.priceError)
@@ -299,12 +340,13 @@ class HomeViewModelTest {
     private fun subscription(
         id: Long = 1,
         name: String = "Test",
-        cents: Long = 1000
+        cents: Long = 1000,
+        currency: Currency = Currency.TRY
     ) = Subscription(
         id = id,
         name = name,
         price = Money(cents),
-        currencyCode = "TRY",
+        currency = currency,
         billingPeriod = BillingPeriod.MONTHLY,
         nextPaymentDate = null,
         category = SubscriptionCategory.OTHER,
