@@ -11,7 +11,16 @@ oradan bulunur.
 
 ## Sabit Regresyon Listesi
 
-Sırayla ve tek oturumda çalıştırılır. Bir madde kalırsa sonrakilere devam
+**Önce otomatik testler:**
+
+```bash
+./gradlew :app:testDebugUnitTest
+```
+
+Geçmeden elle teste başlanmaz — kırmızı bir birim testi varken cihazda gözlem
+yapmak zaman kaybıdır.
+
+Sonra aşağıdaki liste, sırayla ve tek oturumda çalıştırılır. Bir madde kalırsa sonrakilere devam
 etmeden bildirin; sonraki maddeler zaten bozuk bir durumun üstüne binebilir.
 
 | # | Test | Beklenen | Kazanıldığı faz |

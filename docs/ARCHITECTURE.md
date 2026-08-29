@@ -258,6 +258,26 @@ nadir DB hataları için her çağrı yerine bir sarmalayıcı açma yükü geti
 Kural: **fake yaz, mock kütüphanesi kullanma.** Interface'ler zaten
 Domain'de tanımlı, elle fake yazmak hem daha okunur hem daha hızlı.
 
+### ViewModel testleri public yüzeyden yazılır
+
+Testler `onEvent` gönderip `uiState`'e bakar. **Bir fonksiyonu test etmek için
+görünürlüğü değiştirilmez** — `private` olan `private` kalır.
+
+Gerekçe: davranış test edilir, implementasyon değil. `HomeViewModel.parsePrice`
+private olduğu için fiyat doğrulaması `onEvent(Save(...))` üzerinden test edildi;
+fonksiyon yarın yeniden adlandırılsa veya başka bir sınıfa taşınsa testler
+geçerli kalır.
+
+### `stateIn` + `WhileSubscribed` test ederken toplayıcı şart
+
+`WhileSubscribed` ile kurulan bir `StateFlow` **soğuktur**: kimse toplamadığı
+sürece `.value` yalnızca `initialValue` döndürür.
+
+Testte `backgroundScope.launch { uiState.collect() }` ile bir toplayıcı
+açılmalı. Açılmazsa testler başlangıç değerini görür ve **hiçbir şey
+doğrulamadan yeşil geçer** — sessizce işe yaramaz bir test paketi, ki bu
+başarısız testten daha tehlikelidir.
+
 ---
 
 ## 12. Mevcut Koddan Taşınacak Borçlar

@@ -163,15 +163,21 @@ geri alınabiliyor.
 
 ---
 
-## ⬜ Faz 7 — Test Altyapısı
+## ✅ Faz 7 — Test Altyapısı
 
-- [ ] JUnit, Turbine, coroutines-test kurulumu
-- [ ] `FakeSubscriptionRepository`, `FakeSubscriptionDao`
-- [ ] `HomeViewModel` testleri: yükleme, toplam hesabı, doğrulama, silme
-- [ ] `SubscriptionMapper` testleri
-- [ ] `SubscriptionDao` enstrümantasyon testi (in-memory DB)
+- [x] JUnit, Turbine 1.2.1, coroutines-test kurulumu — sonuncusu uygulamanın
+      çözümlediği coroutines 1.9.0 ile aynı sürüme sabitlendi
+- [x] `FakeSubscriptionRepository` elle yazıldı (mock kütüphanesi yok).
+      **Not:** `FakeSubscriptionDao` gerekmedi — DAO gerçek in-memory Room
+      üzerinde test ediliyor, sahtesine ihtiyaç kalmadı.
+- [x] `HomeViewModel` testleri (19): yükleme, toplam hesabı, doğrulama, silme,
+      undo. Fiyat doğrulaması public yüzeyden test edildi (`parsePrice` private,
+      bkz. ARCHITECTURE §11)
+- [x] `SubscriptionMapper` testleri (8)
+- [x] `SubscriptionDao` enstrümantasyon testi (8, in-memory DB, cihazda koştu)
 
-**Bitti:** `./gradlew test` geçiyor, kritik yollar kapsanmış.
+**Bitti:** `./gradlew :app:testDebugUnitTest` geçiyor (28 test), enstrümantasyon
+cihazda geçiyor (9 test), kritik yollar kapsanmış.
 
 ---
 
@@ -265,6 +271,8 @@ geri alınabiliyor.
 - [ ] `isMinifyEnabled = true` (R8) — APK boyutu ve açılış süresi düşer
 - [ ] `material-icons-extended` kaldırılsın veya daraltılsın: binlerce ikon
       getiriyor, **beş** tanesi kullanılıyor
+- [ ] Şablon testler kaldırılsın (`ExampleUnitTest`, `ExampleInstrumentedTest`
+      — dolgu: `2+2=4` ve paket adı kontrolü)
 - [ ] `targetSdk` Play'in güncel zorunluluğuna yükseltilsin
 - [ ] Gizlilik politikası (çevrimdışı, veri toplanmıyor)
 - [ ] Play Console Data Safety formu

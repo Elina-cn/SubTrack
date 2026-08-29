@@ -27,6 +27,111 @@ Her faz sonunda **en üste** yeni kayıt eklenir. Eski kayıtlar silinmez.
 
 ---
 
+## [Faz 7] Test Altyapısı — 2026-08-29
+
+**Durum:** Tamamlandı
+
+**Yapılanlar**
+- **Test bağımlılıkları:** JUnit, **Turbine 1.2.1**, `kotlinx-coroutines-test`.
+  Sonuncusu uygulamanın gerçekten çözümlediği **coroutines 1.9.0** ile aynı
+  sürüme sabitlendi; farklı sürüm dispatcher hatalarını test hatası gibi
+  gösterirdi.
+- **Birim testleri (28 test, hepsi geçti):**
+
+  | Sınıf | Test |
+  |---|---:|
+  | `SubscriptionMapperTest` | 8 |
+  | `HomeViewModelTest` | 19 |
+  | `ExampleUnitTest` (şablon) | 1 |
+
+- **Enstrümantasyon testleri (9 test, hepsi geçti):** `SubscriptionDaoTest` (8)
+  + şablon. **Cihazda çalıştırıldı** (OPPO CPH2179, Android 10), in-memory Room
+  üzerinde. Son test Faz 1'deki id çakışması hatasını Room tarafından kapatıyor:
+  `AUTOINCREMENT` silinen id'yi asla geri vermiyor.
+- **`FakeSubscriptionRepository` elle yazıldı**, mock kütüphanesi kullanılmadı
+  (ARCHITECTURE §11). Gerçekten satır saklıyor, böylece testler "hangi metot
+  çağrıldı"ya değil **ortaya çıkan listeye** bakıyor.
+- **Üretim kodunda tek satır değişmedi.**
+
+### Bulgu — `parsePrice` private
+
+Fiyat doğrulaması saf fonksiyon olarak test edilemedi: `parsePrice` `private`
+ve üretim kodunu değiştirmek yasaktı. Testler **public yüzeyden** yazıldı —
+`onEvent(Save(...))` gönderilip `uiState.priceError` ve
+`repository.inserted`'ın boş kaldığı kontrol ediliyor.
+
+**Bu tercih edilen yol.** İmplementasyonu değil davranışı doğruluyor;
+`parsePrice` yeniden adlandırılsa veya başka sınıfa taşınsa testler geçerli
+kalır. **`internal` yapılmayacak.**
+
+Tek etkisi sıralama: fiyat testleri fake gerektirdiği için önce mapper, sonra
+fake, sonra ViewModel yazıldı.
+
+### Testlerin gerçekten çalıştığının kanıtı
+
+İki beklenti kasten bozuldu:
+1. `Money(21989)` → `Money(21988)` (toplam aritmetiği)
+2. `assertPriceRejected` içinde `isEmpty()` → `isNotEmpty()`
+
+Sonuç: **`28 tests completed, 7 failed`** — biri aritmetik, **altısı** paylaşılan
+yardımcıyı kullanan tüm fiyat reddi testlerinden. Geri alındı, tekrar yeşil.
+
+### İki teknik not
+
+- **`WhileSubscribed` testte tuzak.** `uiState` soğuk; kimse toplamadığı sürece
+  `.value` başlangıç değerini döndürür. Testlerde
+  `backgroundScope.launch { uiState.collect() }` ile bir toplayıcı açılıyor.
+  Açılmasaydı her assert `isLoading = true` görürdü ve testler **hiçbir şey
+  doğrulamadan yeşil geçerdi** — sessizce işe yaramaz bir test paketi.
+- **`Dispatchers.setMain` zorunlu:** `viewModelScope` `Dispatchers.Main`
+  kullanıyor, JVM testinde öyle bir şey yok.
+
+### Faz 3'ün dördüncü hantal noktası ödenmedi
+
+Faz 3'te *"testte sahte repository koymak üretim kodunu değiştirmeyi
+gerektirir, Hilt'te `@TestInstallIn` ile modül değiştirilir"* demiştik.
+**Gerçekleşmedi.** `HomeViewModel` repository'yi constructor'dan aldığı için
+fake'i elle geçirmek yetti; Hilt'e hiç dokunulmadı.
+
+`@TestInstallIn` gerçekten **Hilt'in kendi kurduğu grafı** test ederken
+gerekecek: Compose UI testleri (`@HiltAndroidTest`) veya uçtan uca testler.
+Faz 8'de boş durum ve yükleme ekranları için UI testi yazılırsa orada çıkar.
+
+**Değişen dosyalar**
+- `gradle/libs.versions.toml`, `app/build.gradle.kts` — test bağımlılıkları
+- `app/src/test/java/.../data/mapper/SubscriptionMapperTest.kt` (yeni)
+- `app/src/test/java/.../fake/FakeSubscriptionRepository.kt` (yeni)
+- `app/src/test/java/.../ui/home/HomeViewModelTest.kt` (yeni)
+- `app/src/androidTest/java/.../data/local/SubscriptionDaoTest.kt` (yeni)
+- `.gitignore` — `/.idea/markdown.xml`
+
+**Commit'ler**
+- `a114982` build: add test dependencies
+- `e1e0c22` test: add mapper tests
+- `a322ae5` test: add home view model tests with fake repository
+- `b087356` test: add dao instrumentation tests on an in-memory database
+- `82dfaf7` chore: ignore markdown.xml
+
+**Tag**
+- `phase-7-done`
+
+**Elle test sonucu**
+- Üretim kodu değişmediği için faza özel adım yok; `docs/TESTING.md`'deki sabit
+  liste yeterli.
+- Uygulamanın hâlâ derlenip cihazda açıldığı doğrulandı.
+
+**Bilinen borç**
+- Şablon testler (`ExampleUnitTest`, `ExampleInstrumentedTest`) dolgu — sırasıyla
+  `2+2=4` ve paket adı kontrolü. Kapsam dışı bırakıldı, Faz 16 temizliğinde
+  kaldırılacak.
+
+**Sonraki faz için not**
+- Faz 8: boş durum, yükleme göstergesi, hata gösterimi, erişilebilirlik.
+  `HomeUiState.isLoading` hâlâ hesaplanıyor ama UI'da okunmuyor — o fazın ilk
+  maddesi.
+
+---
+
 ## [Faz 6] Girdi Doğrulama, Hata Gösterimi ve Undo — 2026-08-29
 
 **Durum:** Tamamlandı
