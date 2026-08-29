@@ -1,5 +1,6 @@
 package com.elinacn.subtrack.ui.home
 
+import com.elinacn.subtrack.domain.model.Currency
 import com.elinacn.subtrack.domain.model.Money
 import com.elinacn.subtrack.domain.model.Subscription
 import com.elinacn.subtrack.ui.common.UiText
@@ -15,7 +16,17 @@ import com.elinacn.subtrack.ui.common.UiText
  */
 data class HomeUiState(
     val subscriptions: List<Subscription> = emptyList(),
+    /** Every subscription converted into [baseCurrency] and added up. */
     val monthlyTotal: Money = Money.ZERO,
+    /** What [monthlyTotal] is denominated in. Fixed for now; phase 9b makes it a preference. */
+    val baseCurrency: Currency = Currency.Base,
+    /**
+     * True when at least one subscription is priced in something other than [baseCurrency].
+     *
+     * Drives a line under the total saying so. Without it a mixed list produces a number with no
+     * explanation of how prices in three currencies became one figure.
+     */
+    val isTotalConverted: Boolean = false,
     val isLoading: Boolean = true,
     /** Owned here rather than by the composable: whether it may close depends on validation. */
     val isAddSheetOpen: Boolean = false,
@@ -34,7 +45,7 @@ sealed interface HomeEvent {
     data object DismissAddSheet : HomeEvent
 
     /** Store a new subscription. The price arrives as typed; parsing belongs to the ViewModel. */
-    data class Save(val name: String, val rawPrice: String) : HomeEvent
+    data class Save(val name: String, val rawPrice: String, val currency: Currency) : HomeEvent
 
     /** Sent as the user edits, so a stale error stops contradicting what is on screen. */
     data object ClearNameError : HomeEvent

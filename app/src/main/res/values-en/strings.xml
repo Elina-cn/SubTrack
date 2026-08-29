@@ -9,12 +9,19 @@
     <string name="add_subscription_title">New Subscription</string>
     <string name="subscription_name_label">Subscription Name</string>
     <string name="subscription_price_label">Price (e.g. 159.99)</string>
+    <string name="currency_label">Currency</string>
     <string name="save">Save</string>
+
+    <!-- Spoken currency names; the chips themselves show the ISO 4217 code. -->
+    <string name="currency_try">Turkish lira</string>
+    <string name="currency_usd">US dollar</string>
+    <string name="currency_eur">Euro</string>
+    <string name="currency_gbp">British pound</string>
 
     <!-- Subscription row -->
     <string name="delete">Delete</string>
-    <!-- Currency stays TL until phase 9 introduces currency selection. -->
-    <string name="price_format">%1$.2f TL</string>
+    <!-- Shown under the total only when the list holds more than one currency. -->
+    <string name="total_converted_note">Mixed currencies converted to %1$s at fixed rates</string>
     <!-- Validation -->
     <string name="error_name_empty">Enter a subscription name</string>
     <string name="error_price_empty">Enter a price</string>

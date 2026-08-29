@@ -4,11 +4,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.elinacn.subtrack.R
 import com.elinacn.subtrack.domain.model.BillingPeriod
+import com.elinacn.subtrack.domain.model.Currency
 import com.elinacn.subtrack.domain.model.Money
 import com.elinacn.subtrack.domain.model.Subscription
 import com.elinacn.subtrack.domain.model.SubscriptionCategory
-import com.elinacn.subtrack.domain.model.sum
 import com.elinacn.subtrack.domain.repository.SubscriptionRepository
+import com.elinacn.subtrack.domain.usecase.CurrencyConverter
 import com.elinacn.subtrack.ui.common.UiText
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
@@ -33,6 +34,14 @@ class HomeViewModel @Inject constructor(
     private val screenState = MutableStateFlow(ScreenState())
 
     /**
+     * Fixed rates for now.
+     *
+     * Phase 9b hands in a table read from storage instead. Nothing here changes when it does - the
+     * converter already takes its rates from outside, so only the argument moves.
+     */
+    private val converter = CurrencyConverter()
+
+    /**
      * The single source of truth for the screen.
      *
      * combine merges the stored list with the state above, and stateIn turns the result into a hot
@@ -47,7 +56,9 @@ class HomeViewModel @Inject constructor(
     ) { subscriptions, screen ->
         HomeUiState(
             subscriptions = subscriptions,
-            monthlyTotal = subscriptions.map { it.price }.sum(),
+            monthlyTotal = converter.totalIn(subscriptions, Currency.Base),
+            baseCurrency = Currency.Base,
+            isTotalConverted = subscriptions.any { it.currency != Currency.Base },
             isLoading = false,
             isAddSheetOpen = screen.isAddSheetOpen,
             nameError = screen.nameError,
@@ -72,7 +83,7 @@ class HomeViewModel @Inject constructor(
                 it.copy(isAddSheetOpen = false, nameError = null, priceError = null)
             }
 
-            is HomeEvent.Save -> save(event.name, event.rawPrice)
+            is HomeEvent.Save -> save(event.name, event.rawPrice, event.currency)
 
             HomeEvent.ClearNameError -> screenState.update { it.copy(nameError = null) }
 
@@ -92,7 +103,7 @@ class HomeViewModel @Inject constructor(
      * Validates first and only writes if everything checks out. The sheet stays open on a bad
      * entry - closing it would throw away what the user typed along with the explanation.
      */
-    private fun save(name: String, rawPrice: String) {
+    private fun save(name: String, rawPrice: String, currency: Currency) {
         val trimmedName = name.trim()
         val nameError = if (trimmedName.isEmpty()) UiText.Resource(R.string.error_name_empty) else null
         val priceResult = parsePrice(rawPrice)
@@ -115,7 +126,7 @@ class HomeViewModel @Inject constructor(
                         id = 0,
                         name = trimmedName,
                         price = price,
-                        currencyCode = DEFAULT_CURRENCY,
+                        currency = currency,
                         billingPeriod = BillingPeriod.MONTHLY,
                         nextPaymentDate = null,
                         category = SubscriptionCategory.OTHER,
@@ -225,9 +236,6 @@ class HomeViewModel @Inject constructor(
     private companion object {
         /** Outlives a configuration change, expires on a real departure. */
         const val STOP_TIMEOUT_MS = 5_000L
-
-        /** Phase 9 replaces this with a per-subscription choice. */
-        const val DEFAULT_CURRENCY = "TRY"
 
         const val MINOR_UNIT_DIGITS = 2
 

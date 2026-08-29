@@ -19,6 +19,7 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -27,6 +28,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
 import com.elinacn.subtrack.R
+import com.elinacn.subtrack.domain.model.Currency
 import com.elinacn.subtrack.ui.common.UiText
 import com.elinacn.subtrack.ui.theme.Dimens
 import com.elinacn.subtrack.ui.theme.SubTrackTheme
@@ -46,7 +48,7 @@ fun AddSubscriptionSheet(
     sheetState: SheetState,
     nameError: UiText?,
     priceError: UiText?,
-    onSave: (name: String, rawPrice: String) -> Unit,
+    onSave: (name: String, rawPrice: String, currency: Currency) -> Unit,
     onNameEdited: () -> Unit,
     onPriceEdited: () -> Unit,
     onDismiss: () -> Unit,
@@ -54,6 +56,7 @@ fun AddSubscriptionSheet(
 ) {
     var name by rememberSaveable { mutableStateOf("") }
     var rawPrice by rememberSaveable { mutableStateOf("") }
+    var currency by rememberSaveable(stateSaver = CurrencySaver) { mutableStateOf(Currency.Base) }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -105,10 +108,23 @@ fun AddSubscriptionSheet(
                 supportingText = priceError?.let { { Text(it.asString()) } }
             )
 
+            Spacer(modifier = Modifier.height(Dimens.SpacerMedium))
+
+            // Left aligned against the centred column, so the label sits over its chips rather
+            // than floating in the middle of the sheet.
+            Text(
+                text = stringResource(id = R.string.currency_label),
+                modifier = Modifier.fillMaxWidth(),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Spacer(modifier = Modifier.height(Dimens.SpacerSmall))
+            CurrencySelector(selected = currency, onSelect = { currency = it })
+
             Spacer(modifier = Modifier.height(Dimens.SpacerXLarge))
 
             Button(
-                onClick = { onSave(name, rawPrice) },
+                onClick = { onSave(name, rawPrice, currency) },
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer,
                     contentColor = MaterialTheme.colorScheme.onPrimaryContainer
@@ -122,6 +138,15 @@ fun AddSubscriptionSheet(
     }
 }
 
+/**
+ * Enums cannot go into a Bundle on their own, so the choice is stored by its ISO code and looked
+ * up again on the way back.
+ */
+private val CurrencySaver = Saver<Currency, String>(
+    save = { it.name },
+    restore = { Currency.fromCode(it) }
+)
+
 /** Field errors as they appear after a rejected save. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Preview(showBackground = true)
@@ -132,7 +157,7 @@ private fun AddSubscriptionSheetErrorPreview() {
             sheetState = rememberModalBottomSheetState(),
             nameError = UiText.Resource(R.string.error_name_empty),
             priceError = UiText.Resource(R.string.error_price_invalid),
-            onSave = { _, _ -> },
+            onSave = { _, _, _ -> },
             onNameEdited = {},
             onPriceEdited = {},
             onDismiss = {}
