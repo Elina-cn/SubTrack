@@ -433,6 +433,22 @@ scope'ta tanımlanırsa farklı class loader'lara düşüyorlar ve arama boşa
 KSP `:app`'te durduğu için Hilt de orada duruyor. **Root'a "tutarlılık" adına
 geri eklenmemeli** — root dosyasında bunu hatırlatan bir yorum var.
 
+### Şema sürümlemesi
+
+**Uygulama yayınlanana kadar** şema değişikliklerinde migration yazılmaz:
+sürüm 1 yeniden üretilir ve `app/schemas/1.json` güncellenir.
+
+**Gerekçe:** Hiçbir kullanıcıda veri yok, korunacak bir şey yok. Migration
+yazmak var olmayan veriyi korumak için emek harcamaktır.
+
+**Play Store'a çıktıktan sonra bu kural biter.** Her şema değişikliği migration
+gerektirir, istisnası yoktur — o noktadan sonra cihazlarda gerçek veri vardır ve
+onu bozmak geri alınamaz.
+
+> Bu satır **Faz 16'da tekrar okunmalı.** Yayın anı kuralın değiştiği andır.
+
+Faz 12a'daki geçmiş takibi tablosu bu kural kapsamında sürüm 1'e eklenecek.
+
 ### Mimari karar: şema dışa aktarılır
 
 `SubTrackDatabase` `exportSchema = true` ile tanımlıdır. Room her sürüm için

@@ -27,6 +27,88 @@ Her faz sonunda **en üste** yeni kayıt eklenir. Eski kayıtlar silinmez.
 
 ---
 
+## [Faz 8a] Yükleme, Hata ve Erişilebilirlik — 2026-08-29
+
+**Durum:** Tamamlandı (8b — boş durum ekranı — ertelendi)
+
+**Yapılanlar**
+- **`isLoading` UI'a bağlandı.** Faz 5a'dan beri hesaplanıyor ama hiç
+  okunmuyordu; açılışta "yükleniyor" ile "hiç abonelik yok" ayırt
+  edilemiyordu. Yeni `DelayedLoadingIndicator` bileşeni göstergeyi
+  **300 ms geciktiriyor**: yerel Room okuması onlarca milisaniye sürüyor ve
+  o kadarlık bir spinner ilerleme değil arıza gibi görünür — kırpışma
+  kullanıcıya "bir şeyler ters gitti" hissi verir.
+- **Gösterge ekran okuyucuya "meşgul" diyor:** `contentDescription` +
+  `liveRegion = Polite`. Sessiz bir spinner, görmeyen kullanıcıya hiçbir
+  şey anlatmıyor.
+- **Dashboard toplamı tek odak durağı oldu** (`semantics(mergeDescendants = true)`).
+  Önce etiket ve tutar ayrı düğümdü; tutarın üstüne düşen okuyucu
+  "219.89 TL" deyip neyin toplamı olduğunu söylemiyordu.
+- **Dokunma alanı taraması:** `SubscriptionCard` 56dp, FAB 56dp, Kaydet
+  butonu görsel olarak 40dp — ama Material3 `Surface.kt` içinde
+  `minimumInteractiveComponentSize()` uyguluyor, dokunma alanı 48dp.
+  Kaynaktan doğrulandı, **değişiklik gerekmedi**.
+- **Kontrast ölçümü** (Faz 1c'den sonra eklenen her metin/zemin çifti):
+  Snackbar metni 11.65:1, geri al eylemi 7.73:1, alan altı hata metni
+  6.54:1, spinner 3.96:1 (spinner metin değil, eşiği 3:1). Açık ve koyu
+  temada hepsi AA geçiyor. **Palete dokunulmadı.**
+- **`UiText.Resource` argüman alıyor.** Argümanlar `vararg` değil `List`
+  olarak tutuluyor: vararg dizi olurdu ve data class eşitliği referansa
+  düşerdi — testler eşitliğe dayanıyor.
+- **Fiyat üst sınırı mesajı sınırı söylüyor:** 1000000 metne gömülmek
+  yerine argüman olarak geçiyor, tavan değişince mesaj ve kod ayrışamıyor.
+- Yükleme ve hata durumları için `@Preview`'lar eklendi.
+
+**Değişen dosyalar**
+- `ui/common/DelayedLoadingIndicator.kt` — yeni, 300 ms gecikmeli gösterge
+- `ui/common/UiText.kt` — `Resource` artık `args: List<Any>` taşıyor
+- `ui/home/HomeScreen.kt` — gösterge bağlandı, yükleme/hata preview'ları
+- `ui/home/components/DashboardCard.kt` — `mergeDescendants`
+- `ui/home/components/AddSubscriptionSheet.kt` — hata durumu preview'ları
+- `ui/home/HomeViewModel.kt` — sınır mesajına `MAX_PRICE` argümanı
+- `res/values/strings.xml`, `res/values-en/strings.xml` — `loading`,
+  argümanlı `error_price_too_large`
+- `test/.../ui/home/HomeViewModelTest.kt` — argümanlı mesaj testi (28 → 29)
+- `docs/ARCHITECTURE.md`, `docs/ROADMAP.md` — palet borcu kaydı
+
+**Commit'ler**
+- `6c73bbe` feat: show loading indicator while subscriptions load
+- `88a8aa1` feat: improve accessibility of dashboard and controls
+- `df71ec1` feat: add previews for loading and error states
+- `06338ac` feat: support arguments in UiText and show the price limit
+- `ee64802` docs: record palette debt for unmapped colour roles
+
+**Tag**
+- `phase-8a-done`
+
+**Karşılaşılan sorunlar**
+- **Yeniden dene (retry) eylemi eklenmedi — bilinçli karar.**
+  `error_save_failed` gerçek bir veritabanı reddi demek; aynı veriyle tekrar
+  denemek aynı sonucu verir. "Yeniden dene" düğmesi kullanıcıya olmayan bir
+  çıkış yolu vaat eder.
+- **Palet borcu:** `inversePrimary` ve `inverseSurface` tanımlı değil,
+  Material'ın varsayılan moru devreye giriyor. Kontrast sorunlu değil ama
+  kimlik yanlış. Tek tek yamamak yerine **Faz 14'te** (tema gözden geçirme)
+  bütün olarak ele alınacak.
+
+**Elle test sonucu**
+- Yükleme göstergesi hızlı açılışta hiç görünmüyor (beklenen — 300 ms
+  eşiğinin altında kalıyor), yapay gecikmede düzgün çıkıyor.
+- Fiyat sınırı mesajı sınır değerini gösteriyor.
+- **TalkBack testi yapılamadı:** cihazda TalkBack çok donuyor (OPPO A15s,
+  düşük donanım + debug build). Erişilebilirlik değişiklikleri kod düzeyinde
+  doğru ama **cihazda doğrulanmadı**. Faz 16 öncesi emülatörde bir kez
+  düzgün test edilmeli — ROADMAP Faz 16'ya madde olarak eklendi.
+
+**Sonraki faz için not**
+- **Faz 8b (boş durum ekranı) ertelendi.** Tasarım kararı bekliyor: ekranda
+  ne yazacağı, hangi görselin kullanılacağı ve kullanıcıyı nereye
+  yönlendireceği kararlaştırılmadan kod yazmak boşa iş.
+- Faz 14'te palet bütün olarak elden geçirilecek (`inversePrimary`,
+  `inverseSurface`).
+
+---
+
 ## [Faz 7] Test Altyapısı — 2026-08-29
 
 **Durum:** Tamamlandı

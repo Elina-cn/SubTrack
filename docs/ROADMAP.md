@@ -187,21 +187,24 @@ cihazda geçiyor (9 test), kritik yollar kapsanmış.
 
 ---
 
-## ⬜ Faz 8 — UX Cilası
+## 🟡 Faz 8 — UX Cilası
 
-- [ ] Boş durum ekranı
-- [ ] Yükleme durumu
-- [ ] Hata gösterimi (Snackbar)
-- [ ] Erişilebilirlik: `contentDescription`, dokunma alanı ≥ 48dp — **not:**
-      `SwipeToDeleteRow`'un semantics'i (custom "Sil" eylemi +
-      `mergeDescendants`) hotfix serisinde baştan kondu.
-- [ ] Koyu tema tüm ekranlarda gözden geçirilsin
-- [ ] **Açık tema** gözden geçirilsin — test cihazının varsayılanı koyu tema,
-      testler ağırlıklı orada yapılıyor
-- [ ] `HomeUiState.isLoading` UI'a bağlansın. Şu an hesaplanıyor ama hiç
-      okunmuyor; açılışta "yükleniyor" ile "hiç abonelik yok" ayırt edilemiyor.
-- [ ] Dashboard toplamı ekran okuyucuya bağlamlı okunsun (şu an etiket ve tutar
-      ayrı düğüm, "0.00 TL" bağlamsız okunuyor)
+**8a** yükleme/hata/erişilebilirlik **(bitti)**, **8b** boş durum ekranı —
+tasarım kararı bekliyor, ileri bir tarihe ertelendi.
+
+- [ ] **8b:** Boş durum ekranı
+- [x] **8a:** Yükleme durumu — 300 ms gecikmeli gösterge, kırpışmıyor
+- [x] **8a:** Hata gösterimi (Snackbar) — Faz 6'da kurulmuştu, doğrulandı
+- [x] **8a:** Erişilebilirlik: `contentDescription`, dokunma alanı ≥ 48dp.
+      Ölçüldü: `SubscriptionCard` 56dp, FAB 56dp, Kaydet butonu görsel 40dp ama
+      Material3 dokunma alanını 48dp'ye kendisi genişletiyor. `SwipeToDeleteRow`
+      semantics'i hotfix serisinde baştan konmuştu.
+- [x] **8a:** Koyu tema gözden geçirildi — yeni çiftlerin hepsi AA geçiyor
+- [x] **8a:** Açık tema gözden geçirildi — Faz 1c'den sonra eklenen tüm
+      metin/zemin çiftleri ölçüldü, palete dokunulmadı
+- [x] **8a:** `HomeUiState.isLoading` UI'a bağlandı (Faz 5a'dan beri ölüydü)
+- [x] **8a:** Dashboard toplamı `mergeDescendants` ile tek odak durağı oldu —
+      "Aylık Toplam, 219.89 TL" birlikte okunuyor
 
 **Bitti:** Hiçbir durumda boş/kırık ekran yok.
 
@@ -259,12 +262,10 @@ Aylık toplamın zaman içindeki anlık görüntüleri. `PROJECT_SPEC.md` §1'de
 - [ ] Domain modeli + mapper, mevcut desene uygun
 - [ ] Ana ekranda "geçen aya göre" karşılaştırması
 
-> **Açık karar — şema sürümü:** `PROJECT_SPEC.md` §7 geçmiş tablosunun v1.0
-> şemasında bulunmasını istiyor, ama şema Faz 2'de sürüm 1 olarak donduruldu
-> (`app/schemas/1.json`). Uygulama yayınlanmadığı için iki seçenek var:
-> (a) sürüm 2'ye çıkıp gerçek bir migration yazmak — yayından önce migration
-> mekanizmasını bir kez çalıştırmış oluruz; (b) hiç kullanıcı verisi olmadığı
-> için sürüm 1'i yeniden üretmek. Bu faza gelince karara bağlanacak.
+> **Şema sürümü — karara bağlandı:** Sürüm 1 **yeniden üretilecek**, migration
+> yazılmayacak. Uygulama yayınlanmadığı için korunacak kullanıcı verisi yok.
+> Kural ve gerekçesi ARCHITECTURE §12 *"Şema sürümlemesi"* başlığında; yayından
+> sonra migration zorunlu hale geliyor.
 
 ---
 
@@ -314,6 +315,10 @@ Aylık toplamın zaman içindeki anlık görüntüleri. `PROJECT_SPEC.md` §1'de
       (PROJECT_SPEC §4)
 - [ ] Ücretlendirme kararı verilsin (peşin / ücretsiz+premium / ücretsiz) —
       kod tarafında etkisi yok, buraya kadar bekleyebilir (PROJECT_SPEC §5)
+- [ ] ARCHITECTURE'daki **"Şema sürümlemesi"** kuralı okunsun. Yayından sonra
+      migration zorunlu hale geliyor, istisnası yok.
+- [ ] TalkBack testi **emülatörde** bir kez düzgün yapılsın. Test cihazında
+      (OPPO A15s) TalkBack donuyor; erişilebilirlik hiç doğrulanamadı.
 - [ ] Play Console Data Safety formu
 - [ ] Mağaza görselleri ve açıklama metni
 - [ ] Internal testing → production
