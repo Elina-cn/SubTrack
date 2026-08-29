@@ -27,19 +27,19 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import com.elinacn.subtrack.R
 import com.elinacn.subtrack.domain.model.BillingPeriod
+import com.elinacn.subtrack.domain.model.Currency
 import com.elinacn.subtrack.domain.model.Money
 import com.elinacn.subtrack.domain.model.Subscription
 import com.elinacn.subtrack.domain.model.SubscriptionCategory
 import com.elinacn.subtrack.ui.common.DelayedLoadingIndicator
 import com.elinacn.subtrack.ui.common.UiText
+import com.elinacn.subtrack.ui.common.rememberMoneyFormatter
 import com.elinacn.subtrack.ui.home.components.AddSubscriptionSheet
 import com.elinacn.subtrack.ui.home.components.DashboardCard
 import com.elinacn.subtrack.ui.home.components.SubscriptionCard
 import com.elinacn.subtrack.ui.home.components.SwipeToDeleteRow
 import com.elinacn.subtrack.ui.theme.Dimens
 import com.elinacn.subtrack.ui.theme.SubTrackTheme
-import java.math.BigDecimal
-import java.util.Locale
 
 /**
  * The home screen. Stateless with respect to data: it renders [uiState] and reports back through
@@ -52,7 +52,7 @@ fun HomeScreen(
     onEvent: (HomeEvent) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val priceFormat = stringResource(id = R.string.price_format)
+    val moneyFormatter = rememberMoneyFormatter()
     val snackbarHostState = remember { SnackbarHostState() }
     val sheetState = rememberModalBottomSheetState()
 
@@ -60,6 +60,11 @@ fun HomeScreen(
     val deletedMessage = stringResource(id = R.string.subscription_deleted)
     val undoLabel = stringResource(id = R.string.undo)
     val errorText = uiState.errorMessage?.asString()
+    val conversionNote = if (uiState.isTotalConverted) {
+        stringResource(id = R.string.total_converted_note, uiState.baseCurrency.name)
+    } else {
+        null
+    }
 
     // Offer the undo for as long as the snackbar is up; whichever way it ends, tell the ViewModel.
     //
@@ -122,7 +127,10 @@ fun HomeScreen(
             contentPadding = PaddingValues(bottom = Dimens.ListBottomSpacing) // room for the FAB
         ) {
             item {
-                DashboardCard(totalAmount = uiState.monthlyTotal.format(priceFormat))
+                DashboardCard(
+                    totalAmount = moneyFormatter.format(uiState.monthlyTotal, uiState.baseCurrency),
+                    conversionNote = conversionNote
+                )
 
                 Text(
                     text = stringResource(id = R.string.my_subscriptions),
@@ -147,7 +155,9 @@ fun HomeScreen(
                 SwipeToDeleteRow(onDelete = { onEvent(HomeEvent.Delete(subscription.id)) }) {
                     SubscriptionCard(
                         name = subscription.name,
-                        price = subscription.price.format(priceFormat)
+                        // Its own currency, not a converted figure: the user entered 12,99
+                        // USD and that is what the row has to keep saying.
+                        price = moneyFormatter.format(subscription.price, subscription.currency)
                     )
                 }
             }
@@ -159,7 +169,9 @@ fun HomeScreen(
             sheetState = sheetState,
             nameError = uiState.nameError,
             priceError = uiState.priceError,
-            onSave = { name, rawPrice -> onEvent(HomeEvent.Save(name, rawPrice)) },
+            onSave = { name, rawPrice, currency ->
+                onEvent(HomeEvent.Save(name, rawPrice, currency))
+            },
             onNameEdited = { onEvent(HomeEvent.ClearNameError) },
             onPriceEdited = { onEvent(HomeEvent.ClearPriceError) },
             onDismiss = { onEvent(HomeEvent.DismissAddSheet) }
@@ -167,18 +179,16 @@ fun HomeScreen(
     }
 }
 
-/**
- * Renders an amount with the localized pattern. Display only - the value itself stays in whole
- * minor units, and BigDecimal keeps the conversion exact.
- */
-private fun Money.format(pattern: String): String =
-    String.format(Locale.US, pattern, BigDecimal(cents).movePointLeft(2))
-
-private fun previewSubscription(id: Long, name: String, cents: Long) = Subscription(
+private fun previewSubscription(
+    id: Long,
+    name: String,
+    cents: Long,
+    currency: Currency = Currency.TRY
+) = Subscription(
     id = id,
     name = name,
     price = Money(cents),
-    currencyCode = "TRY",
+    currency = currency,
     billingPeriod = BillingPeriod.MONTHLY,
     nextPaymentDate = null,
     category = SubscriptionCategory.OTHER,
@@ -229,6 +239,28 @@ private fun HomeScreenPopulatedPreview() {
             uiState = HomeUiState(
                 subscriptions = subscriptions,
                 monthlyTotal = Money(21989),
+                isLoading = false
+            ),
+            onEvent = {}
+        )
+    }
+}
+
+/** A mixed list, where the total needs the line saying what it was converted from. */
+@Preview(showBackground = true, showSystemUi = true)
+@Composable
+private fun HomeScreenMixedCurrencyPreview() {
+    val subscriptions = listOf(
+        previewSubscription(1, "Netflix", 15999),
+        previewSubscription(2, "Spotify", 1099, Currency.USD),
+        previewSubscription(3, "Adobe", 2499, Currency.EUR)
+    )
+    SubTrackTheme {
+        HomeScreen(
+            uiState = HomeUiState(
+                subscriptions = subscriptions,
+                monthlyTotal = Money(178545),
+                isTotalConverted = true,
                 isLoading = false
             ),
             onEvent = {}

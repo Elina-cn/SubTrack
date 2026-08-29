@@ -19,11 +19,18 @@ import com.elinacn.subtrack.R
 import com.elinacn.subtrack.ui.theme.Dimens
 import com.elinacn.subtrack.ui.theme.SubTrackTheme
 
-/** The monthly total, already formatted by the caller. */
+/**
+ * The monthly total, already formatted by the caller.
+ *
+ * [conversionNote] is shown only when there is something to explain - a list priced in more than
+ * one currency. Left out of a single-currency list on purpose: a permanent line about exchange
+ * rates would be noise for the many users who never leave TRY.
+ */
 @Composable
 fun DashboardCard(
     totalAmount: String,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    conversionNote: String? = null
 ) {
     Card(
         modifier = modifier
@@ -50,6 +57,16 @@ fun DashboardCard(
                 color = MaterialTheme.colorScheme.onPrimaryContainer,
                 style = MaterialTheme.typography.headlineMedium
             )
+            if (conversionNote != null) {
+                Spacer(modifier = Modifier.height(Dimens.SpacerSmall))
+                Text(
+                    text = conversionNote,
+                    // Same pair as the label above, measured at 7.11:1 in both themes - well past
+                    // the 4.5:1 small text needs, so this stays at full opacity too.
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
         }
     }
 }
@@ -58,7 +75,7 @@ fun DashboardCard(
 @Composable
 private fun DashboardCardPreview() {
     SubTrackTheme {
-        DashboardCard(totalAmount = "219.89 TL")
+        DashboardCard(totalAmount = "₺219,89")
     }
 }
 
@@ -66,6 +83,17 @@ private fun DashboardCardPreview() {
 @Composable
 private fun DashboardCardEmptyPreview() {
     SubTrackTheme {
-        DashboardCard(totalAmount = "0.00 TL")
+        DashboardCard(totalAmount = "₺0,00")
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun DashboardCardConvertedPreview() {
+    SubTrackTheme {
+        DashboardCard(
+            totalAmount = "₺1.284,52",
+            conversionNote = "Farklı para birimleri sabit kurla TRY cinsine çevrildi"
+        )
     }
 }
