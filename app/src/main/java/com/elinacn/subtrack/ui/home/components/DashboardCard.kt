@@ -13,6 +13,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import com.elinacn.subtrack.R
 import com.elinacn.subtrack.ui.theme.Dimens
@@ -27,7 +28,10 @@ fun DashboardCard(
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .padding(Dimens.ScreenPadding),
+            .padding(Dimens.ScreenPadding)
+            // One focus stop instead of two: a screen reader landing on the amount alone would
+            // announce "219.89 TL" with nothing saying what it is the total of.
+            .semantics(mergeDescendants = true) {},
         shape = RoundedCornerShape(Dimens.DashboardCorner),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
         elevation = CardDefaults.cardElevation(defaultElevation = Dimens.DashboardElevation)
