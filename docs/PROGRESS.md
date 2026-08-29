@@ -27,6 +27,135 @@ Her faz sonunda **en üste** yeni kayıt eklenir. Eski kayıtlar silinmez.
 
 ---
 
+## [Faz 6] Girdi Doğrulama, Hata Gösterimi ve Undo — 2026-08-29
+
+**Durum:** Tamamlandı
+
+**Yapılanlar**
+- **`UiText` sarmalayıcısı `ui/common/` altına konuldu, `domain/`'e değil.**
+  Çözümlemesi `stringResource` gerektiriyor; domain'e koymak
+  `androidx.annotation.StringRes` import'u demekti ve **domain Faz 2'den beri
+  sıfır import'la derleniyor.**
+- **Girdi doğrulama:** boş ad; boş, geçersiz, negatif veya sıfır fiyat; üst
+  sınır; ondalık basamak sayısı. Hatalar **alan bazlı** (`nameError`,
+  `priceError`) — tepede "bir şeyler yanlış" diyen tek mesaj değil.
+- **Sheet durumu ViewModel'a taşındı** (`HomeUiState.isAddSheetOpen` +
+  `OpenAddSheet` / `DismissAddSheet`). Gerekçe: *"hatalı girdide sheet
+  kapanmasın"* şartı, kapanma kararının **doğrulama sonucuna bağlı** olması
+  demek; composable bunu bilemez. Yan kazanç: ViewModel yapılandırma
+  değişikliğinden zaten sağ çıktığı için döndürmede sheet açık kalıyor.
+- **Undo:** Snackbar ile geri alma. Silmeden önce `getById` ile okunuyor, geri
+  alırken **aynı id** ile ekleniyor — öğe listenin sonuna atlamak yerine eski
+  sırasına dönüyor.
+- **`CancellationException` yeniden fırlatılıyor.** Yakalansaydı iptal edilen
+  bir coroutine "veritabanı hatası" olarak raporlanırdı.
+- **Faz 1a'daki uyarı kontrol edildi.** *"Undo sonrası kaydırma state'i
+  `EndToStart`'ta takılabilir"* deniyordu; `b678e2d`'de `rememberSaveable` →
+  düz `remember` değişikliğiyle sızıntı zaten kapanmış. Gereksiz bir `reset()`
+  **eklenmedi**, gerekmediği doğrulandı.
+
+### Mimari karar — `Result<T>` kullanılmıyor
+
+Hatalarımızın çoğu veritabanı hatası değil, **girdi hatası**; ViewModel'da
+Room'a hiç ulaşmadan yakalanıyor. `Result<T>` bunlara dokunmaz, yalnızca nadir
+DB hataları için her çağrıya sarmalayıcı ekler. Doğrulama ViewModel'da, DB
+hataları `try/catch` ile yakalanıp `UiText`'e çevriliyor. Sessiz `try/catch`
+yasağı korunuyor — yakalanan her hata kullanıcıya ulaşıyor. (ARCHITECTURE §9
+bu karara göre güncellendi.)
+
+### Hotfix 1 — Snackbar kaybolmuyordu (`c72a2cc`)
+
+material3'te `showSnackbar`'ın varsayılan süresi **`actionLabel` verilip
+verilmediğine göre değişiyor**: etiket yoksa `Short`, varsa `Indefinite`.
+"Geri al" butonu eklemek Snackbar'ı farkında olmadan süresiz yapmış.
+
+İki mekanizma birlikte çalışıyordu: `Indefinite` bitmemesini, ViewModel'da
+hayatta kalan `pendingUndo` state'i ise döndürmede geri gelmesini sağlıyordu.
+
+Her iki `showSnackbar` çağrısına `duration` **açıkça** verildi.
+
+**Döndürme kararı:** Snackbar kalsın ve sayaç sıfırlansın. Undo penceresi
+kullanıcıya verilmiş bir fırsat; telefonu çevirmek ondan vazgeçme kararı değil.
+Satır zaten veritabanından silinmiş durumda, `pendingUndo` yalnızca geri koymak
+için gerekeni tutuyor.
+
+**Bilinen sınır:** aynı anda **tek** undo izleniyor. Ardışık silmede yalnızca
+son işlem geri alınabilir.
+
+### Hotfix 2 — Fiyat üst sınırı (`aac3bd3`)
+
+`999999999` kabul ediliyordu. Eski eşik `Long` taşmasına göre yazılmıştı; taşma
+~92 katrilyon kuruşta olduğu için **pratikte hiç tetiklenmiyordu.**
+`MAX_PRICE = 1000000` — bir ürün sınırı, en pahalı gerçek aboneliğin binlerce
+katı ama kayan bir tuş vuruşunu yakalayacak kadar düşük.
+
+Ayrıca **ikiden fazla ondalık artık sessizce yuvarlanmıyor**, reddediliyor.
+`159,999` eskiden sessizce `160,00` oluyordu; para değerini kullanıcıya sormadan
+değiştirmek bu kod tabanının `BigDecimal` duruşuyla çelişiyordu. Sondaki sıfırlar
+sayılmıyor: `159,990` kabul, `159,999` red.
+
+### Açılış süresi incelemesi — düzeltme yapılmadı
+
+Faz 6 sonrası uygulamanın geç açıldığı bildirildi. **Ölçüldü**
+(OPPO CPH2179, Android 10, `adb shell am start -W -S`, 5 tekrar):
+
+| Build | Medyan cold start |
+|---|---|
+| Debug | **~8100 ms** |
+| Release | **~856 ms** |
+
+**Fark 9,5 kat.** Logcat kesin yeri gösterdi:
+
+> `E ANR_LOG : Blocked msg = { what=110 obj=AppBindData{com.elinacn.subtrack} }, cost = 5709 ms`
+
+`what=110` = `BIND_APPLICATION` — APK açma, sınıf yükleyici, dex doğrulama.
+8 saniyenin **5,7'si bizim kodumuz çalışmadan önce** geçiyor. Debug build'in
+`debuggable` bayrağı ART'ın optimizasyonunu engelliyor (`Late-enabling
+-Xcheck:jni`).
+
+**Şüphelerin hepsi çürütüldü:** sheet kapalıyken kompozisyona girmiyor,
+`LaunchedEffect`'ler ilk satırda `null` kontrolüyle çıkıyor, Room ilk açılışta
+yük getirmiyor (veri temizken 9236 ms, doluyken 8027 ms — fark gürültü içinde),
+Hilt ve `Theme.kt` `BIND_APPLICATION`'dan sonra geliyor.
+
+Faz 6 yavaşlamayı **tetikledi ama sebebi değil**: kod arttıkça debug dex
+doğrulaması doğrusal büyüyor. Aynı kod release'de 856 ms'de açılıyor.
+
+**Değişen dosyalar**
+- `app/src/main/java/com/elinacn/subtrack/ui/common/UiText.kt` (yeni)
+- `app/src/main/java/com/elinacn/subtrack/ui/home/HomeUiState.kt` — hata alanları, yeni event'ler
+- `app/src/main/java/com/elinacn/subtrack/ui/home/HomeViewModel.kt` — doğrulama, undo, `try/catch`
+- `app/src/main/java/com/elinacn/subtrack/ui/home/HomeScreen.kt` — Snackbar altyapısı
+- `app/src/main/java/com/elinacn/subtrack/ui/home/components/AddSubscriptionSheet.kt` — `isError` / `supportingText`
+- `app/src/main/res/values/strings.xml`, `values-en/strings.xml` — doğrulama ve undo metinleri
+- `docs/ARCHITECTURE.md` §9
+
+**Commit'ler**
+- `368555f` feat: add UiText wrapper for view model messages
+- `3f3dd34` feat: add input validation with inline field errors
+- `224de58` feat: add undo for subscription deletion
+- `7981262` docs: record error handling decision in architecture
+- `c72a2cc` fix: give the undo snackbar a duration so it dismisses itself
+- `aac3bd3` fix: cap the price at a product limit and reject extra decimals
+
+**Tag**
+- `phase-6-done`
+
+**Elle test sonucu**
+- Doğrulama, undo, hata gösterimi, İngilizce çeviriler ve fiyat sınırları —
+  hepsi geçti.
+- `docs/TESTING.md`'deki 16 maddelik sabit regresyon listesi geçti.
+- **Not:** test cihazının varsayılanı **koyu tema**, testler ağırlıklı orada
+  yapılıyor. Açık tema Faz 8'de ayrıca gözden geçirilmeli.
+
+**Sonraki faz için not**
+- Faz 7: test altyapısı. `HomeViewModel`'ın doğrulama mantığı artık saf ve
+  bağımlılıksız test edilebilir durumda — `parsePrice` kuralları ilk yazılacak
+  testler.
+- Faz 16'ya iki performans maddesi eklendi (`material-icons-extended`, R8).
+
+---
+
 ## [Faz 5b] MainActivity Parçalama ve Durumsuzlaştırma — 2026-08-21
 
 **Durum:** Tamamlandı

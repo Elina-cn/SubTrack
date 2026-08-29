@@ -306,6 +306,36 @@ sıfırlanıyor (`onDragStarted`), böylece birikme yapısal olarak imkânsız.
 oy kullanmıyor. (`computeTarget`'ın üç dalından ikisi `positionalThreshold`'u
 hiç okumuyordu; hızlı fiskenin silmesinin sebebi buydu.)
 
+### Snackbar süresi her zaman açıkça verilir
+
+material3'te `showSnackbar`'ın varsayılan süresi **`actionLabel` verilip
+verilmediğine göre değişir**:
+
+```kotlin
+duration: SnackbarDuration =
+    if (actionLabel == null) SnackbarDuration.Short else SnackbarDuration.Indefinite
+```
+
+Yani bir eylem düğmesi eklemek, Snackbar'ı farkında olmadan **süresiz** yapar.
+Faz 6'da "Geri al" butonu eklendiğinde tam olarak bu oldu. **`duration` her
+çağrıda açıkça yazılmalı**, varsayılana bırakılmamalı.
+
+### Açılış performansı release build'de ölçülür
+
+Bu projede debug build, release'e göre **~9,5 kat** yavaş açılıyor
+(ölçüm: OPPO CPH2179 / Android 10, medyan **8100 ms** ve **856 ms**).
+
+Sebep kod değil, `debuggable` bayrağı: ART uygulamanın dex'ini optimize
+edemiyor ve süre `BIND_APPLICATION` aşamasında harcanıyor — yani uygulamanın
+kendi kodu daha çalışmadan. Ölçüm yöntemi:
+
+```bash
+adb shell am start -W -S -n com.elinacn.subtrack/.MainActivity
+```
+
+**Açılış süresiyle ilgili bir yargıya varmadan önce release build'de ölçün.**
+Debug build'deki yavaşlık normaldir ve optimize edilmemelidir.
+
 ### Mimari karar: renk şemaları `by lazy` ile kurulur
 
 `Theme.kt`'deki `DarkColorScheme` ve `LightColorScheme`, top-level `val` değil

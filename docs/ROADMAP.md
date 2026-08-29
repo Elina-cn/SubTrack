@@ -142,21 +142,21 @@ durumda — Hilt'in gerekçesi anlaşıldı.
 
 ---
 
-## ⬜ Faz 6 — CRUD Tamamlama
+## ✅ Faz 6 — CRUD Tamamlama
 
-**Kalan iş:** girdi doğrulama, hata mesajı ve undo. Şu an geçersiz girdi
-sessizce reddediliyor.
-
-- [ ] Ekleme repository üzerinden
-- [ ] Girdi doğrulama: boş ad, geçersiz/negatif fiyat → hata mesajı
-- [ ] Fiyat parse mantığı ViewModel'da (`String` → `Long` kuruş)
+- [x] Ekleme repository üzerinden
+- [x] Girdi doğrulama: boş ad, geçersiz/negatif/sıfır fiyat, üst sınır ve
+      ondalık basamak → **alan bazlı** hata mesajı (`nameError`, `priceError`)
+- [x] Fiyat parse mantığı ViewModel'da (`String` → `Long` kuruş, `BigDecimal`
+      üzerinden)
 - [x] Kaydırarak silme repository'yi tetikliyor — **Faz 5a'da mecburen
       yapıldı:** `mutableStateListOf` kalkınca `remove(sub)` de kalkmak
       zorundaydı.
-- [ ] Silme sonrası Snackbar ile geri al (undo)
-- [ ] Repository hata yönetimi karara bağlansın: `Result<T>`, `DataError`
-      tipi, veya exception + ViewModel'da yakalama. ARCHITECTURE §9
-      güncellensin. (Faz 3'ten ertelendi.)
+- [x] Silme sonrası Snackbar ile geri al (undo) — öğe **eski sırasına**
+      dönüyor (aynı id ile ekleniyor)
+- [x] Repository hata yönetimi karara bağlandı: **`Result<T>` kullanılmıyor.**
+      Doğrulama ViewModel'da, DB hataları `try/catch` ile yakalanıp `UiText`'e
+      çevriliyor. ARCHITECTURE §9 güncellendi. (Faz 3'ten ertelenmişti.)
 
 **Bitti:** Ekleme/silme kalıcı, hatalı girdi engelleniyor, yanlış silme
 geri alınabiliyor.
@@ -184,6 +184,8 @@ geri alınabiliyor.
       `SwipeToDeleteRow`'un semantics'i (custom "Sil" eylemi +
       `mergeDescendants`) hotfix serisinde baştan kondu.
 - [ ] Koyu tema tüm ekranlarda gözden geçirilsin
+- [ ] **Açık tema** gözden geçirilsin — test cihazının varsayılanı koyu tema,
+      testler ağırlıklı orada yapılıyor
 - [ ] `HomeUiState.isLoading` UI'a bağlansın. Şu an hesaplanıyor ama hiç
       okunmuyor; açılışta "yükleniyor" ile "hiç abonelik yok" ayırt edilemiyor.
 - [ ] Dashboard toplamı ekran okuyucuya bağlamlı okunsun (şu an etiket ve tutar
@@ -260,6 +262,9 @@ geri alınabiliyor.
 - [ ] Uygulama ikonu (adaptive) ve marka kimliği
 - [ ] Release imzalama yapılandırması, keystore güvenliği
 - [ ] ProGuard/R8 kuralları, release build testi
+- [ ] `isMinifyEnabled = true` (R8) — APK boyutu ve açılış süresi düşer
+- [ ] `material-icons-extended` kaldırılsın veya daraltılsın: binlerce ikon
+      getiriyor, **beş** tanesi kullanılıyor
 - [ ] `targetSdk` Play'in güncel zorunluluğuna yükseltilsin
 - [ ] Gizlilik politikası (çevrimdışı, veri toplanmıyor)
 - [ ] Play Console Data Safety formu

@@ -32,12 +32,13 @@ etmeden bildirin; sonraki maddeler zaten bozuk bir durumun üstüne binebilir.
 | 14 | Sheet açık ve metin yazılıyken ekran döndür | Sheet **açık kalıyor**, metin duruyor | 5b |
 | 15 | Sistem temasını koyuya al | Tüm metinler okunabilir, kartlar arka plandan ayrışıyor | 1b · kontrast 1c |
 | 16 | Cihaz dilini İngilizceye al | Metinler çevrilmiş geliyor | 1b |
+| 17 | Boş ad veya geçersiz fiyatla Kaydet'e bas | Sheet **açık kalıyor**, hata ilgili alanın **altında** | 6 |
+| 18 | Bir satırı sil, Snackbar'a dokunma | Birkaç saniyede **kendiliğinden** kayboluyor | 6 |
+| 19 | Sil, sonra "Geri al"a bas | Öğe **eski sırasına** dönüyor | 6 |
 
 **Not — beklenen davranışlar, hata değil:**
 - İlk kurulumda liste **boş** başlar. Seed veri yok; boş durum ekranı Faz 8'de.
-- Boş ad veya geçersiz fiyatla Kaydet'e basmak **sessizce hiçbir şey yapmaz**.
-  Doğrulama ve hata mesajı Faz 6'da.
-- Silinen bir öğe **geri alınamaz**. Undo Faz 6'da.
+- Ardışık silmede **yalnızca son işlem** geri alınabilir; tek undo izleniyor.
 
 ---
 
