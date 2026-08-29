@@ -288,6 +288,10 @@ Aylık toplamın zaman içindeki anlık görüntüleri. `PROJECT_SPEC.md` §1'de
       "Geri al" eylemi `inversePrimary` tanımsız olduğu için **mor** görünüyor
       (#D0BCFF / #6750A4). Paletimiz mavi-camgöbeği ailesinde. Tüm `colorScheme`
       rolleri gözden geçirilip eksikler tanımlanmalı, sadece bu ikisi değil.
+- [ ] Para birimi gösterimi tutarlı hale getirilsin: `NumberFormat` locale'e göre
+      bazen sembol bazen ISO kodu yazıyor (EN dilinde toplam "TRY 1.785,45",
+      kart "$10.99"). Her yerde sembol mü zorlanacak, her yerde kod mu —
+      karar verilecek.
 
 ---
 

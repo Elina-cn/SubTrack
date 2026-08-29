@@ -25,8 +25,30 @@ class MoneyFormatter(private val locale: Locale) {
     private val formats = mutableMapOf<Currency, NumberFormat>()
 
     /** Renders [amount], which is assumed to be denominated in [currency]. */
-    fun format(amount: Money, currency: Currency): String =
-        formatFor(currency).format(BigDecimal.valueOf(amount.cents, MINOR_UNIT_DIGITS))
+    fun format(amount: Money, currency: Currency): String {
+        val format = formatFor(currency)
+        val text = format.format(BigDecimal.valueOf(amount.cents, MINOR_UNIT_DIGITS))
+        return text.spacedAfterCode(format.currency?.getSymbol(locale))
+    }
+
+    /**
+     * Turns "TRY1,785.45" into "TRY 1,785.45".
+     *
+     * A locale with no glyph for a currency falls back to its ISO code, and NumberFormat sets that
+     * code straight against the digits with nothing between them - three letters running into a
+     * number read as one word. A symbol is left alone: "$10.99" is how a dollar amount is written.
+     *
+     * The gap is a non-breaking space so a line break can never leave the amount without its code.
+     */
+    private fun String.spacedAfterCode(symbol: String?): String {
+        if (symbol == null || symbol.none { it.isLetter() }) return this
+        val index = indexOf(symbol)
+        if (index < 0) return this
+        val after = index + symbol.length
+        // Nothing to separate when the code trails the amount, as it does in some locales.
+        if (after >= length || !this[after].isDigit()) return this
+        return substring(0, after) + NO_BREAK_SPACE + substring(after)
+    }
 
     private fun formatFor(currency: Currency): NumberFormat = formats.getOrPut(currency) {
         // The locale decides the separators and where the symbol sits; the currency decides which
@@ -39,6 +61,8 @@ class MoneyFormatter(private val locale: Locale) {
     private companion object {
         /** True for all four supported currencies; see the note on [Currency]. */
         const val MINOR_UNIT_DIGITS = 2
+
+        const val NO_BREAK_SPACE = ' '
     }
 }
 
