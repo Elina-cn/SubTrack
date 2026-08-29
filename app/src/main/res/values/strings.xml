@@ -20,6 +20,12 @@
 
     <!-- Subscription row -->
     <string name="delete">Sil</string>
+    <!-- Spoken as one phrase; the row is a single stop for a screen reader. Ad, tutar. -->
+    <string name="subscription_row_description">%1$s, %2$s</string>
+    <!-- Spoken form of the dashboard card. Etiket, tutar (+ çevrim notu). -->
+    <string name="dashboard_description">%1$s, %2$s</string>
+    <string name="dashboard_description_converted">%1$s, %2$s. %3$s</string>
+
     <!-- Shown under the total only when the list holds more than one currency. -->
     <string name="total_converted_note">Farklı para birimleri sabit kurla %1$s cinsine çevrildi</string>
 

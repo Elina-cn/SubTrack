@@ -27,8 +27,9 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.LayoutDirection
 import com.elinacn.subtrack.R
@@ -53,6 +54,7 @@ private const val DeleteThresholdFraction = 0.5f
 @Composable
 fun SwipeToDeleteRow(
     onDelete: () -> Unit,
+    contentDescription: String,
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit
 ) {
@@ -71,6 +73,7 @@ fun SwipeToDeleteRow(
 
     // Hoisted out of the semantics lambda, which is not a composable scope.
     val deleteLabel = stringResource(id = R.string.delete)
+    val rowDescription = contentDescription
 
     val dragState = rememberDraggableState { delta ->
         val dragged = offsetX + delta
@@ -83,10 +86,12 @@ fun SwipeToDeleteRow(
         modifier = modifier
             .fillMaxWidth()
             .onSizeChanged { rowWidth = it.width }
-            // mergeDescendants is what makes this reachable: without it the card's own text nodes
-            // take the accessibility focus and the action stays on an unfocusable parent, so
-            // TalkBack never offers it. Merging turns the row into one focusable node.
-            .semantics(mergeDescendants = true) {
+            // clearAndSetSemantics, not mergeDescendants. Merging leaves every descendant in
+            // the accessibility tree - the platform delegate walks the unmerged tree - so the name
+            // and the price stayed as separate stops and the row was three items to step through
+            // instead of one. Clearing drops the subtree, and this node speaks for all of it.
+            .clearAndSetSemantics {
+                this.contentDescription = rowDescription
                 // Swiping is unreachable with TalkBack, so expose deletion as an explicit action.
                 customActions = listOf(CustomAccessibilityAction(deleteLabel) { onDelete(); true })
             }

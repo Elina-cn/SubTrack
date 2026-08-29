@@ -13,7 +13,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.tooling.preview.Preview
 import com.elinacn.subtrack.R
 import com.elinacn.subtrack.ui.theme.Dimens
@@ -32,20 +33,29 @@ fun DashboardCard(
     modifier: Modifier = Modifier,
     conversionNote: String? = null
 ) {
+    val label = stringResource(id = R.string.total_monthly)
+    // Written out here rather than left to merging. mergeDescendants keeps every child in the
+    // accessibility tree - the delegate walks the unmerged tree - so the card still offered three
+    // stops, and the amount was one of them: "219.89 TL" with nothing saying what it totals.
+    // clearAndSetSemantics drops the children and speaks one sentence in an order we choose.
+    val description = if (conversionNote == null) {
+        stringResource(id = R.string.dashboard_description, label, totalAmount)
+    } else {
+        stringResource(id = R.string.dashboard_description_converted, label, totalAmount, conversionNote)
+    }
+
     Card(
         modifier = modifier
             .fillMaxWidth()
             .padding(Dimens.ScreenPadding)
-            // One focus stop instead of two: a screen reader landing on the amount alone would
-            // announce "219.89 TL" with nothing saying what it is the total of.
-            .semantics(mergeDescendants = true) {},
+            .clearAndSetSemantics { contentDescription = description },
         shape = RoundedCornerShape(Dimens.DashboardCorner),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
         elevation = CardDefaults.cardElevation(defaultElevation = Dimens.DashboardElevation)
     ) {
         Column(modifier = Modifier.padding(Dimens.DashboardPadding)) {
             Text(
-                text = stringResource(id = R.string.total_monthly),
+                text = label,
                 // No alpha: dimming this to 0.7 dropped it to 3.6:1. The size and weight gap
                 // against the amount below already carries the hierarchy.
                 color = MaterialTheme.colorScheme.onPrimaryContainer,

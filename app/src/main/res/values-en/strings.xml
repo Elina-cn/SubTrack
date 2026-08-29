@@ -20,6 +20,12 @@
 
     <!-- Subscription row -->
     <string name="delete">Delete</string>
+    <!-- Spoken as one phrase; the row is a single stop for a screen reader. Name, amount. -->
+    <string name="subscription_row_description">%1$s, %2$s</string>
+    <!-- Spoken form of the dashboard card. Label, amount (+ conversion note). -->
+    <string name="dashboard_description">%1$s, %2$s</string>
+    <string name="dashboard_description_converted">%1$s, %2$s. %3$s</string>
+
     <!-- Shown under the total only when the list holds more than one currency. -->
     <string name="total_converted_note">Mixed currencies converted to %1$s at fixed rates</string>
     <!-- Validation -->
