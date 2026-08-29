@@ -51,6 +51,126 @@ etmeden bildirin; sonraki maddeler zaten bozuk bir durumun üstüne binebilir.
 
 ---
 
+## Emülatör Testleri
+
+Fiziksel cihaz (OPPO A15s, CPH2179, Android 10) iki şeyi ölçemiyor: ekranı
+tek boyutta ve **423dp** genişlikte (720x1600 @ 272dpi override), ve TalkBack
+açılınca donuyor. Dar ekran ve farklı Android sürümü testleri emülatörde
+yapılır.
+
+### AVD'ler
+
+| AVD | Çözünürlük | Yoğunluk | Efektif genişlik | API | Ne için |
+|---|---|---|---|---|---|
+| `subtrack_narrow_api29` | 720x1280 | 320 dpi | **360dp** | 29 | Dar ekran, sığma/sarma testleri. Test cihazıyla aynı Android sürümü. |
+| `subtrack_wide_api34` | 1080x2400 | 420 dpi | 411dp | 34 | Güncel Android davranışları, koyu tema, dynamic color |
+
+360dp keyfi değil: Compose bileşenlerinin sığıp sığmadığı bu eşiğe göre
+hesaplanıyor, ve yaygın bütçe telefonlarının genişliği bu. Fiziksel cihaz
+423dp olduğu için dar durumu hiç göstermiyor.
+
+Oluşturma (yalnızca bir kez gerekir):
+
+```bash
+avdmanager create avd -n subtrack_narrow_api29 -k "system-images;android-29;google_apis_playstore;x86_64" --abi x86_64
+avdmanager create avd -n subtrack_wide_api34 -k "system-images;android-34;google_apis_playstore;x86_64" -d pixel_6 --abi x86_64
+```
+
+`avdmanager` dar profili varsayılan 320x640 @ 160dpi ile kurar; sonra
+`~/.android/avd/subtrack_narrow_api29.avd/config.ini` içinde
+`hw.lcd.width=720`, `hw.lcd.height=1280`, `hw.lcd.density=320` yapılır.
+İki AVD'de de `hw.keyboard=yes` — donanım klavyesi olmadan `adb shell input
+text` yazarken soft klavye açılıp düzeni kaydırıyor ve dokunma koordinatları
+şaşıyor.
+
+Başlatma (ikisi aynı anda çalışabilir, farklı port):
+
+```bash
+emulator -avd subtrack_narrow_api29 -no-snapshot-save -no-boot-anim -gpu swiftshader_indirect
+```
+
+### Soft klavyeyi kapatma
+
+Otomatik test yaparken şart; açık kalırsa düzen kayar.
+
+```bash
+adb shell settings put secure show_ime_with_hard_keyboard 0
+```
+
+### Yazı tipi ölçeği
+
+```bash
+adb shell settings put system font_scale 2.0
+adb shell settings put system font_scale 1.0
+```
+
+Değiştirdikten sonra Activity yeniden başlatılır. **Test bitince 1.0'a geri
+alın** — unutulursa sonraki tüm ölçümler yanlış çıkar.
+
+### Koyu tema
+
+```bash
+adb shell cmd uimode night yes
+adb shell cmd uimode night no
+```
+
+**API 29'da çalışmıyor** — komut "Night mode: no" döndürüp değeri yazmıyor,
+`settings put secure ui_night_mode 2` de tutmuyor. Koyu tema testleri
+`subtrack_wide_api34` üzerinde yapılır.
+
+### TalkBack
+
+**Şu an yapılamıyor.** Ne API 29 ne API 34 `google_apis_playstore` imajında
+Android Accessibility Suite kurulu değil (`pm list packages -u` ve
+`/system/priv-app` taramasında iz yok). Kurmak için ya emülatörde bir Google
+hesabıyla Play Store'a girilmeli ya da imaj değiştirilmeli. Erişilebilirlik
+davranışı bu yüzden yalnızca **erişilebilirlik ağacından** doğrulanabiliyor:
+
+```bash
+adb shell uiautomator dump /sdcard/u.xml
+adb exec-out cat /sdcard/u.xml
+```
+
+Bu ağaç ekran okuyucunun okuduğu şeyin ta kendisi; `contentDescription` ve
+düğüm birleşmesi buradan görülür. Görmediği tek şey **özel eylemler**
+(`CustomAccessibilityAction`) — dump biçimi eylem listesini içermiyor, o
+yüzden "Sil" eyleminin varlığı bu yolla ne doğrulanabilir ne çürütülebilir.
+
+### Ölçüm
+
+`uiautomator dump` bottom sheet açıkken çoğu zaman alttaki pencereyi
+döndürüyor, sheet içindeki bileşenleri göremiyor. Piksel ölçümü için ham
+ekran görüntüsü kullanılır:
+
+```bash
+adb exec-out screencap > ekran.raw
+```
+
+Baştaki 12 veya 16 baytlık başlıktan sonra RGBA gelir; `dosya_boyutu -
+genişlik*yükseklik*4` başlığın hangisi olduğunu verir. Bu makinede görüntü
+kütüphanesi yok ve kurulmuyor.
+
+### Otomatik testler
+
+```bash
+ANDROID_SERIAL=emulator-5554 ./gradlew :app:connectedDebugAndroidTest
+```
+
+`connectedDebugAndroidTest` bitince uygulamayı **kaldırıyor**. Ekran
+görüntüsü veya elle test yapılacaksa testten sonra yeniden kurun.
+
+### Açılış süresi
+
+```bash
+adb shell am force-stop com.elinacn.subtrack
+adb shell am start -W -n com.elinacn.subtrack/.MainActivity
+```
+
+Beş tekrarın medyanı alınır. Debug build ölçümüdür, release değil —
+karşılaştırma yalnızca kendi içinde anlamlıdır.
+
+---
+
 ## Faza Özel Testler
 
 Sabit liste geçtikten sonra çalıştırılır. Claude Code her faz sonunda bu
