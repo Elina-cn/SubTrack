@@ -6,6 +6,12 @@ CC, prompt açıkça istediğinde `git tag phase-N-done` atar.
 
 **Durum işaretleri:** ⬜ başlanmadı · 🟡 devam ediyor · ✅ bitti
 
+> **Kapsam notu (2026-08-29):** Faz 9-15 artık **v1.0 kapsamındadır** — sonraki
+> sürümler değil, bu sürümün kalanı. `PROJECT_SPEC.md` §4 yeniden yazıldı;
+> düzenleme, kur yönetimi, yenileme tarihi, hatırlatma, kategoriler, ödeme
+> periyodu, geçmiş takibi ve istatistik v1.0'a alındı. Ağ bağlantısı v1.1'e,
+> hesap ve senkronizasyon v2.0'a taşındı.
+
 ---
 
 ## ✅ Faz 0 — Acil Düzeltmeler
@@ -208,6 +214,8 @@ cihazda geçiyor (9 test), kritik yollar kapsanmış.
 - [ ] Fiyat biçimlendirmesi `Locale.US`'tan cihaz locale'ine geçsin
       (Türkçede virgül). TalkBack'in karışık dil okumasına da katkısı olabilir.
 - [ ] Sabit kur tablosu ile toplam normalizasyonu
+- [ ] Kurlar ayarlardan elle düzenlenebilsin — v1.0'da otomatik güncelleme yok,
+      elle giriş onun yerini tutuyor (bkz. PROJECT_SPEC §5)
 - [ ] Ana para birimi tercihi (DataStore)
 
 **Bitti:** Karışık para birimli abonelikler doğru toplanıyor.
@@ -239,10 +247,32 @@ cihazda geçiyor (9 test), kritik yollar kapsanmış.
 
 ---
 
+## ⬜ Faz 12a — Geçmiş Takibi
+
+Aylık toplamın zaman içindeki anlık görüntüleri. `PROJECT_SPEC.md` §1'deki
+"geçen aya göre ne değişti?" vaadinin veri tarafı.
+
+- [ ] `MonthlySnapshotEntity` — dönem, toplam (kuruş), para birimi, kayıt zamanı
+- [ ] `MonthlySnapshotDao` — `observeAll`, `upsert`, dönem bazlı sorgu
+- [ ] Anlık görüntünün ne zaman yazılacağı karara bağlansın (uygulama açılışı,
+      ay dönümü, veya her değişiklikte üzerine yazma)
+- [ ] Domain modeli + mapper, mevcut desene uygun
+- [ ] Ana ekranda "geçen aya göre" karşılaştırması
+
+> **Açık karar — şema sürümü:** `PROJECT_SPEC.md` §7 geçmiş tablosunun v1.0
+> şemasında bulunmasını istiyor, ama şema Faz 2'de sürüm 1 olarak donduruldu
+> (`app/schemas/1.json`). Uygulama yayınlanmadığı için iki seçenek var:
+> (a) sürüm 2'ye çıkıp gerçek bir migration yazmak — yayından önce migration
+> mekanizmasını bir kez çalıştırmış oluruz; (b) hiç kullanıcı verisi olmadığı
+> için sürüm 1'i yeniden üretmek. Bu faza gelince karara bağlanacak.
+
+---
+
 ## ⬜ Faz 13 — İstatistik
 
 - [ ] Kategori dağılım grafiği
-- [ ] Aylık trend
+- [ ] Aylık trend — **Faz 12a'daki anlık görüntüleri okur**, o faz olmadan
+      gösterecek veri yok
 - [ ] En pahalı abonelikler
 
 ---
@@ -279,7 +309,11 @@ cihazda geçiyor (9 test), kritik yollar kapsanmış.
 - [ ] Şablon testler kaldırılsın (`ExampleUnitTest`, `ExampleInstrumentedTest`
       — dolgu: `2+2=4` ve paket adı kontrolü)
 - [ ] `targetSdk` Play'in güncel zorunluluğuna yükseltilsin
-- [ ] Gizlilik politikası (çevrimdışı, veri toplanmıyor)
+- [ ] Gizlilik politikası — v1.0 çevrimdışı, veri toplanmıyor. **v1.1'de ağ
+      eklendiğinde politika ve Data Safety formu güncellenecek**
+      (PROJECT_SPEC §4)
+- [ ] Ücretlendirme kararı verilsin (peşin / ücretsiz+premium / ücretsiz) —
+      kod tarafında etkisi yok, buraya kadar bekleyebilir (PROJECT_SPEC §5)
 - [ ] Play Console Data Safety formu
 - [ ] Mağaza görselleri ve açıklama metni
 - [ ] Internal testing → production
