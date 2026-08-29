@@ -326,6 +326,27 @@ sıfırlanıyor (`onDragStarted`), böylece birikme yapısal olarak imkânsız.
 oy kullanmıyor. (`computeTarget`'ın üç dalından ikisi `positionalThreshold`'u
 hiç okumuyordu; hızlı fiskenin silmesinin sebebi buydu.)
 
+### Bilinen borç: tanımlanmamış renk rolleri
+
+`colorScheme`'de **tanımlamadığımız her rol Material baseline değerine düşer** ve
+paletimizin dışında renkler üretir.
+
+Tespit edilenler:
+
+| Rol | Düştüğü değer | Nerede görünüyor |
+|---|---|---|
+| `inversePrimary` | #D0BCFF / #6750A4 (mor) | Snackbar'ın eylem düğmesi ("Geri al") |
+| `inverseSurface` | #322F35 / #E6E0E9 (nötr gri) | Snackbar zemini |
+
+Kontrastları AA'yı geçiyor, yani erişilebilirlik sorunu değil — **kimlik**
+sorunu. Paletimiz mavi-camgöbeği ailesinde, oradan mor çıkıyor.
+
+**Faz 14'te tüm roller gözden geçirilecek**, sadece bu ikisi yamanmayacak.
+
+**Yeni bir `colorScheme` rolü kullanmadan önce `Theme.kt`'de tanımlı olup
+olmadığı kontrol edilmeli.** Tanımsızsa ya tanımlanır ya da o rolü kullanan
+bileşenin palet dışına çıkacağı bilinerek kullanılır.
+
 ### Snackbar süresi her zaman açıkça verilir
 
 material3'te `showSnackbar`'ın varsayılan süresi **`actionLabel` verilip

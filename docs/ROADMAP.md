@@ -252,6 +252,11 @@ cihazda geçiyor (9 test), kritik yollar kapsanmış.
 - [ ] Dynamic color (Material You, Android 12+)
 - [ ] Manuel tema tercihi (sistem/açık/koyu)
 - [ ] Koyu temada kart ↔ arka plan ayrımı 1.29:1, gözden geçirilsin
+- [ ] **Renk paleti bütün olarak yeniden ele alınacak.** Tanımlanmamış roller
+      Material baseline'ına düşüyor ve palet dışı renkler çıkıyor: Snackbar'daki
+      "Geri al" eylemi `inversePrimary` tanımsız olduğu için **mor** görünüyor
+      (#D0BCFF / #6750A4). Paletimiz mavi-camgöbeği ailesinde. Tüm `colorScheme`
+      rolleri gözden geçirilip eksikler tanımlanmalı, sadece bu ikisi değil.
 
 ---
 
