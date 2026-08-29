@@ -54,7 +54,11 @@ fun HomeScreen(
 ) {
     val moneyFormatter = rememberMoneyFormatter()
     val snackbarHostState = remember { SnackbarHostState() }
-    val sheetState = rememberModalBottomSheetState()
+    // skipPartiallyExpanded: half-open, the sheet cut the save button off below a 640dp-tall
+    // screen and nothing on screen said it was there to be dragged up. Opening expanded shows the
+    // whole form; the scroll inside it is what covers the case where the form is taller than the
+    // screen anyway.
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     // Resolved here rather than inside the effects below, which are not composable scopes.
     val deletedMessage = stringResource(id = R.string.subscription_deleted)
@@ -152,13 +156,18 @@ fun HomeScreen(
                 items = uiState.subscriptions,
                 key = { it.id } // Room's AUTOINCREMENT never reuses an id, so this stays unique
             ) { subscription ->
-                SwipeToDeleteRow(onDelete = { onEvent(HomeEvent.Delete(subscription.id)) }) {
-                    SubscriptionCard(
-                        name = subscription.name,
-                        // Its own currency, not a converted figure: the user entered 12,99
-                        // USD and that is what the row has to keep saying.
-                        price = moneyFormatter.format(subscription.price, subscription.currency)
+                // Its own currency, not a converted figure: the user entered 12,99 USD and that
+                // is what the row has to keep saying.
+                val price = moneyFormatter.format(subscription.price, subscription.currency)
+                SwipeToDeleteRow(
+                    onDelete = { onEvent(HomeEvent.Delete(subscription.id)) },
+                    contentDescription = stringResource(
+                        id = R.string.subscription_row_description,
+                        subscription.name,
+                        price
                     )
+                ) {
+                    SubscriptionCard(name = subscription.name, price = price)
                 }
             }
         }
