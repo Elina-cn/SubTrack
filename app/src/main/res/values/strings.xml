@@ -21,7 +21,7 @@
     <string name="error_price_empty">Fiyat boş olamaz</string>
     <string name="error_price_invalid">Geçerli bir sayı girin</string>
     <string name="error_price_not_positive">Fiyat sıfırdan büyük olmalı</string>
-    <string name="error_price_too_large">Fiyat çok büyük</string>
+    <string name="error_price_too_large">Fiyat %1$,d\'dan küçük olmalı</string>
     <string name="error_price_too_many_decimals">En fazla iki ondalık basamak girin</string>
 
     <!-- Failures -->

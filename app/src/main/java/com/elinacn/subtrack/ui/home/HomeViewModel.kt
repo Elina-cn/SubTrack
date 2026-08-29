@@ -188,7 +188,11 @@ class HomeViewModel @Inject constructor(
             return PriceResult.Invalid(UiText.Resource(R.string.error_price_not_positive))
         }
         if (amount > MAX_PRICE) {
-            return PriceResult.Invalid(UiText.Resource(R.string.error_price_too_large))
+            // The limit is handed to the message instead of being written into it, so the two
+            // cannot drift apart when the ceiling changes.
+            return PriceResult.Invalid(
+                UiText.Resource(R.string.error_price_too_large, listOf(MAX_PRICE.toLong()))
+            )
         }
         // Trailing zeros do not count: "159.990" is two decimals written long, "159.999" is three.
         if (amount.stripTrailingZeros().scale() > MINOR_UNIT_DIGITS) {

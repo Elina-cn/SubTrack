@@ -174,7 +174,24 @@ class HomeViewModelTest {
 
     @Test
     fun save_priceAboveCeiling_reportsPriceError() = runTest {
-        assertPriceRejected(rawPrice = "1000001", expected = R.string.error_price_too_large)
+        assertPriceRejected(
+            rawPrice = "1000001",
+            expected = R.string.error_price_too_large,
+            args = listOf(1_000_000L)
+        )
+    }
+
+    @Test
+    fun save_priceAboveCeiling_carriesTheLimitIntoTheMessage() = runTest {
+        collectState()
+
+        viewModel.onEvent(HomeEvent.Save("Netflix", "5000000"))
+        advanceUntilIdle()
+
+        // The number travels as an argument, so the string resource never has to repeat a limit
+        // that could drift away from the constant.
+        val error = viewModel.uiState.value.priceError as UiText.Resource
+        assertEquals(listOf(1_000_000L), error.args)
     }
 
     @Test
@@ -261,14 +278,18 @@ class HomeViewModelTest {
         advanceUntilIdle()
     }
 
-    private fun TestScope.assertPriceRejected(rawPrice: String, expected: Int) {
+    private fun TestScope.assertPriceRejected(
+        rawPrice: String,
+        expected: Int,
+        args: List<Any> = emptyList()
+    ) {
         collectState()
         viewModel.onEvent(HomeEvent.OpenAddSheet)
 
         viewModel.onEvent(HomeEvent.Save("Netflix", rawPrice))
         advanceUntilIdle()
 
-        assertEquals(errorRes(expected), viewModel.uiState.value.priceError)
+        assertEquals(UiText.Resource(expected, args), viewModel.uiState.value.priceError)
         assertTrue(repository.inserted.isEmpty())
         assertTrue(viewModel.uiState.value.isAddSheetOpen)
     }
