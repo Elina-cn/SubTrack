@@ -32,4 +32,8 @@
     <string name="subscription_deleted">Abonelik silindi</string>
     <string name="undo">Geri al</string>
 
+
+    <!-- Status -->
+    <string name="loading">Yükleniyor</string>
+
 </resources>

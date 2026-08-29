@@ -31,4 +31,8 @@
     <string name="subscription_deleted">Subscription deleted</string>
     <string name="undo">Undo</string>
 
+
+    <!-- Status -->
+    <string name="loading">Loading</string>
+
 </resources>

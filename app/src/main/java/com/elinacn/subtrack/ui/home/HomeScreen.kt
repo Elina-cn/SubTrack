@@ -30,6 +30,7 @@ import com.elinacn.subtrack.domain.model.BillingPeriod
 import com.elinacn.subtrack.domain.model.Money
 import com.elinacn.subtrack.domain.model.Subscription
 import com.elinacn.subtrack.domain.model.SubscriptionCategory
+import com.elinacn.subtrack.ui.common.DelayedLoadingIndicator
 import com.elinacn.subtrack.ui.home.components.AddSubscriptionSheet
 import com.elinacn.subtrack.ui.home.components.DashboardCard
 import com.elinacn.subtrack.ui.home.components.SubscriptionCard
@@ -134,6 +135,10 @@ fun HomeScreen(
                 )
             }
 
+            item {
+                DelayedLoadingIndicator(isLoading = uiState.isLoading)
+            }
+
             items(
                 items = uiState.subscriptions,
                 key = { it.id } // Room's AUTOINCREMENT never reuses an id, so this stays unique
@@ -185,6 +190,14 @@ private fun previewSubscription(id: Long, name: String, cents: Long) = Subscript
 private fun HomeScreenEmptyPreview() {
     SubTrackTheme {
         HomeScreen(uiState = HomeUiState(isLoading = false), onEvent = {})
+    }
+}
+
+@Preview(showBackground = true, showSystemUi = true)
+@Composable
+private fun HomeScreenLoadingPreview() {
+    SubTrackTheme {
+        HomeScreen(uiState = HomeUiState(isLoading = true), onEvent = {})
     }
 }
 
