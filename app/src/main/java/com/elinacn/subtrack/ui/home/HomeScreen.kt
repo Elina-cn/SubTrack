@@ -31,6 +31,7 @@ import com.elinacn.subtrack.domain.model.Money
 import com.elinacn.subtrack.domain.model.Subscription
 import com.elinacn.subtrack.domain.model.SubscriptionCategory
 import com.elinacn.subtrack.ui.common.DelayedLoadingIndicator
+import com.elinacn.subtrack.ui.common.UiText
 import com.elinacn.subtrack.ui.home.components.AddSubscriptionSheet
 import com.elinacn.subtrack.ui.home.components.DashboardCard
 import com.elinacn.subtrack.ui.home.components.SubscriptionCard
@@ -198,6 +199,21 @@ private fun HomeScreenEmptyPreview() {
 private fun HomeScreenLoadingPreview() {
     SubTrackTheme {
         HomeScreen(uiState = HomeUiState(isLoading = true), onEvent = {})
+    }
+}
+
+/** The snackbar is driven by a LaunchedEffect, so this one only renders in interactive preview. */
+@Preview(showBackground = true, showSystemUi = true)
+@Composable
+private fun HomeScreenErrorPreview() {
+    SubTrackTheme {
+        HomeScreen(
+            uiState = HomeUiState(
+                isLoading = false,
+                errorMessage = UiText.Raw("Abonelik kaydedilemedi")
+            ),
+            onEvent = {}
+        )
     }
 }
 

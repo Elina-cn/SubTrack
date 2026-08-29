@@ -15,6 +15,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SheetState
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -24,9 +25,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.tooling.preview.Preview
 import com.elinacn.subtrack.R
 import com.elinacn.subtrack.ui.common.UiText
 import com.elinacn.subtrack.ui.theme.Dimens
+import com.elinacn.subtrack.ui.theme.SubTrackTheme
 
 /**
  * Form for a new subscription.
@@ -116,5 +119,23 @@ fun AddSubscriptionSheet(
                 Text(stringResource(id = R.string.save))
             }
         }
+    }
+}
+
+/** Field errors as they appear after a rejected save. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Preview(showBackground = true)
+@Composable
+private fun AddSubscriptionSheetErrorPreview() {
+    SubTrackTheme {
+        AddSubscriptionSheet(
+            sheetState = rememberModalBottomSheetState(),
+            nameError = UiText.Resource(R.string.error_name_empty),
+            priceError = UiText.Resource(R.string.error_price_invalid),
+            onSave = { _, _ -> },
+            onNameEdited = {},
+            onPriceEdited = {},
+            onDismiss = {}
+        )
     }
 }
