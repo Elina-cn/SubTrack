@@ -8,6 +8,7 @@ import com.elinacn.subtrack.domain.model.Currency
 import com.elinacn.subtrack.domain.model.Money
 import com.elinacn.subtrack.domain.model.Subscription
 import com.elinacn.subtrack.domain.model.SubscriptionCategory
+import com.elinacn.subtrack.domain.repository.SettingsRepository
 import com.elinacn.subtrack.domain.repository.SubscriptionRepository
 import com.elinacn.subtrack.domain.usecase.CurrencyConverter
 import com.elinacn.subtrack.ui.common.UiText
@@ -27,7 +28,8 @@ import javax.inject.Inject
 /** Holds the home screen's state and turns its events into repository calls. */
 @HiltViewModel
 class HomeViewModel @Inject constructor(
-    private val repository: SubscriptionRepository
+    private val repository: SubscriptionRepository,
+    private val settingsRepository: SettingsRepository
 ) : ViewModel() {
 
     /** Everything that is not stored: sheet visibility, validation errors, the pending undo. */
@@ -52,13 +54,14 @@ class HomeViewModel @Inject constructor(
      */
     val uiState: StateFlow<HomeUiState> = combine(
         repository.observeAll(),
+        settingsRepository.observeMainCurrency(),
         screenState
-    ) { subscriptions, screen ->
+    ) { subscriptions, mainCurrency, screen ->
         HomeUiState(
             subscriptions = subscriptions,
-            monthlyTotal = converter.totalIn(subscriptions, Currency.Base),
-            baseCurrency = Currency.Base,
-            isTotalConverted = subscriptions.any { it.currency != Currency.Base },
+            monthlyTotal = converter.totalIn(subscriptions, mainCurrency),
+            baseCurrency = mainCurrency,
+            isTotalConverted = subscriptions.any { it.currency != mainCurrency },
             isLoading = false,
             isAddSheetOpen = screen.isAddSheetOpen,
             nameError = screen.nameError,

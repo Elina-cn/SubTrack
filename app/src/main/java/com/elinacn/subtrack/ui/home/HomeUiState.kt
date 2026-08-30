@@ -18,7 +18,7 @@ data class HomeUiState(
     val subscriptions: List<Subscription> = emptyList(),
     /** Every subscription converted into [baseCurrency] and added up. */
     val monthlyTotal: Money = Money.ZERO,
-    /** What [monthlyTotal] is denominated in. Fixed for now; phase 9b makes it a preference. */
+    /** What [monthlyTotal] is denominated in. Read from the stored main-currency preference. */
     val baseCurrency: Currency = Currency.Base,
     /**
      * True when at least one subscription is priced in something other than [baseCurrency].
