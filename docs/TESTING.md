@@ -91,13 +91,33 @@ Başlatma (ikisi aynı anda çalışabilir, farklı port):
 emulator -avd subtrack_narrow_api29 -no-snapshot-save -no-boot-anim -gpu swiftshader_indirect
 ```
 
-### Soft klavyeyi kapatma
+### Soft klavye — iki yönlü, ikisi de gerekli
 
-Otomatik test yaparken şart; açık kalırsa düzen kayar.
+Her iki AVD'de `hw.keyboard=yes`. Bunun iki sonucu var ve **ikisi de tuzak**.
+
+**Normal otomatik testte kapalı olmalı.** Açık kalırsa `adb shell input text`
+sırasında klavye açılıp düzeni kaydırır, dokunma koordinatları şaşar.
 
 ```bash
 adb shell settings put secure show_ime_with_hard_keyboard 0
 ```
+
+**Klavyeyle ilgili bir şey ölçülecekse açılmalı.** Donanım klavyesi tanımlı
+olduğu için yazılım klavyesi **hiç çizilmez**: `dumpsys input_method`
+`mInputShown=true` der, IME penceresi de vardır, ama içerik inset'i sıfırdır
+ve ekranda yer kaplamaz. Bu yüzden klavye testi **sessizce yanlış sonuç
+verir** — hata vermez, sadece ölçtüğün şey gerçek telefonda olan şey değildir.
+Faz 9b-1 kapanışında tam olarak bu oldu ve "sheet klavyeyle kaymıyor" diye
+yanlış bir bulgu raporlandı.
+
+```bash
+adb shell settings put secure show_ime_with_hard_keyboard 1   # ölçümden önce
+adb shell settings put secure show_ime_with_hard_keyboard 0   # ölçümden sonra
+```
+
+Klavyenin üst kenarı, uygulama penceresi `adjustResize` ile küçüldüğü için
+en dıştaki kaydırma düğümünün (`android.widget.ScrollView`) alt sınırından
+okunabilir; ayrı bir piksel taramasına gerek yok.
 
 ### Yazı tipi ölçeği
 

@@ -176,6 +176,82 @@ terim 5.000: `(1099×428500+5000)/10000 = 47092` — cihazın gösterdiği değe
 
 ---
 
+### Hotfix — Kaydet butonu kaydırma alanının dışına alındı (2026-08-30)
+
+**Bulunan:** 9b-1 kapanış ölçümünde, 360dp'de klavye açıkken Kaydet
+font_scale 1.0'da 40px'in 19'u görünecek şekilde kırpıktı, font_scale 2.0'da
+erişilebilirlik ağacında **hiç yoktu**. Kaydırarak ulaşılıyordu ama
+kullanıcıya kaydırması gerektiğini söyleyen hiçbir işaret yoktu. Faz 10, 11 ve
+12 bu sheet'e üç alan daha ekleyecek; taşma davranışının onlardan önce
+düzeltilmesi gerekiyordu.
+
+**Kaynaktan doğrulananlar** (material3 1.4.0, foundation-layout 1.9.5):
+- `ModalBottomSheet.kt:186` — kütüphane içeriği zaten
+  `Box(Modifier.fillMaxSize().imePadding())` içine koyuyor. **IME insets'i
+  hâlihazırda halledilmiş**, projeye `imePadding` / `WindowInsets` /
+  `enableEdgeToEdge` sokmaya gerek yok. Manifest'e de dokunulmadı.
+- İçerik `Surface` içindeki bir `Column`'a `ColumnScope` alıcısıyla geçiyor.
+  `Surface`'ın yükseklik kısıtı yok, `draggableAnchors` bloğu `sheetSize.height`
+  ile `constraints.maxHeight`'ı karşılaştırıyor: içerik **wrap-content**
+  ölçülüyor ama üst sınır olarak kullanılabilir yükseklik veriliyor. Dış `Box`
+  `fillMaxSize` olduğu için bu sınır **sonlu** — yani `weight` çalışır.
+
+**Seçilen yöntem: `Modifier.weight(1f, fill = false)`.**
+`ColumnScope.weight` KDoc'u (`Column.kt:292`) ve `RowColumnMeasurePolicy.kt:198`
+birlikte okununca: `mainAxisMin = if (parentData.fill) childMainAxisSize else 0`,
+`mainAxisMax = childMainAxisSize`. Yani `fill = true` sheet'i **her zaman tam
+ekran** yapardı ve Hotfix serisindeki "sheet içeriğe göre boyutlanıyor"
+davranışını bozardı. `fill = false` ile kaydırma bölgesi
+`minHeight = 0, maxHeight = kalan alan` kısıtıyla ölçülüyor: form kısaysa
+küçülüyor, uzunsa kırpılıp kaydırılıyor. Kaydet weight'siz kardeş olduğu için
+`fixedSpace`'e giriyor — yeri **form ölçülmeden önce** ayrılıyor.
+
+Ekstra sarmalayıcıya gerek olmadı: sheet'in `content` lambda'sı zaten
+`ColumnScope`, iki kardeş doğrudan oraya kondu. Alan sırası, doğrulama,
+hata gösterimi, `CurrencySelector` ve string kaynakları **değişmedi**;
+`skipPartiallyExpanded = true` korundu. Kaydet ile seçici arasındaki 24dp
+boşluk `Spacer` olmaktan çıkıp butonun üst padding'i oldu — böylece sabit
+kalıyor, kaydırılıp gitmiyor.
+
+**Ölçüm** (`show_ime_with_hard_keyboard 1` ile, dört kombinasyonun hepsi):
+
+| Cihaz | fs | Klavye üstü | Kaydet (klavye açık) | Dokunma alanı | Kaydırınca oynuyor mu |
+|---|---|---|---|---|---|
+| Dar API 29 | 1.0 | y=782 | `[48,606][672,702]` tam görünür | 96px = **48dp** | hayır — üç dump'ta da aynı |
+| Dar API 29 | 2.0 | y=870 | `[48,683][672,790]` tam görünür | 107px = **53,5dp** | hayır |
+| Geniş API 34 | 1.0 | y=1517 | `[63,1287][1017,1413]` tam görünür | 126px = **48dp** | hayır |
+| Geniş API 34 | 2.0 | y=1517 | `[63,1272][1017,1412]` tam görünür | 140px = **53,3dp** | hayır |
+
+Öncesiyle karşılaştırma: dar fs1.0'da Kaydet `[329,763][391,782]`'de kırpıktı,
+dar fs2.0'da ağaçta yoktu. Şimdi dördünde de tam görünür ve kaydırmadan
+dokunulabilir.
+
+**Klavye kapalıyken sheet yüksekliği değişmedi — dört kombinasyonda da 0dp
+fark.** Kaydet metni klavyesiz konumlarda birebir aynı yerde: dar fs1.0
+`[329,1132][391,1172]`, dar fs2.0 `[303,1109][417,1184]`, geniş fs1.0
+`[500,2143][580,2196]`, geniş fs2.0 `[465,2113][616,2211]`. `fill = false`
+seçiminin koruduğu şey tam olarak buydu.
+
+Yatayda (2400x1080) da kontrol edildi: kaydırma bölgesi `[360,190][2040,723]`,
+Kaydet `[423,797][1977,902]` — ekranda ve sabit.
+
+**Fonksiyonel:** iki emülatörde de abonelik eklendi, sheet kapandı, satır ve
+toplam güncellendi. Dar emülatörde font_scale 2.0'da kaydırmadan kaydedildi —
+düzeltmenin asıl kazancı bu.
+
+**Testler:** 58 birim testi geçti, yeni derleme uyarısı yok.
+`docs/TESTING.md` sabit regresyon listesi (21 madde) geniş emülatörde bir kez
+koşuldu, hepsi geçti.
+
+**Belge:** `docs/TESTING.md`'deki soft klavye bölümü iki yönlü hale getirildi —
+ölçümden önce `show_ime_with_hard_keyboard 1`, sonra `0`. Unutulursa klavye
+testi hata vermeden yanlış sonuç verir.
+
+**Commit'ler**
+- `63026ca` fix: keep the save button out of the sheet's scrolling region
+
+---
+
 ## [Faz 9a] Para Birimi Seçimi ve Normalizasyon — 2026-08-30
 
 **Durum:** Tamamlandı (9b — ayarlar ekranı — ayrı prompt)
