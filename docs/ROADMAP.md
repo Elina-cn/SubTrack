@@ -225,7 +225,8 @@ tasarım kararı bekliyor, ileri bir tarihe ertelendi.
 - [ ] **9b:** Kurlar ayarlardan elle düzenlenebilsin — v1.0'da otomatik
       güncelleme yok, elle giriş onun yerini tutuyor (bkz. PROJECT_SPEC §5).
       `CurrencyConverter` tablosunu zaten dışarıdan alıyor.
-- [ ] **9b:** Ana para birimi tercihi (DataStore)
+- [x] **9b:** Ana para birimi tercihi (DataStore) — ayarlar ekranı, Navigation,
+      Preferences DataStore; toplam seçilen para biriminde hesaplanıyor
 
 **Bitti:** Karışık para birimli abonelikler doğru toplanıyor.
 
@@ -292,8 +293,13 @@ Aylık toplamın zaman içindeki anlık görüntüleri. `PROJECT_SPEC.md` §1'de
 - [ ] **Renk paleti bütün olarak yeniden ele alınacak.** Tanımlanmamış roller
       Material baseline'ına düşüyor ve palet dışı renkler çıkıyor: Snackbar'daki
       "Geri al" eylemi `inversePrimary` tanımsız olduğu için **mor** görünüyor
-      (#D0BCFF / #6750A4). Paletimiz mavi-camgöbeği ailesinde. Tüm `colorScheme`
-      rolleri gözden geçirilip eksikler tanımlanmalı, sadece bu ikisi değil.
+      (#D0BCFF / #6750A4). Aynı sebeple Faz 9b-1'de ölçülen iki rol daha:
+      `outline` tanımsız, chip kenarlığı koyu temada **#49454F**; `onSurfaceVariant`
+      tanımsız, seçilmemiş chip etiketi ve ayarlar açıklama metni koyu temada
+      **#CAC4D0**, açık temada **#49454F**. İkisi de mor-gri, kontrast AA geçiyor
+      (koyu 9.66:1, açık 6.85:1) — sorun okunabilirlik değil, palet tutarlılığı.
+      Paletimiz mavi-camgöbeği ailesinde. Tüm `colorScheme`
+      rolleri gözden geçirilip eksikler tanımlanmalı, sadece bunlar değil.
 - [ ] Para birimi gösterimi tutarlı hale getirilsin: `NumberFormat` locale'e göre
       bazen sembol bazen ISO kodu yazıyor (EN dilinde toplam "TRY 1.785,45",
       kart "$10.99"). Her yerde sembol mü zorlanacak, her yerde kod mu —
@@ -334,7 +340,15 @@ Aylık toplamın zaman içindeki anlık görüntüleri. `PROJECT_SPEC.md` §1'de
       reddedildi — **nasıl çözüleceği ayrıca kararlaştırılacak.**
       Bekleyen maddeler: satır ve kart tek odak durağı mı okunuyor,
       "Sil" özel eylemi görünüp çalışıyor mu, para birimi chip'lerinin
-      seçili durumu duyuruluyor mu (ağaçta `checked="false"` görünüyor).
+      seçili durumu duyuruluyor mu. Faz 9b-1'de **ayarlar ekranında**
+      `checkable="true"` ve seçili chip `checked="true"` ölçüldü (dar ve geniş
+      emülatörde, dört ayrı dump). Hotfix'teki ters bulgu büyük olasılıkla
+      **ekleme sheet'inin dump'ından** geliyor — o pencerenin dump'ı güvenilmez.
+      Yine de TalkBack ile doğrulanacak: ağaçta doğru olması duyurulduğu
+      anlamına gelmiyor.
+- [ ] DataStore `libdatastore_shared_counter.so` native kütüphanesi getiriyor;
+      `stripDebugDebugSymbols` strip edemiyor, olduğu gibi paketleniyor.
+      Release APK boyutu ölçülürken göz önünde bulundurulsun.
 - [ ] Play Console Data Safety formu
 - [ ] Mağaza görselleri ve açıklama metni
 - [ ] Internal testing → production

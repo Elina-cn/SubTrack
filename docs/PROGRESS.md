@@ -27,6 +27,155 @@ Her faz sonunda **en üste** yeni kayıt eklenir. Eski kayıtlar silinmez.
 
 ---
 
+## [Faz 9b-1] Navigation, DataStore ve Ana Para Birimi Tercihi — 2026-08-30
+
+**Durum:** Tamamlandı (9b-2 — kur düzenleme — ayrı prompt)
+
+**Yapılanlar — belgeler ve bağımlılıklar**
+- `ARCHITECTURE.md`'ye **§13 Navigation** ve **§14 Kullanıcı Tercihleri** eklendi;
+  kod bunlara göre yazıldı, tersi değil.
+- **Sürüm tavanı çıkmadı.** `navigation-compose 2.9.5` ve
+  `datastore-preferences 1.1.7` ilk denemede geçti; `checkDebugAarMetadata`
+  compileSdk/AGP şikayeti **vermedi**, Faz 5a'daki hilt-navigation-compose
+  durumu tekrarlanmadı. AGP 9.0.1 ve compileSdk 36.1 olduğu gibi kaldı.
+
+**Yapılanlar — kod**
+- `SettingsRepository` (domain) / `SettingsRepositoryImpl` (data). Para birimi
+  **ISO kodu** olarak saklanıyor, ordinal değil: ordinal, enum'a bir sabit
+  eklendiği gün sessizce anlam değiştirir, dosya ise onu yazan sürümden uzun
+  yaşar. Okuma `IOException`'da `emptyPreferences()`'a düşüyor, başka her hata
+  yeniden fırlatılıyor.
+- `DataStoreModule` `@Singleton`. `RepositoryModule`'e ikinci `@Binds`.
+- `ui/navigation/`: `Destination` (düz String rota) + `SubTrackNavHost`.
+  `hiltViewModel()` yalnızca `composable` bloklarında; ekranlar durumsuz.
+  Ayarlara gidişte `launchSingleTop = true` — çift dokunuş iki kopya yığmasın.
+- `MainActivity` yalnızca tema + `SubTrackNavHost`.
+- `CurrencySelector` `ui/home/components/` → `ui/common/`, içeriği değişmeden.
+- `SettingsViewModel` **iyimser kopya tutmuyor:** dokunuş yazar, ekran store
+  yeniden yayınladığı için güncellenir. Yazma başarısız olursa chip'ler yerinde
+  kalır — ekranda görünen, gerçekten kayıtlı olandır.
+- `HomeViewModel` üç akışı `combine` ediyor; toplam seçili para biriminde.
+
+**Testler**
+- 46 → **58 birim testi**, hepsi geçti. Enstrümantasyon **9/9, iki emülatörde de**.
+- `SettingsRepositoryImplTest` geçici dosya üzerinde **gerçek DataStore** ile
+  çalışıyor, fake ile değil — asıl sınanan şey diskten geri okumak.
+- **`multiple DataStores active` hatası testte kasıtlı üretildi.** Aynı dosya
+  üzerinde ikinci store açmak `IllegalStateException` fırlatıyor; test ilk
+  scope'u iptal ederek geçiyor. Bu, §14'teki "tekillik Hilt'in sorumluluğudur"
+  cümlesinin çalışma zamanı kanıtı.
+
+**Değişen dosyalar**
+- `domain/repository/SettingsRepository.kt`, `data/repository/SettingsRepositoryImpl.kt` — yeni
+- `di/DataStoreModule.kt` — yeni; `di/RepositoryModule.kt` — ikinci binding
+- `ui/navigation/Destination.kt`, `ui/navigation/SubTrackNavHost.kt` — yeni
+- `ui/settings/SettingsUiState.kt`, `SettingsViewModel.kt`, `SettingsScreen.kt` — yeni
+- `ui/common/CurrencySelector.kt` — `ui/home/components/` altından taşındı
+- `MainActivity.kt`, `ui/home/HomeScreen.kt`, `HomeViewModel.kt`, `HomeUiState.kt`
+- `ui/home/components/AddSubscriptionSheet.kt` — yalnızca import satırı
+- `res/values/strings.xml`, `res/values-en/strings.xml`
+- `gradle/libs.versions.toml`, `app/build.gradle.kts`
+- `docs/ARCHITECTURE.md`, `docs/WORKFLOW.md`, `docs/TESTING.md`
+
+**Commit'ler**
+- `2d172e4` docs: add navigation and datastore architecture decisions
+- `8de2106` build: add navigation-compose and datastore-preferences
+- `b21171f` feat: store the main currency preference in DataStore
+- `ae2d16f` feat: add a settings screen behind a navigation host
+- `ce4b24b` feat: total subscriptions in the chosen main currency
+- `aa8f39f` test: cover the settings repository, view model and currency switch
+- `10ef2f4` docs: add navigation and preference regression checks
+
+**Karşılaşılan sorunlar**
+- **`b21171f` tek başına derlenmiyor.** `git mv` dosya taşımasını çoktan
+  stage'lemişti ve o commit'e girdi; `package` satırının düzeltilmesi bir
+  sonraki commit'te kaldı. **Geçmiş düzeltilmedi** — bilinçli karar: taşıma
+  içerik taşımıyor, geçmişi yeniden yazmanın riski kazancından büyük.
+- Emülatörler oturumlar arasında iki kez kendiliğinden kapandı, yeniden
+  başlatıldı. Bu turda ikisi de **İngilizce locale + açık temada** açıldı;
+  API 29 bu sefer koyu temada kilitli değildi.
+
+**Emülatör test sonuçları**
+
+| # | Test | Dar (API 29, 360dp) | Geniş (API 34, 411dp) |
+|---|---|---|---|
+| 1 | Ayarlara gidiş | geçti — ikon 96×96px = **48×48dp** | geçti — 126×126px = **48×48dp** |
+| 2 | İki geri yolu + 5 gidiş-gel | geçti — tek geri tuşuyla launcher | geçti |
+| 3 | Tercih toplamı değiştiriyor | geçti — TRY 630,91 → **$14,72** | geçti — aynı |
+| 4 | Kalıcılık | geçti — `settings.preferences_pb` 24 byte | geçti |
+| 5 | Tek instance | temiz — logcat'te `multiple DataStores` yok | temiz |
+| 6 | Ayarlarda döndürme | geçti — ekran ve seçim korundu | geçti |
+| 7 | Dar + font_scale 2.0 | geçti — chip 80,0/82,0/80,0/83,0dp, kırpılma yok | — |
+| 8 | Temiz kurulum (`pm clear`) | geçti — TRY 0.00, çökme yok | geçti |
+
+Sabit regresyon listesi (19 madde) geniş emülatörde bir kez koşuldu, hepsi geçti.
+Türkçe metinler `cmd locale set-app-locales tr-TR` ile ayrıca doğrulandı.
+
+Test 8'in kanıtı dikkate değer: `pm clear` sonrası `files/datastore/` **yok**,
+ama uygulama TRY ile açılıyor. DataStore dosyayı ilk yazmada oluşturuyor,
+okuma varsayılana düşüyor — §14'ün tarif ettiği davranış.
+
+**Bulgu — chip seçim durumu ayarlar ekranında görünüyor**
+Hotfix kaydındaki "dört chip de checked=false bildiriyor" maddesinin tersi
+ölçüldü: ayarlar ekranında chip'ler `checkable="true"`, seçili olan
+`checked="true"` veriyor (dar ve geniş emülatörde, dört ayrı dump). Ekleme
+sheet'inin dump'ında ise `checkable="false"` çıkıyor. Yani sorun bileşende
+değil, **sheet penceresinin dump'ında** — o pencerenin `uiautomator dump`
+çıktısı zaten Faz 9a'dan beri güvenilmez. TalkBack olmadan kesin konuşulamaz;
+madde Faz 16'da açık kaldı.
+
+**Bulgu — koyu temada iki tanımsız rol**
+`TopAppBar` **palet içinde**: açık temada `#FFFFFF`, koyu temada `#2D3436`,
+ikisi de tanımlı `surface`. Ama `outline` ve `onSurfaceVariant` tanımsız
+olduğu için Material baseline moru geliyor: chip kenarlığı **#49454F**,
+seçilmemiş chip etiketi ve ayarlar açıklama metni **#CAC4D0** (koyu) /
+**#49454F** (açık). Kontrast AA geçiyor (9.66:1 ve 6.85:1) — sorun
+okunabilirlik değil, palet tutarlılığı. Faz 14'e eklendi, düzeltilmedi.
+
+**IME ölçümü — önceki bulgu yanlıştı**
+İlk raporda "sheet API 29'da klavyeyle yukarı kaymıyor" yazılmıştı. **Yanlış.**
+Sebep AVD'nin donanım klavyesi (`hw.keyboard`, config `qwerty/v/v`): yazılım
+klavyesi hiç çizilmiyordu. `mInputShown=true` görünüyor ama IME penceresinin
+`mGivenContentInsets=[0,1232][0,0]` ve dokunma bölgesi boş — ekranda yer
+kaplamıyor. `settings put secure show_ime_with_hard_keyboard 1` ile gerçek
+telefon durumu üretildi ve yeniden ölçüldü:
+
+| Cihaz | font_scale | Klavye üst kenarı | Save (klavye açıkken) | Erişilebilir mi |
+|---|---|---|---|---|
+| Dar API 29 | 1.0 | y=**782** | `[329,763][391,782]` — 40px'in 19'u görünür, **kırpık** | Evet — tek fiske, içerik 129px kaydı, Save `[329,634][391,674]`, klavyeden 108px yukarıda |
+| Dar API 29 | 2.0 | y=**870** | ağaçta **yok**, viewport dışında | Evet — iki fiske, içerik 328px kaydı, Save `[303,699][417,774]`, klavyeden 96px yukarıda |
+| Geniş API 34 | 1.0 | y=**1517** | `[500,1323][580,1376]` — **tam görünür** | Kaydırma gerekmedi |
+| Geniş API 34 | 2.0 | y=**1517** | `[465,1293][616,1391]` — **tam görünür** | Kaydırma gerekmedi |
+
+Klavye üst kenarı `ScrollView` düğümünün alt sınırından okundu; pencere
+`adjustResize` ile küçüldüğü için ikisi aynı çizgi. Klavye açılınca sheet her
+iki cihazda da tam yüksekliğe genişliyor ve `verticalScroll` gerçekten
+çalışıyor — Hotfix'te eklenen kaydırma **klavye durumunda da işini görüyor**.
+Ama dar ekranda Save **ilk anda kırpık (fs 1.0) veya hiç görünmez (fs 2.0)**
+geliyor; kullanıcının kaydırması gerekiyor.
+
+Manifest'te `windowSoftInputMode` **tanımlı değil** (platform varsayılanı;
+ölçüm pencerenin pan değil resize ettiğini gösteriyor). Kod tabanında
+`imePadding`, `WindowInsets`, `enableEdgeToEdge`, `setDecorFitsSystemWindows`
+**hiç geçmiyor**. Düzeltme yapılmadı, ayrı prompt bekliyor.
+
+**Düzeltme — kur hesabı formülü**
+Faz 9b-1 raporunda TRY toplamı için yazılan `(1099×428500+214250)/10000`
+formülü **yanlıştı**; 47113 verir. Koddaki yuvarlama terimi **bölenin** yarısı,
+yani hedef kurun yarısı: `divideHalfUp` içinde `val half = denominator / 2` ve
+çağrıda `denominator = rates.rateOf(to)`. TRY'ye çevirirken bölen 10.000,
+terim 5.000: `(1099×428500+5000)/10000 = 47092` — cihazın gösterdiği değer.
+**Kodda hata yok**, hatalı olan rapordaki elle hesaptı.
+
+**Sonraki faz için not**
+- 9b-2: kur düzenleme. `ExchangeRateTable.of()` eksikleri varsayılandan
+  dolduruyor, `CurrencyConverter` tabloyu zaten dışarıdan alıyor —
+  `SettingsRepository`'ye ikinci bir anahtar grubu eklenecek.
+- `ExchangeRateTable.Default` kurları (42,85 / 46,20 / 53,90) **hâlâ
+  doğrulanmadı.** 9b-2 bunları düzenlenebilir yapınca tekrar gündeme gelecek.
+
+---
+
 ## [Faz 9a] Para Birimi Seçimi ve Normalizasyon — 2026-08-30
 
 **Durum:** Tamamlandı (9b — ayarlar ekranı — ayrı prompt)
