@@ -7,6 +7,7 @@ import com.elinacn.subtrack.domain.model.Currency
 import com.elinacn.subtrack.domain.model.Money
 import com.elinacn.subtrack.domain.model.Subscription
 import com.elinacn.subtrack.domain.model.SubscriptionCategory
+import com.elinacn.subtrack.fake.FakeSettingsRepository
 import com.elinacn.subtrack.fake.FakeSubscriptionRepository
 import com.elinacn.subtrack.ui.common.UiText
 import kotlinx.coroutines.Dispatchers
@@ -31,6 +32,7 @@ class HomeViewModelTest {
 
     private val dispatcher = StandardTestDispatcher()
     private lateinit var repository: FakeSubscriptionRepository
+    private lateinit var settingsRepository: FakeSettingsRepository
     private lateinit var viewModel: HomeViewModel
 
     @Before
@@ -38,7 +40,8 @@ class HomeViewModelTest {
         // viewModelScope runs on Dispatchers.Main, which does not exist off-device.
         Dispatchers.setMain(dispatcher)
         repository = FakeSubscriptionRepository()
-        viewModel = HomeViewModel(repository)
+        settingsRepository = FakeSettingsRepository()
+        viewModel = HomeViewModel(repository, settingsRepository)
     }
 
     @After
@@ -116,6 +119,45 @@ class HomeViewModelTest {
         )
         collectState()
 
+        assertEquals(false, viewModel.uiState.value.isTotalConverted)
+    }
+
+    @Test
+    fun uiState_mainCurrencyChanges_recalculatesTheTotalInTheNewCurrency() = runTest {
+        repository.setSubscriptions(
+            listOf(
+                subscription(id = 1, cents = 15999), // 159,99 TRY
+                subscription(id = 2, cents = 1099, currency = Currency.USD) // 10,99 USD
+            )
+        )
+        collectState()
+
+        // In TRY: 15999 + round(1099 * 428500 / 10000) = 15999 + 47092.
+        assertEquals(Money(63091), viewModel.uiState.value.monthlyTotal)
+        assertEquals(Currency.TRY, viewModel.uiState.value.baseCurrency)
+
+        settingsRepository.setMainCurrency(Currency.USD)
+        advanceUntilIdle()
+
+        // In USD: round(15999 * 10000 / 428500) + 1099 = 373 + 1099.
+        assertEquals(Money(1472), viewModel.uiState.value.monthlyTotal)
+        assertEquals(Currency.USD, viewModel.uiState.value.baseCurrency)
+        assertTrue(viewModel.uiState.value.isTotalConverted)
+    }
+
+    @Test
+    fun uiState_mainCurrencyMatchesEverySubscription_doesNotClaimAConversionHappened() = runTest {
+        repository.setSubscriptions(
+            listOf(subscription(id = 1, cents = 1099, currency = Currency.USD))
+        )
+        collectState()
+        assertTrue(viewModel.uiState.value.isTotalConverted)
+
+        settingsRepository.setMainCurrency(Currency.USD)
+        advanceUntilIdle()
+
+        // Converted to itself, so the amount comes back untouched and the note goes away.
+        assertEquals(Money(1099), viewModel.uiState.value.monthlyTotal)
         assertEquals(false, viewModel.uiState.value.isTotalConverted)
     }
 
