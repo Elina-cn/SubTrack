@@ -67,15 +67,23 @@ fun AddSubscriptionSheet(
         containerColor = MaterialTheme.colorScheme.surface,
         modifier = modifier
     ) {
+        // Two siblings in the sheet's own ColumnScope: a form that scrolls, and a save button that
+        // does not. weight(fill = false) is what splits them - it hands the scrolling half an upper
+        // bound of whatever height is left over, with a minimum of zero, so a short form still
+        // measures to its own height and the sheet stays content-sized. Plain weight(1f) would set
+        // that minimum to the full leftover height and make the sheet fill the screen every time.
+        //
+        // The button is measured without a weight, so its height is reserved before the form gets
+        // the remainder. That is the whole point: on a 360dp screen with the keyboard up the form
+        // no longer pushes the button past the bottom edge, because the button was never competing
+        // for that space. ModalBottomSheet already applies imePadding() to its root box, so the
+        // leftover height shrinks with the keyboard on its own.
         Column(
             modifier = Modifier
+                .weight(1f, fill = false)
                 .fillMaxWidth()
-                // The sheet opens fully expanded, but at a large font scale the form is taller than
-                // the screen even then. Scrolling is what actually guarantees the save button can
-                // be reached; expanding only saves the user from having to look for it.
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = Dimens.SheetPadding)
-                .padding(bottom = Dimens.SheetBottomPadding),
+                .padding(horizontal = Dimens.SheetPadding),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
@@ -127,20 +135,24 @@ fun AddSubscriptionSheet(
             )
             Spacer(modifier = Modifier.height(Dimens.SpacerSmall))
             CurrencySelector(selected = currency, onSelect = { currency = it })
+        }
 
-            Spacer(modifier = Modifier.height(Dimens.SpacerXLarge))
-
-            Button(
-                onClick = { onSave(name, rawPrice, currency) },
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                ),
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(Dimens.CardCorner)
-            ) {
-                Text(stringResource(id = R.string.save))
-            }
+        // Outside the scrolling column, so it holds its place at the bottom of the sheet however
+        // far the form is scrolled. The gap above it was a Spacer inside the form before; as
+        // padding here it stays a constant separation instead of scrolling away.
+        Button(
+            onClick = { onSave(name, rawPrice, currency) },
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+            ),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = Dimens.SheetPadding)
+                .padding(top = Dimens.SpacerXLarge, bottom = Dimens.SheetBottomPadding),
+            shape = RoundedCornerShape(Dimens.CardCorner)
+        ) {
+            Text(stringResource(id = R.string.save))
         }
     }
 }
