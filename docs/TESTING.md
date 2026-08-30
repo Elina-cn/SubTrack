@@ -44,6 +44,8 @@ etmeden bildirin; sonraki maddeler zaten bozuk bir durumun üstüne binebilir.
 | 17 | Boş ad veya geçersiz fiyatla Kaydet'e bas | Sheet **açık kalıyor**, hata ilgili alanın **altında** | 6 |
 | 18 | Bir satırı sil, Snackbar'a dokunma | Birkaç saniyede **kendiliğinden** kayboluyor | 6 |
 | 19 | Sil, sonra "Geri al"a bas | Öğe **eski sırasına** dönüyor | 6 |
+| 20 | Ayarlar ikonuna bas, geri oku ve sistem geri tuşuyla dön | Ayarlar açılıyor, iki yol da ana ekrana dönüyor, geri yığınında **birikme yok** | 9b |
+| 21 | Ayarlarda başka bir para birimi seç, uygulamayı tamamen kapat, yeniden aç | Seçim **duruyor**, toplam o para biriminde | 9b |
 
 **Not — beklenen davranışlar, hata değil:**
 - İlk kurulumda liste **boş** başlar. Seed veri yok; boş durum ekranı Faz 8'de.
