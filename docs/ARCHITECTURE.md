@@ -503,3 +503,27 @@ Koyu şemada `primary` `PastelBlue` olarak kalır — koyu yüzey üstünde zate
 sürükleme deltaları kuyruğa girdiğinde bekleyen bir `snapTo`, yerleşme
 animasyonunu iptal edip `onDelete`'i düşürüyordu. Yerleşme için `animate()`
 suspend fonksiyonu kullanılır — tek doğruluk kaynağı, yarış yok.
+
+---
+
+## 13. Navigation
+
+- Tek Activity, tek `NavHost` (`ui/navigation/SubTrackNavHost.kt`).
+- Rotalar düz `String` sabiti (`ui/navigation/Destination.kt`). Type-safe rota
+  v1.0'da kullanılmıyor: argümansız iki hedef için kazancı yok ve AGP 9'da ek
+  derleyici plugin'i riski var (bkz. Faz 0, @Parcelize). Faz 15'te yeniden bakılacak.
+- `hiltViewModel()` yalnızca `composable` bloğunda çağrılır. Ekran composable'ları
+  durumsuz kalır; preview'lar Hilt grafına ihtiyaç duymaz.
+- ViewModel ömrü `NavBackStackEntry`'ye bağlıdır — hedef geri yığınında durduğu
+  sürece ViewModel yaşar.
+
+## 14. Kullanıcı Tercihleri (DataStore)
+
+- **Preferences DataStore** kullanılır, Proto değil.
+- Room ile aynı desen: arayüz domain'de, gerçekleme data'da, `DataStore<Preferences>`
+  Hilt'ten `@Singleton`. Aynı dosya için ikinci instance çalışma zamanı hatasıdır;
+  tekillik Hilt'in sorumluluğundadır.
+- Okuma hatasında (`IOException`) `emptyPreferences()`'a düşülür, varsayılanlar
+  kullanılır. Bu açık bir fallback, sessiz `try/catch` değil (§9). Diğer hata
+  tipleri yeniden fırlatılır.
+- Varsayılan ana para birimi: `TRY`.

@@ -93,7 +93,7 @@ Tüm kod diff'ini yapıştırmaya gerek yok; gerekirse istenecek.
 | Dosya | Kim günceller | Ne zaman |
 |---|---|---|
 | `PROJECT_SPEC.md` | Sohbet | Kapsam değişirse |
-| `ARCHITECTURE.md` | Sohbet | Mimari karar değişirse |
+| `ARCHITECTURE.md` | Sohbet karar verir, CC yazar | Mimari karar değişirse |
 | `ROADMAP.md` | Claude Code | Faz bitince işaretler |
 | `PROGRESS.md` | Claude Code | Her faz sonunda kayıt ekler |
 | `CLAUDE.md` | Sohbet | Çalışma kuralı değişirse |
