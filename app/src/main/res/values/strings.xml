@@ -49,4 +49,11 @@
     <!-- Status -->
     <string name="loading">Yükleniyor</string>
 
+    <!-- Settings -->
+    <string name="settings_title">Ayarlar</string>
+    <string name="navigate_back">Geri</string>
+    <string name="main_currency_label">Ana Para Birimi</string>
+    <string name="main_currency_description">Aylık toplam bu para biriminde gösterilir.</string>
+    <string name="error_setting_save_failed">Ayar kaydedilemedi</string>
+
 </resources>

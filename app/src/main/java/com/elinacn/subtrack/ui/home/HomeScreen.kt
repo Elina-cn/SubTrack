@@ -8,8 +8,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -18,6 +20,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -44,12 +47,16 @@ import com.elinacn.subtrack.ui.theme.SubTrackTheme
 /**
  * The home screen. Stateless with respect to data: it renders [uiState] and reports back through
  * [onEvent], holding nothing but whether the add sheet is open.
+ *
+ * [onNavigateToSettings] arrives as a lambda rather than a NavController, so the screen knows only
+ * that a settings screen exists somewhere, not how to reach it.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     uiState: HomeUiState,
     onEvent: (HomeEvent) -> Unit,
+    onNavigateToSettings: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val moneyFormatter = rememberMoneyFormatter()
@@ -109,6 +116,19 @@ fun HomeScreen(
         modifier = modifier,
         containerColor = MaterialTheme.colorScheme.background,
         snackbarHost = { SnackbarHost(snackbarHostState) },
+        topBar = {
+            TopAppBar(
+                title = { Text(text = stringResource(id = R.string.app_name)) },
+                actions = {
+                    IconButton(onClick = onNavigateToSettings) {
+                        Icon(
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = stringResource(id = R.string.settings_title)
+                        )
+                    }
+                }
+            )
+        },
         floatingActionButton = {
             FloatingActionButton(
                 onClick = { onEvent(HomeEvent.OpenAddSheet) },
@@ -209,7 +229,7 @@ private fun previewSubscription(
 @Composable
 private fun HomeScreenEmptyPreview() {
     SubTrackTheme {
-        HomeScreen(uiState = HomeUiState(isLoading = false), onEvent = {})
+        HomeScreen(uiState = HomeUiState(isLoading = false), onEvent = {}, onNavigateToSettings = {})
     }
 }
 
@@ -217,7 +237,7 @@ private fun HomeScreenEmptyPreview() {
 @Composable
 private fun HomeScreenLoadingPreview() {
     SubTrackTheme {
-        HomeScreen(uiState = HomeUiState(isLoading = true), onEvent = {})
+        HomeScreen(uiState = HomeUiState(isLoading = true), onEvent = {}, onNavigateToSettings = {})
     }
 }
 
@@ -231,7 +251,8 @@ private fun HomeScreenErrorPreview() {
                 isLoading = false,
                 errorMessage = UiText.Raw("Abonelik kaydedilemedi")
             ),
-            onEvent = {}
+            onEvent = {},
+            onNavigateToSettings = {}
         )
     }
 }
@@ -250,7 +271,8 @@ private fun HomeScreenPopulatedPreview() {
                 monthlyTotal = Money(21989),
                 isLoading = false
             ),
-            onEvent = {}
+            onEvent = {},
+            onNavigateToSettings = {}
         )
     }
 }
@@ -272,7 +294,8 @@ private fun HomeScreenMixedCurrencyPreview() {
                 isTotalConverted = true,
                 isLoading = false
             ),
-            onEvent = {}
+            onEvent = {},
+            onNavigateToSettings = {}
         )
     }
 }

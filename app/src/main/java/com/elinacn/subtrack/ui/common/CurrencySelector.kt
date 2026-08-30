@@ -1,4 +1,4 @@
-package com.elinacn.subtrack.ui.home.components
+package com.elinacn.subtrack.ui.common
 
 import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
