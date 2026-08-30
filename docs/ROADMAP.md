@@ -210,16 +210,22 @@ tasarım kararı bekliyor, ileri bir tarihe ertelendi.
 
 ---
 
-## ⬜ Faz 9 — Para Birimi Seçimi
+## 🟡 Faz 9 — Para Birimi Seçimi
 
-- [ ] Ekleme formuna para birimi seçici (TRY, USD, EUR, GBP)
-- [ ] Locale'e göre para formatlama
-- [ ] Fiyat biçimlendirmesi `Locale.US`'tan cihaz locale'ine geçsin
-      (Türkçede virgül). TalkBack'in karışık dil okumasına da katkısı olabilir.
-- [ ] Sabit kur tablosu ile toplam normalizasyonu
-- [ ] Kurlar ayarlardan elle düzenlenebilsin — v1.0'da otomatik güncelleme yok,
-      elle giriş onun yerini tutuyor (bkz. PROJECT_SPEC §5)
-- [ ] Ana para birimi tercihi (DataStore)
+İki promptta yürütülüyor: **9a** para birimi ve normalizasyon **(bitti)**,
+**9b** ayarlar ekranı + Navigation + DataStore.
+
+- [x] **9a:** Ekleme formuna para birimi seçici (TRY, USD, EUR, GBP) —
+      `FilterChip` sırası, tek dokunuş
+- [x] **9a:** Locale'e göre para formatlama — `NumberFormat`, para birimi
+      açıkça set ediliyor
+- [x] **9a:** Fiyat biçimlendirmesi `Locale.US`'tan cihaz locale'ine geçti
+- [x] **9a:** Sabit kur tablosu ile toplam normalizasyonu — tek çıpa, her
+      çift tek adımda, HALF_UP
+- [ ] **9b:** Kurlar ayarlardan elle düzenlenebilsin — v1.0'da otomatik
+      güncelleme yok, elle giriş onun yerini tutuyor (bkz. PROJECT_SPEC §5).
+      `CurrencyConverter` tablosunu zaten dışarıdan alıyor.
+- [ ] **9b:** Ana para birimi tercihi (DataStore)
 
 **Bitti:** Karışık para birimli abonelikler doğru toplanıyor.
 
@@ -321,8 +327,14 @@ Aylık toplamın zaman içindeki anlık görüntüleri. `PROJECT_SPEC.md` §1'de
       kod tarafında etkisi yok, buraya kadar bekleyebilir (PROJECT_SPEC §5)
 - [ ] ARCHITECTURE'daki **"Şema sürümlemesi"** kuralı okunsun. Yayından sonra
       migration zorunlu hale geliyor, istisnası yok.
-- [ ] TalkBack testi **emülatörde** bir kez düzgün yapılsın. Test cihazında
-      (OPPO A15s) TalkBack donuyor; erişilebilirlik hiç doğrulanamadı.
+- [ ] TalkBack testi bir kez düzgün yapılsın. Test cihazında (OPPO A15s)
+      TalkBack donuyor. **Emülatör de çözüm olmadı:** kurulu iki
+      `google_apis_playstore` imajının ikisinde de Android Accessibility
+      Suite yok. Google hesabıyla giriş ve üçüncü taraf APK indirme
+      reddedildi — **nasıl çözüleceği ayrıca kararlaştırılacak.**
+      Bekleyen maddeler: satır ve kart tek odak durağı mı okunuyor,
+      "Sil" özel eylemi görünüp çalışıyor mu, para birimi chip'lerinin
+      seçili durumu duyuruluyor mu (ağaçta `checked="false"` görünüyor).
 - [ ] Play Console Data Safety formu
 - [ ] Mağaza görselleri ve açıklama metni
 - [ ] Internal testing → production

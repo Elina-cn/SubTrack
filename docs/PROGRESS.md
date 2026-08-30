@@ -27,6 +27,210 @@ Her faz sonunda **en üste** yeni kayıt eklenir. Eski kayıtlar silinmez.
 
 ---
 
+## [Faz 9a] Para Birimi Seçimi ve Normalizasyon — 2026-08-30
+
+**Durum:** Tamamlandı (9b — ayarlar ekranı — ayrı prompt)
+
+**Yapılanlar — kur dönüşümü**
+- **`Currency`, `ExchangeRateTable`, `CurrencyConverter`** domain'e eklendi.
+  Kurlar `Long`, **10.000 ölçekli**, hepsi tek çıpaya (TRY) göre yazılı.
+  Böylece **her çift tek adımda** çevriliyor — kaynak kuru bölü hedef kuru,
+  ölçek sadeleşiyor — ve USD→EUR gibi bir çapraz dönüşüm iki kez değil
+  **bir kez** yuvarlanıyor.
+- **Yuvarlama HALF_UP.** Gerekçe: `parsePrice` da HALF_UP kullanıyor; aynı
+  tutar girişte bir şey, gösterimde başka bir şey olamaz. HALF_EVEN'in
+  koruduğu şey tekrarlı yuvarlamanın yukarı kayması, o da burada olmuyor.
+- **`totalIn` önce her para birimi içinde topluyor, sonra çeviriyor.**
+  Hata böylece abonelik sayısıyla değil **para birimi sayısıyla** (en fazla
+  dört) sınırlı. Kanıt testte sabitlendi: 4 adet 0,01 USD → satır satır
+  çevrilirse **1,72 TL**, grup halinde **1,71 TL** (doğrusu 1,714).
+- Dönüşüm mantığı saf Kotlin; domain'de tek yabancı import Faz 3'ten kalma
+  `kotlinx.coroutines.flow.Flow`.
+
+**Yapılanlar — arayüz**
+- **`CurrencySelector`, `FilterChip` sırası.** SegmentedButton kaynağa
+  bakılarak elendi: `SegmentedButton.kt:425` her segmentte ikon çizilsin
+  çizilmesin **18dp + 8dp** ayırıyor, dört segment ~320dp istiyor ve sheet
+  padding'inden sonra 360dp ekrana sığmıyor.
+- `MoneyFormatter` — `NumberFormat.getCurrencyInstance(locale)`, para birimi
+  açıkça set ediliyor. Kart kendi para biriminde, dashboard normalize edilmiş
+  toplamda; karışık listede altına çevrim notu çıkıyor.
+
+**Uyarı — kurlar tahmindir**
+`ExchangeRateTable.Default` içindeki 42,85 / 46,20 / 53,90 değerleri
+**doğrulanmadı.** Yayından önce elle kontrol edilmeli; kodda tarih ve
+"bunlar eskir" notu var.
+
+**Testler**
+- 29 → **46 birim testi**, hepsi geçti (`CurrencyConverterTest` 14 yeni).
+
+**Değişen dosyalar**
+- `domain/model/Currency.kt`, `domain/model/ExchangeRateTable.kt` — yeni
+- `domain/usecase/CurrencyConverter.kt` — yeni
+- `domain/model/Subscription.kt` — `currencyCode: String` → `currency: Currency`
+- `data/mapper/SubscriptionMapper.kt` — enum dönüşümü, şema değişmedi
+- `ui/common/MoneyFormatter.kt` — yeni
+- `ui/home/components/CurrencySelector.kt` — yeni
+- `ui/home/HomeViewModel.kt`, `HomeUiState.kt`, `HomeScreen.kt`,
+  `AddSubscriptionSheet.kt`, `DashboardCard.kt`
+- `res/values/strings.xml`, `res/values-en/strings.xml`
+
+**Commit'ler**
+- `a709af2` feat: add currency conversion to domain
+- `6923adc` feat: add currency selector to add sheet
+- `55c837d` feat: show per-subscription currency and normalized total
+- `a97d8eb` test: add currency conversion tests
+
+**Elle test sonucu (fiziksel cihaz, OPPO A15s)**
+- a, b, c, d, e, g **geçti**.
+- h'de chip'ler alt satıra **kaymadı** — beklenen, cihaz 423dp, dar değil.
+- f'de bulgu (hata değil): İngilizce dilde toplam **"TRY1,785.45"** diye
+  boşluksuz çıkıyordu. `NumberFormat` sembolü locale'e göre seçiyor; kartta
+  `$10.99`, toplamda ISO kodu yazması tutarsız görünüyor ama teknik olarak
+  doğru. Sembol/kod tutarlılığı kararı **Faz 14'e** madde olarak eklendi;
+  okunabilirlik `cac1f63` ile düzeltildi.
+
+**Tag**
+- `phase-9a-done`
+
+---
+
+## [Emülatör Kurulumu] Dar Ekran ve Farklı Android Sürümü — 2026-08-30
+
+**Durum:** Tamamlandı (TalkBack kısmı hariç)
+
+**Kurulan AVD'ler**
+
+| AVD | Çözünürlük | Yoğunluk | Efektif genişlik | API |
+|---|---|---|---|---|
+| `subtrack_narrow_api29` | 720x1280 | 320 dpi | **360dp** | 29 |
+| `subtrack_wide_api34` | 1080x2400 (Pixel 6) | 420 dpi | 411dp | 34 |
+
+**En önemli bulgu:** fiziksel cihaz ölçüldü — `init=720x1600 320dpi
+base=720x1600 272dpi` → efektif genişlik **423dp**. Yani Faz 9a'da "360dp'ye
+sığar mı" diye hesaplanan durum **hiç ekranda görülmemişti**.
+
+**Ölçümler**
+- **Chip genişlikleri 360dp'de:** TRY 57,5 · USD 59,0 · EUR 58,0 · GBP 60,0dp.
+  Aralar 8,0dp, sol kenar 24,0dp, yükseklik 32,0dp. Dördü **tek satırda**,
+  toplam 258,5dp, sağda **77,5dp boş**. Faz 9a'daki "~58dp" tahmini tuttu.
+- **font_scale 2.0'da FlowRow sarıyor:** TRY/USD/EUR üst satır (80,0 / 82,0 /
+  80,0dp), GBP alt satır (83,0dp). **Kırpılma yok.**
+- **Enstrümantasyon testleri 9/9**, iki emülatörde de geçti.
+- **Açılış medyanı (5 tekrar):** API 29 **7055 ms**, API 34 **3946 ms**,
+  fiziksel cihaz ~8100 ms. Hepsi debug build.
+- **Dynamic color paletimizi ezmiyor** — API 34 koyu temada dashboard kartı
+  hâlâ PastelBlue. Faz 14 için: sorun Material You değil, tanımsız roller.
+- **Uygulamadan tek bir FATAL veya StrictMode ihlali yok.** Logcat'teki
+  `FATAL EXCEPTION` `com.google.android.sdksetup`'a ait (Olson timezone),
+  StrictMode ihlalleri `android.process.acore` ve `com.google.android.gms`.
+
+**TalkBack — YAPILAMADI**
+Her iki `google_apis_playstore` imajında da Android Accessibility Suite
+kurulu değil (`pm list packages -u` ve `/system/priv-app` taramasında iz
+yok). Kurmanın iki yolu var, ikisi de reddedildi: emülatörde Google hesabına
+giriş, ve üçüncü taraf APK indirme. **Faz 16'ya taşındı.**
+
+**Değişen dosyalar**
+- `docs/TESTING.md` — "Emülatör Testleri" bölümü eklendi
+
+**Commit'ler**
+- `23b2459` docs: document emulator testing setup
+
+**Karşılaşılan sorunlar**
+- `cmd uimode night yes` **API 29'da çalışmıyor**; koyu tema testleri API 34'te.
+- `uiautomator dump` bottom sheet açıkken çoğunlukla alttaki pencereyi
+  döndürüyor. Piksel ölçümü için ham `screencap` tamponu elle çözümlendi
+  (makinede görüntü kütüphanesi yok, kurulmadı).
+- `connectedDebugAndroidTest` bitince uygulamayı **kaldırıyor**.
+
+---
+
+## [Hotfix] Erişilebilirlik Birleştirme, Dar Ekran Sheet, Para Birimi Boşluğu — 2026-08-30
+
+**Durum:** Tamamlandı
+
+**1. Semantics birleştirme (`de60e47`)**
+
+**Önemli bulgu — önceki teşhis yanlıştı.** `mergeDescendants` aslında
+çalışıyordu. Erişilebilirlik ağacı **birleştirilmemiş** ağaçtan kuruluyor:
+`SemanticsOwner.kt:157`'deki `getAllUncoveredSemanticsNodesToIntObjectMap`
+`unmergedRootSemanticsNode`'dan başlıyor ve `replacedChildren` üzerinden
+yürüyor. Yani birleşen bir düğümün çocukları **her zaman** ayrı düğüm olarak
+kalıyor; dump birleşmeyi hiç gösteremiyor. `Surface`'ın kendi
+`semantics(mergeDescendants = false)` çağrısı da suçlu değil —
+`collapsePeer` bayrağı yalnızca OR'luyor, `false` `true`'yu kapatamıyor.
+
+`clearAndSetSemantics`'e geçildi: `getChildren` temizleyen düğüm için boş
+liste döndürüyor, alt ağaç gerçekten kayboluyor. Hem **ölçülebilir** hem de
+cümlenin sırası bizim kontrolümüzde. Silme özel eylemi korunuyor —
+`calculateSemanticsConfiguration` config'i sıfırlayıp sonra o düğümün kendi
+bloğunu uyguluyor.
+
+**2. Dar ekranda Kaydet butonu (`f4a6bd9`)**
+
+360x640dp'de sheet yarı açık geliyordu ve Kaydet ekranın altında kalıyordu —
+her iki font ölçeğinde. `skipPartiallyExpanded = true` + içeriğe
+`verticalScroll`. İkisi birlikte: expand bildirilen durumu çözüyor, scroll
+formun ekrandan uzun olduğu hâli garantiliyor.
+
+**3. Para birimi boşluğu (`cac1f63`)**
+
+ISO kodundan sonra **kırılmaz boşluk (U+00A0)**. Boşluk yalnızca sembol
+harflerden oluşuyorsa giriyor; sembollü biçimler değişmedi.
+
+**Doğrulama testi sonuçları (her iki emülatörde)**
+
+| # | Test | Dar (API 29, 360dp) | Geniş (API 34, 411dp) |
+|---|---|---|---|
+| 1 | Kaydet, font_scale 1.0, sürükleme yok | **geçti** — y=1113..1190, ekran altına 89px | — |
+| 2 | Kaydet, font_scale 2.0, sürükleme yok | **geçti** — y=1094..1198, ekran altına 81px | — |
+| 3 | Sheet içi kaydırma | **geçti** | — |
+| 4 | Tutamaçtan kapatma | **geçti** | — |
+| 5 | Sheet boyu içeriğe göre, regresyon yok | — | **geçti** — sheet 457dp, Kaydet 178px içeride |
+| 6 | Para birimi biçimi (byte seviyesi) | **geçti** | **geçti** |
+| 7 | Kaydırarak silme regresyonu | **geçti** | **geçti** |
+| 8 | Döndürmede state korunması | **geçti** | **geçti** |
+| 9 | TalkBack "Sil" eylemi | **doğrulanamadı** | **doğrulanamadı** |
+
+Ayrıntılar:
+- **Kaydırma (3):** font_scale 2.0'da içerik zaten sığdığı için kaydıracak
+  taşma yok, koordinatlar sabit kaldı. Taşmayı zorlamak için **font_scale
+  3.0**'a çıkıldı; orada "Currency" ekran dışından y=978'e, sonra y=608'e
+  geldi ve Kaydet `[267,1064][453,1184]`'te erişilebilir oldu. Yukarı
+  kaydırma sheet'i kapatmıyor; içerik en üstteyken aşağı kaydırma kapatıyor
+  (ModalBottomSheet'in standart sürükleyip-kapat davranışı).
+- **Byte doğrulaması (6):** ISO kodlu tutarlarda `54 52 59 C2 A0 31` —
+  yani "TRY" + U+00A0 + rakam. Sembollü tutarlarda sembol doğrudan rakama
+  bitişik, boşluk **yok**.
+- **Silme (7):** hafif kaydırma (%20) silmedi, **ardışık üç hafif kaydırma
+  da silmedi** (Faz 1a'daki birikme düzeltmesi ayakta), tam kaydırma (%86)
+  sildi. Toplam 1.785,45 → 630,91 (= 159,99 + 470,92), doğru.
+- **Döndürme (8):** yatayda `TestAbonelik` ve `42.50` korundu, EUR chip'i
+  piksel düzeyinde hâlâ seçili (PastelBlue dolgu).
+
+**Commit'ler**
+- `de60e47` fix: merge semantics on dashboard and subscription rows
+- `f4a6bd9` fix: keep the save button reachable on narrow screens
+- `cac1f63` fix: add spacing to currency codes
+
+**Bilinen eksikler**
+- **Chip seçim durumu erişilebilirlik ağacında görünmüyor.** EUR görsel
+  olarak seçiliyken dört chip de `checked="false" selected="false"`
+  bildiriyor. Ekran okuyucu kullanıcısına hangi para biriminin etkin olduğu
+  söylenmiyor olabilir — TalkBack'siz doğrulanamıyor, Faz 16'ya madde.
+- Silme özel eyleminin gerçekten duyurulup çalıştığı **doğrulanamadı**.
+- Dar emülatör koyu temada kilitli kaldı (API 29 kısıtı); doğrulama testleri
+  orada koyu temada yapıldı. Kaydet butonunun rengi iki temada aynı olduğu
+  için ölçümler etkilenmedi.
+
+**Sonraki faz için not**
+- Faz 9b: ayarlar ekranı, Navigation, DataStore. `CurrencyConverter` tablosunu
+  zaten dışarıdan alıyor; `ExchangeRateTable.of()` eksik kurları varsayılandan
+  dolduruyor, yani yalnızca argüman değişecek.
+
+---
+
 ## [Faz 8a] Yükleme, Hata ve Erişilebilirlik — 2026-08-29
 
 **Durum:** Tamamlandı (8b — boş durum ekranı — ertelendi)
