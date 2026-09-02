@@ -96,7 +96,7 @@ fun ExchangeRatesScreen(
                 .padding(Dimens.ScreenPadding)
         ) {
             Text(
-                text = stringResource(id = R.string.exchange_rates_description),
+                text = stringResource(id = R.string.exchange_rates_description, Currency.Base.name),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onBackground
             )
