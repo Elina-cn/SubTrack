@@ -161,6 +161,37 @@ class HomeViewModelTest {
         assertEquals(false, viewModel.uiState.value.isTotalConverted)
     }
 
+    @Test
+    fun uiState_editedRate_recalculatesTheTotal() = runTest {
+        repository.setSubscriptions(
+            listOf(subscription(id = 1, cents = 1000, currency = Currency.USD)) // 10,00 USD
+        )
+        collectState()
+
+        // At the shipped 42,8500 that is 428,50 TRY.
+        assertEquals(Money(42_850), viewModel.uiState.value.monthlyTotal)
+
+        settingsRepository.setRate(Currency.USD, 500_000L) // 50,0000
+        advanceUntilIdle()
+
+        assertEquals(Money(50_000), viewModel.uiState.value.monthlyTotal)
+    }
+
+    @Test
+    fun uiState_ratesReset_goesBackToTheShippedTable() = runTest {
+        repository.setSubscriptions(
+            listOf(subscription(id = 1, cents = 1000, currency = Currency.USD))
+        )
+        collectState()
+        settingsRepository.setRate(Currency.USD, 500_000L)
+        advanceUntilIdle()
+
+        settingsRepository.resetRates()
+        advanceUntilIdle()
+
+        assertEquals(Money(42_850), viewModel.uiState.value.monthlyTotal)
+    }
+
     // --- saving ---------------------------------------------------------------------------
 
     @Test

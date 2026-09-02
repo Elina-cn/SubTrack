@@ -8,6 +8,7 @@ import com.elinacn.subtrack.domain.model.Subscription
 import com.elinacn.subtrack.domain.model.SubscriptionCategory
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -150,6 +151,68 @@ class CurrencyConverterTest {
         assertEquals(Money(462_000), edited.convert(Money(10_000), Currency.EUR, Currency.TRY))
     }
 
+    // --- overflow -------------------------------------------------------------------------
+
+    /**
+     * The bound behind [ExchangeRateTable.MAX_RATE], exercised rather than asserted in a comment.
+     *
+     * The widest value inside convert is `groupTotalCents * sourceRate`, in a Long. A thousand
+     * subscriptions at the per-subscription ceiling is 10^11 kuruş; at the maximum rate that is
+     * 10^18, comfortably inside Long.MAX_VALUE (about 9.22 x 10^18).
+     */
+    @Test
+    fun totalIn_atThePriceAndRateCeilings_staysPositive() {
+        val converter = CurrencyConverter(
+            ExchangeRateTable.of(mapOf(Currency.USD to ExchangeRateTable.MAX_RATE))
+        )
+        val subscriptions = List(SUBSCRIPTION_BOUND) {
+            subscription(cents = MAX_PRICE_CENTS, currency = Currency.USD)
+        }
+
+        val total = converter.totalIn(subscriptions, Currency.TRY)
+
+        // 10^11 kuruş at 1.000,0000 TRY per dollar, back down by the anchor's own scale.
+        assertEquals(Money(100_000_000_000_000L), total)
+        assertTrue(total.cents > 0)
+    }
+
+    /**
+     * The true worst case: the largest rate as the source and the smallest as the target, so the
+     * division does not shrink the product at all.
+     */
+    @Test
+    fun totalIn_maxRateSourceIntoMinRateTarget_isTheWidestProductAndStillFits() {
+        val converter = CurrencyConverter(
+            ExchangeRateTable.of(
+                mapOf(
+                    Currency.EUR to ExchangeRateTable.MAX_RATE,
+                    Currency.USD to ExchangeRateTable.MIN_RATE
+                )
+            )
+        )
+        val subscriptions = List(SUBSCRIPTION_BOUND) {
+            subscription(cents = MAX_PRICE_CENTS, currency = Currency.EUR)
+        }
+
+        val total = converter.totalIn(subscriptions, Currency.USD)
+
+        assertEquals(Money(1_000_000_000_000_000_000L), total)
+        assertTrue(total.cents > 0)
+    }
+
+    /**
+     * States the headroom as arithmetic rather than prose, so raising [ExchangeRateTable.MAX_RATE]
+     * without thinking breaks a test instead of a total.
+     */
+    @Test
+    fun maxRate_leavesRoomForFarMoreSubscriptionsThanAnyoneWillHave() {
+        val widestPerSubscription = MAX_PRICE_CENTS * ExchangeRateTable.MAX_RATE
+        val affordableSubscriptions = Long.MAX_VALUE / widestPerSubscription
+
+        assertEquals(9_223L, affordableSubscriptions)
+        assertTrue(affordableSubscriptions > SUBSCRIPTION_BOUND)
+    }
+
     private fun subscription(
         cents: Long,
         currency: Currency = Currency.TRY
@@ -164,4 +227,12 @@ class CurrencyConverterTest {
         iconKey = null,
         createdAt = 0
     )
+
+    private companion object {
+        /** HomeViewModel.MAX_PRICE of 1.000.000 whole units, in minor units. */
+        const val MAX_PRICE_CENTS = 100_000_000L
+
+        /** Far past any plausible list; the headroom above it is what MAX_RATE was chosen for. */
+        const val SUBSCRIPTION_BOUND = 1_000
+    }
 }
