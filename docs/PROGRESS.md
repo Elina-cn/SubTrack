@@ -167,6 +167,11 @@ yani hedef kurun yarısı: `divideHalfUp` içinde `val half = denominator / 2` v
 terim 5.000: `(1099×428500+5000)/10000 = 47092` — cihazın gösterdiği değer.
 **Kodda hata yok**, hatalı olan rapordaki elle hesaptı.
 
+**Not — 214250 sayısı bu kayıtta iki kez geçiyor, ikisi de doğru bağlamda.**
+Yuvarlama terimi **her zaman bölenin yarısı**, bölen de **hedef** kur:
+TRY'ye çevirirken bölen 10.000, terim 5.000; USD'ye çevirirken bölen 428.500,
+terim 214.250. Yukarıdaki hata, TRY hedefi için USD'nin terimini kullanmaktı.
+
 **Sonraki faz için not**
 - 9b-2: kur düzenleme. `ExchangeRateTable.of()` eksikleri varsayılandan
   dolduruyor, `CurrencyConverter` tabloyu zaten dışarıdan alıyor —

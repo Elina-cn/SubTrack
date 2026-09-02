@@ -527,3 +527,21 @@ suspend fonksiyonu kullanılır — tek doğruluk kaynağı, yarış yok.
   kullanılır. Bu açık bir fallback, sessiz `try/catch` değil (§9). Diğer hata
   tipleri yeniden fırlatılır.
 - Varsayılan ana para birimi: `TRY`.
+
+## 15. Döviz Kurları
+
+- Kurlar DataStore'da `Long`, **10.000 ölçekli**, para birimi başına bir
+  anahtar. Domain'deki `ExchangeRateTable` ile aynı gösterim (§6, Faz 9a).
+- **TRY çıpadır**, değeri sabit 10.000 ve düzenlenemez. Diğer kurlar
+  "1 birim yabancı para = kaç TRY" anlamındadır; arayüz yönü açıkça yazar.
+- Anahtarı olmayan para birimi `ExchangeRateTable.Default`'a düşer.
+- **Sıfırlama anahtarları siler, varsayılanı yazmaz.** Böylece ileride
+  varsayılanlar güncellenirse sıfırlayan kullanıcı yeni değerleri alır.
+- Girdi `BigDecimal` üzerinden ayrıştırılır (§6). En fazla dört ondalık —
+  ölçek 10.000, fazlası temsil edilemez ve sessizce yuvarlanamaz.
+- **Sıfır veya ölçek altı kur reddedilir.** `CurrencyConverter` hedef kuru
+  bölen olarak kullanır; sıfır kur sıfıra bölmedir. Doğrulama bunu kesin
+  engeller, alt sınır bir ölçek birimidir.
+- Üst sınır `Long` taşmasına göre belirlenir ve testle sabitlenir.
+- Son düzenleme zamanı epoch millis olarak saklanır ve kullanıcıya gösterilir.
+  Hiç düzenlenmemişse varsayılanların tahmin olduğu söylenir.
