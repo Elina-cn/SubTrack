@@ -36,14 +36,6 @@ class HomeViewModel @Inject constructor(
     private val screenState = MutableStateFlow(ScreenState())
 
     /**
-     * Fixed rates for now.
-     *
-     * Phase 9b hands in a table read from storage instead. Nothing here changes when it does - the
-     * converter already takes its rates from outside, so only the argument moves.
-     */
-    private val converter = CurrencyConverter()
-
-    /**
      * The single source of truth for the screen.
      *
      * combine merges the stored list with the state above, and stateIn turns the result into a hot
@@ -55,8 +47,12 @@ class HomeViewModel @Inject constructor(
     val uiState: StateFlow<HomeUiState> = combine(
         repository.observeAll(),
         settingsRepository.observeMainCurrency(),
+        settingsRepository.observeRates(),
         screenState
-    ) { subscriptions, mainCurrency, screen ->
+    ) { subscriptions, mainCurrency, rates, screen ->
+        // Built per emission rather than held as a field: the table is now editable, and a
+        // converter that outlived it would keep totalling at yesterday's rates.
+        val converter = CurrencyConverter(rates)
         HomeUiState(
             subscriptions = subscriptions,
             monthlyTotal = converter.totalIn(subscriptions, mainCurrency),
