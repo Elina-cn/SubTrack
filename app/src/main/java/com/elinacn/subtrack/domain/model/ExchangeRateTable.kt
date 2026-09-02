@@ -25,6 +25,24 @@ class ExchangeRateTable private constructor(private val ratesToAnchor: Map<Curre
          */
         const val RATE_SCALE = 10_000L
 
+        /** Four decimal places, so the smallest rate that can be represented at all. */
+        const val MIN_RATE = 1L
+
+        /**
+         * The largest rate the arithmetic can carry: 1.000,0000 units of the anchor per foreign
+         * unit.
+         *
+         * The bound comes from [CurrencyConverter], where the widest value is
+         * `groupTotalCents * sourceRate + targetRate / 2` in a [Long]. At the per-subscription
+         * ceiling of 10^8 kuruş and this rate, the product reaches Long.MAX_VALUE only after
+         * **9.223 subscriptions in one currency** - about a hundred times more than the largest
+         * plausible list, and the check is pinned by a test rather than left to this comment.
+         *
+         * Raising it costs headroom proportionally: ten times this rate leaves room for 922
+         * subscriptions, which is still safe but no longer obviously so.
+         */
+        const val MAX_RATE = 10_000_000L
+
         /**
          * A snapshot taken on 2026-08-29, anchored on TRY.
          *

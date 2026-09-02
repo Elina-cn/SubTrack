@@ -1,6 +1,7 @@
 package com.elinacn.subtrack.domain.repository
 
 import com.elinacn.subtrack.domain.model.Currency
+import com.elinacn.subtrack.domain.model.ExchangeRateTable
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -16,4 +17,26 @@ interface SettingsRepository {
 
     /** Stores the currency totals should be shown in. */
     suspend fun setMainCurrency(currency: Currency)
+
+    /**
+     * Emits the exchange rates in use, again whenever they change.
+     *
+     * A currency the user has never edited keeps its value from [ExchangeRateTable.Default], so
+     * the table handed out is always complete.
+     */
+    fun observeRates(): Flow<ExchangeRateTable>
+
+    /**
+     * Stores one rate, as [ExchangeRateTable.RATE_SCALE]-scaled units of the anchor currency.
+     *
+     * The caller is responsible for validating the value; the range the arithmetic can carry is
+     * [ExchangeRateTable.MIN_RATE] to [ExchangeRateTable.MAX_RATE].
+     */
+    suspend fun setRate(currency: Currency, scaledRate: Long)
+
+    /** Forgets every edited rate, so the defaults apply again. */
+    suspend fun resetRates()
+
+    /** Emits when the rates were last edited, or null when they never have been. */
+    fun observeRatesUpdatedAt(): Flow<Long?>
 }
