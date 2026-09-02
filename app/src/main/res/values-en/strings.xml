@@ -54,5 +54,27 @@
     <string name="main_currency_label">Main Currency</string>
     <string name="main_currency_description">The monthly total is shown in this currency.</string>
     <string name="error_setting_save_failed">Could not save the setting</string>
+    <!-- Exchange rates -->
+    <string name="exchange_rates_title">Exchange Rates</string>
+    <string name="exchange_rates_row_description">Edit the rates your total is calculated with</string>
+    <string name="exchange_rates_description">Rates are entered by hand; the app does not fetch them. Each row says how many %1$s one unit of a foreign currency is worth.</string>
+    <!-- e.g. 1 USD = … TRY -->
+    <string name="rate_field_label">1 %1$s = … %2$s</string>
+    <string name="rate_anchor_note">%1$s is the anchor: every other rate is quoted against it, so it cannot be edited.</string>
+    <string name="rates_updated_at">Last edited: %1$s</string>
+    <string name="rates_never_edited">The rates have never been edited. The values the app ships with are a guess and have not been verified.</string>
+    <string name="reset_rates">Reset to defaults</string>
+    <string name="reset_rates_confirm_title">Reset the rates?</string>
+    <string name="reset_rates_confirm_message">The rates you entered will be removed and the values the app ships with will be used.</string>
+    <string name="reset_rates_confirm">Reset</string>
+    <string name="cancel">Cancel</string>
+
+    <!-- Rate validation -->
+    <string name="error_rate_empty">Enter a rate</string>
+    <string name="error_rate_invalid">Enter a valid number</string>
+    <string name="error_rate_not_positive">The rate must be greater than zero</string>
+    <string name="error_rate_too_many_decimals">Use at most four decimal places</string>
+    <string name="error_rate_too_large">The rate must be under %1$s</string>
+    <string name="error_rates_save_failed">Could not save the rates</string>
 
 </resources>

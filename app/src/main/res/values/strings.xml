@@ -55,5 +55,27 @@
     <string name="main_currency_label">Ana Para Birimi</string>
     <string name="main_currency_description">Aylık toplam bu para biriminde gösterilir.</string>
     <string name="error_setting_save_failed">Ayar kaydedilemedi</string>
+    <!-- Exchange rates -->
+    <string name="exchange_rates_title">Döviz Kurları</string>
+    <string name="exchange_rates_row_description">Toplamın hesaplandığı kurları elle düzenleyin</string>
+    <string name="exchange_rates_description">Kurlar elle girilir; uygulama internetten kur çekmez. Her satır, bir birim yabancı paranın kaç %1$s ettiğini söyler.</string>
+    <!-- Ör: 1 USD = … TRY -->
+    <string name="rate_field_label">1 %1$s = … %2$s</string>
+    <string name="rate_anchor_note">%1$s çıpadır: diğer kurlar ona göre yazılır, bu yüzden düzenlenemez.</string>
+    <string name="rates_updated_at">Son düzenleme: %1$s</string>
+    <string name="rates_never_edited">Kurlar hiç düzenlenmedi. Uygulamayla gelen değerler bir tahmindir, doğrulanmadı.</string>
+    <string name="reset_rates">Varsayılana dön</string>
+    <string name="reset_rates_confirm_title">Kurlar sıfırlansın mı?</string>
+    <string name="reset_rates_confirm_message">Girdiğiniz kurlar silinecek ve uygulamayla gelen değerler kullanılacak.</string>
+    <string name="reset_rates_confirm">Sıfırla</string>
+    <string name="cancel">Vazgeç</string>
+
+    <!-- Rate validation -->
+    <string name="error_rate_empty">Kur boş olamaz</string>
+    <string name="error_rate_invalid">Geçerli bir sayı girin</string>
+    <string name="error_rate_not_positive">Kur sıfırdan büyük olmalı</string>
+    <string name="error_rate_too_many_decimals">En fazla dört ondalık basamak girin</string>
+    <string name="error_rate_too_large">Kur %1$s\'dan küçük olmalı</string>
+    <string name="error_rates_save_failed">Kurlar kaydedilemedi</string>
 
 </resources>

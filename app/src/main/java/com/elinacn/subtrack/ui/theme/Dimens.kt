@@ -50,6 +50,9 @@ object Dimens {
     /** Resting elevation of the dashboard card. */
     val DashboardElevation = 8.dp
 
+    /** Smallest square a finger can be asked to hit; the Material accessibility floor. */
+    val MinTouchTarget = 48.dp
+
     /** Size of the leading icon on a subscription card. */
     val IconSize = 24.dp
 

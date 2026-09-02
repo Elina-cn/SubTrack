@@ -13,6 +13,8 @@ import com.elinacn.subtrack.ui.home.HomeScreen
 import com.elinacn.subtrack.ui.home.HomeViewModel
 import com.elinacn.subtrack.ui.settings.SettingsScreen
 import com.elinacn.subtrack.ui.settings.SettingsViewModel
+import com.elinacn.subtrack.ui.settings.rates.ExchangeRatesScreen
+import com.elinacn.subtrack.ui.settings.rates.ExchangeRatesViewModel
 
 /**
  * The app's only navigation graph.
@@ -52,6 +54,20 @@ fun SubTrackNavHost(
             val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
             SettingsScreen(
+                uiState = uiState,
+                onEvent = viewModel::onEvent,
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToExchangeRates = {
+                    navController.navigate(Destination.EXCHANGE_RATES) { launchSingleTop = true }
+                }
+            )
+        }
+
+        composable(Destination.EXCHANGE_RATES) {
+            val viewModel: ExchangeRatesViewModel = hiltViewModel()
+            val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
+            ExchangeRatesScreen(
                 uiState = uiState,
                 onEvent = viewModel::onEvent,
                 onNavigateBack = { navController.popBackStack() }
