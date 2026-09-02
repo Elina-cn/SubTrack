@@ -27,6 +27,158 @@ Her faz sonunda **en üste** yeni kayıt eklenir. Eski kayıtlar silinmez.
 
 ---
 
+## [Faz 9b-2] Düzenlenebilir Döviz Kurları — 2026-09-02
+
+**Durum:** Tamamlandı. Faz 9 kapandı.
+
+**Yapılanlar — belgeler ve dosya bölme**
+- `ARCHITECTURE.md`'ye **§15 Döviz Kurları** eklendi; kod ona göre yazıldı.
+- `ROADMAP.md` girişi düzeltildi: tag'i **kullanıcı** atar, CC atmaz.
+- `HomeScreen.kt` 301 satırdı, CLAUDE.md §4 sınırının bir satır üstünde. Beş
+  `@Preview` fonksiyonu ve `previewSubscription` yardımcısı
+  `ui/home/HomeScreenPreviews.kt`'ye taşındı: **301 → 201 + 103**. Taşımadan
+  sonra `HomeScreen.kt`'de sekiz import ölü kaldı, onlar da silindi.
+  (Prompt sekiz preview diyordu; dosyada beş tane vardı.)
+
+**Üst sınır hesabı — `MAX_RATE`**
+`CurrencyConverter.convert` içindeki en geniş ara değer
+`grupToplamıKuruş × kaynakKuru`, `Long` içinde. Sınırlar:
+- Abonelik başına tavan `MAX_PRICE` = 1.000.000 birim = **10⁸ kuruş**
+- `Long.MAX_VALUE` = 9.223.372.036.854.775.807 ≈ **9,22 × 10¹⁸**
+
+Bin abonelik aynı para biriminde: grup toplamı 10¹¹ kuruş. Seçilen
+`MAX_RATE = 10.000.000` (ölçekli) = **1.000,0000 TRY / yabancı birim** ile
+çarpım 10¹¹ × 10⁷ = **10¹⁸** — tavanın **9,2 katı** altında.
+
+Tersinden bakınca daha okunaklı: `Long.MAX_VALUE / (10⁸ × 10⁷) = **9.223
+abonelik**. Tek para biriminde, hepsi fiyat tavanında, kur da tavanda. Yoğun
+bir kullanıcının listesi 50-100 kalem; **yaklaşık yüz kat pay** var. Bu sayı
+yoruma bırakılmadı, `CurrencyConverterTest`'te aritmetik olarak sabitlendi —
+`MAX_RATE` düşünmeden yükseltilirse test kırılır.
+
+Kurun kendisi bölen olarak da kullanılıyor. En kötü hâl kaynak `MAX_RATE`,
+hedef `MIN_RATE`: bölme çarpımı hiç küçültmüyor, sonuç 10¹⁸'de kalıyor, hâlâ
+güvenli. Bu da ayrı bir testte.
+
+**Sıfırlama neden anahtar siliyor**
+`resetRates()` `remove()` çağırıyor, `Default`'u geri yazmıyor. Fark ileride
+ortaya çıkar: bir sonraki sürüm daha iyi varsayılan kurlarla gelirse,
+sıfırlamış kullanıcı **yeni** değerleri alır; bugünün sayılarını yazmış olsaydı
+onlara sonsuza kadar takılı kalırdı. Emülatörde doğrulandı — sıfırlamadan sonra
+`settings.preferences_pb` **0 bayta** düştü ve tarih göstergesi "hiç
+düzenlenmedi"e geri döndü.
+
+**Doğrulama**
+- Ölçek altı kur ayrı bir kontrol değil: pozitiflik + en fazla dört ondalık
+  kuralları birlikte zaten ≥ 1 ölçek birimi garantiliyor. Yine de dönüşümden
+  sonra `scaled < MIN_RATE` kontrolü **duruyor** — koruduğu şey sıfıra bölme,
+  yani üslup değil doğruluk meselesi; koda erişilemez olduğu yazıldı.
+- Bir alan hatalıysa **hiçbiri yazılmıyor.** Kısmi kayıt, kullanıcıyı hangi
+  kutunun kaydedildiğini bilemez hâlde bırakırdı.
+
+**Testler**
+- 58 → **84 birim testi**, hepsi geçti. Enstrümantasyon **9/9, iki emülatörde**.
+- İki test yazarken `Save`'in aynı karede yapılan tuş vuruşunu görmediği
+  ortaya çıktı: `save()` türetilmiş `uiState`'i okuyordu, o da `combine`
+  yeniden yayınlayana kadar geride kalıyor. `screenState` önce okunacak şekilde
+  düzeltildi — testin bulduğu gerçek bir zamanlama hatasıydı.
+
+**Değişen dosyalar**
+- `domain/model/ExchangeRateTable.kt` — `MIN_RATE`, `MAX_RATE` (Default değerleri değişmedi)
+- `domain/repository/SettingsRepository.kt`, `data/repository/SettingsRepositoryImpl.kt`
+- `ui/settings/rates/` — `ExchangeRatesUiState.kt`, `ExchangeRatesViewModel.kt`, `ExchangeRatesScreen.kt` (yeni)
+- `ui/navigation/Destination.kt`, `SubTrackNavHost.kt` — üçüncü hedef
+- `ui/settings/SettingsScreen.kt` — kur ekranına giden satır
+- `ui/home/HomeViewModel.kt` — toplam artık saklanan tabloyla
+- `ui/home/HomeScreen.kt`, `ui/home/HomeScreenPreviews.kt` — bölme
+- `ui/theme/Dimens.kt` — `MinTouchTarget`
+- `res/values/strings.xml`, `res/values-en/strings.xml`
+- `docs/ARCHITECTURE.md`, `docs/ROADMAP.md`, `docs/TESTING.md`
+
+**Commit'ler**
+- `641c5e1` docs: add exchange rate decisions and clarify rounding note
+- `6d7932a` refactor: move home previews to a separate file
+- `ba07464` feat: store editable exchange rates in DataStore
+- `2ef9027` feat: add a screen for editing exchange rates by hand
+- `64c5d8a` feat: total with the stored rate table instead of the shipped one
+- `7cbb2b8` test: cover rate validation, overflow bounds and reset
+- `f41a400` fix: pass the anchor code into the exchange rate description
+- `ee0d2db` docs: add exchange rate regression checks
+
+**Karşılaşılan sorunlar**
+- Açıklama metni ilk turda ekranda ham `%1$s` olarak çıktı: string biçim
+  argümanı `stringResource` çağrısına geçilmemişti. Emülatörde görüldü,
+  `f41a400` ile düzeltildi.
+- API 34 emülatöründe IME servisini `am force-stop` ile yeniden başlatmak
+  "System UI isn't responding" diyaloğunu tetikledi. Bir daha yapılmamalı;
+  `show_ime_with_hard_keyboard` ayarını değiştirdikten sonra IME'yi
+  kapatmadan beklemek yetiyor.
+
+**Emülatör test sonuçları**
+
+| # | Test | Dar (API 29, 360dp) | Geniş (API 34, 411dp) |
+|---|---|---|---|
+| 1 | Ayarlar → kur ekranı, beş tur | geçti — beş tur, tek geri tuşuyla launcher | geçti — satır `[42,685][1038,851]` = **63dp** |
+| 2 | Kur değişince toplam | geçti — 10,00 USD @ 50,0000 → **500,00 TRY** | geçti — aynı |
+| 3 | Kalıcılık | geçti — force-stop sonrası 500,00 | geçti |
+| 4 | Sıfırlama | geçti — 42,85/46,2/53,9, dosya **0 bayt** | geçti |
+| 5 | Doğrulama (0, -5, 1,23456, 1000,0001) | geçti — dördü de alan hatası, hiçbiri kaydedilmedi, **FATAL yok** | — |
+| 6 | Klavye erişilebilirliği | **kısmen** — aşağıda | **kısmen** — aşağıda |
+| 7 | Döndürme | geçti — "77.7" korundu | geçti — "88.88" korundu |
+| 8 | `pm clear` sonrası | geçti — varsayılan kurlar, çökme yok | geçti |
+
+**Test 2 elle hesap:** 1000 kuruş × 500.000 / 10.000, yuvarlama terimi bölenin
+yarısı = 5.000 → (500.000.000 + 5.000) / 10.000 = 50.000 kuruş = **500,00 TRY**.
+Cihazın gösterdiği değer.
+
+**Bilinen kusur — klavye açıkken butonlar (test 6)**
+Uygulama penceresi `windowSoftInputMode` tanımlamadığı için platform
+`adjustPan` gibi davranıyor: pencere **küçülmüyor**, kayıyor. Kaydırma
+görünümü de küçülmediği için içerik klavyenin altında kalabiliyor ve
+kaydırarak kurtarılamıyor.
+
+| Cihaz | fs | Klavye üstü | Kaydet | Varsayılana dön | Kaydırarak ulaşılıyor mu |
+|---|---|---|---|---|---|
+| Dar | 1.0 | y=**863** | `[32,1016][688,1112]` altta | `[32,1136][688,1232]` altta | **Hayır** — kaydırma payı yok |
+| Dar | 2.0 | y=**1079** (pencere kaydı) | iki fiske sonra `[303,825][417,900]` | `[163,956][557,1031]` | **Evet** |
+| Geniş | 1.0 | y=**1625** | `[42,1403][1038,1529]` **görünür** | `[42,1561][1038,1687]` kısmen altta | gerek yok |
+| Geniş | 2.0 | y=**1625** | kaydırma sonu `[42,1983][1038,2123]` altta | `[42,2155][1038,2295]` altta | **Hayır** |
+
+Her durumda geri tuşu klavyeyi kapatıyor ve ekrandan çıkmıyor; sonra butonlar
+erişilebilir. Yani özellik kullanılabilir ama akış pürüzlü. **Düzeltilmedi:**
+çözüm `Modifier.imePadding()` ya da manifest'te `adjustResize`, ikisi de bu
+promptun DOKUNMA listesinde ve tek ekranın kararı değil. Ayrı prompt konusu.
+
+**Chip erişilebilirlik ölçümü — 9b-1 bulgusu yanlıştı**
+Ekleme sheet'i açıkken `uiautomator dump` ve `uiautomator dump --compressed`
+alındı; ayarlar ekranının dump'ı ile karşılaştırıldı. **Üçü de birebir aynı
+yapıyı veriyor:**
+
+| Düğüm | sheet (normal) | sheet (--compressed) | ayarlar |
+|---|---|---|---|
+| Tıklanabilir sarmalayıcı `View` | `checkable=true checked=true` | aynı | aynı |
+| `contentDescription` taşıyan çocuk | `checkable=false` | aynı | aynı |
+
+Yani fark ne bileşenden ne dump aracından geliyor — **9b-1'de yanlış düğüme
+bakılmıştı**: `contentDescription` taşıyan çocuk okunmuş, seçili durumu bildiren
+tıklanabilir ebeveyn atlanmıştı. `CurrencySelector` seçili durumu her iki
+ekranda da doğru bildiriyor. Ağaçta doğru olması duyurulduğu anlamına gelmez;
+TalkBack doğrulaması Faz 16'da duruyor.
+
+**Sabit regresyon listesi**
+21 maddenin tamamı geniş emülatörde koşuldu, hepsi geçti. Toplam 219,89 tam
+çıktı; USD'ye geçince $3,73 (= 15999 × 10.000 + 214.250, bölü 428.500).
+Türkçe metinler `cmd locale set-app-locales tr-TR` ile ayrıca doğrulandı.
+
+**Sonraki faz için not**
+- **`ExchangeRateTable.Default` kurları (42,85 / 46,20 / 53,90) hâlâ
+  doğrulanmadı.** Artık kullanıcı düzeltebiliyor ve ekran bunların tahmin
+  olduğunu açıkça söylüyor, ama yayından önce elle kontrol maddesi duruyor.
+- Klavye/inset kararı bir sonraki prompta bırakıldı; `imePadding` ilk kez
+  girecekse bu tek ekranın değil projenin kararı.
+
+---
+
 ## [Faz 9b-1] Navigation, DataStore ve Ana Para Birimi Tercihi — 2026-08-30
 
 **Durum:** Tamamlandı (9b-2 — kur düzenleme — ayrı prompt)

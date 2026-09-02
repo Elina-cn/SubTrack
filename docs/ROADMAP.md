@@ -211,10 +211,10 @@ tasarım kararı bekliyor, ileri bir tarihe ertelendi.
 
 ---
 
-## 🟡 Faz 9 — Para Birimi Seçimi
+## ✅ Faz 9 — Para Birimi Seçimi
 
-İki promptta yürütülüyor: **9a** para birimi ve normalizasyon **(bitti)**,
-**9b** ayarlar ekranı + Navigation + DataStore.
+Üç promptta yürütüldü: **9a** para birimi ve normalizasyon, **9b-1** ayarlar
+ekranı + Navigation + DataStore, **9b-2** düzenlenebilir kurlar. **Hepsi bitti.**
 
 - [x] **9a:** Ekleme formuna para birimi seçici (TRY, USD, EUR, GBP) —
       `FilterChip` sırası, tek dokunuş
@@ -223,9 +223,10 @@ tasarım kararı bekliyor, ileri bir tarihe ertelendi.
 - [x] **9a:** Fiyat biçimlendirmesi `Locale.US`'tan cihaz locale'ine geçti
 - [x] **9a:** Sabit kur tablosu ile toplam normalizasyonu — tek çıpa, her
       çift tek adımda, HALF_UP
-- [ ] **9b:** Kurlar ayarlardan elle düzenlenebilsin — v1.0'da otomatik
+- [x] **9b:** Kurlar ayarlardan elle düzenlenebilsin — v1.0'da otomatik
       güncelleme yok, elle giriş onun yerini tutuyor (bkz. PROJECT_SPEC §5).
-      `CurrencyConverter` tablosunu zaten dışarıdan alıyor.
+      Ayrı kur ekranı, alan bazlı doğrulama, varsayılana dönme, son düzenleme
+      tarihi. Üst sınır `Long` taşmasına göre belirlendi (ARCHITECTURE §15).
 - [x] **9b:** Ana para birimi tercihi (DataStore) — ayarlar ekranı, Navigation,
       Preferences DataStore; toplam seçilen para biriminde hesaplanıyor
 
@@ -341,12 +342,12 @@ Aylık toplamın zaman içindeki anlık görüntüleri. `PROJECT_SPEC.md` §1'de
       reddedildi — **nasıl çözüleceği ayrıca kararlaştırılacak.**
       Bekleyen maddeler: satır ve kart tek odak durağı mı okunuyor,
       "Sil" özel eylemi görünüp çalışıyor mu, para birimi chip'lerinin
-      seçili durumu duyuruluyor mu. Faz 9b-1'de **ayarlar ekranında**
-      `checkable="true"` ve seçili chip `checked="true"` ölçüldü (dar ve geniş
-      emülatörde, dört ayrı dump). Hotfix'teki ters bulgu büyük olasılıkla
-      **ekleme sheet'inin dump'ından** geliyor — o pencerenin dump'ı güvenilmez.
-      Yine de TalkBack ile doğrulanacak: ağaçta doğru olması duyurulduğu
-      anlamına gelmiyor.
+      seçili durumu duyuruluyor mu. **Ağaç tarafı Faz 9b-2'de kapandı:**
+      ekleme sheet'i ve ayarlar ekranı, normal ve `--compressed` dump'ta
+      birebir aynı yapıyı veriyor — tıklanabilir sarmalayıcı
+      `checkable="true"`, seçili olan `checked="true"`. Hotfix'teki ters
+      bulgu yanlış düğüme bakmaktan gelmişti. Geriye yalnızca **TalkBack'in
+      bunu gerçekten seslendirdiği** doğrulaması kaldı.
 - [ ] DataStore `libdatastore_shared_counter.so` native kütüphanesi getiriyor;
       `stripDebugDebugSymbols` strip edemiyor, olduğu gibi paketleniyor.
       Release APK boyutu ölçülürken göz önünde bulundurulsun.
