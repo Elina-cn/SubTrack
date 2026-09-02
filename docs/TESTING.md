@@ -46,6 +46,11 @@ etmeden bildirin; sonraki maddeler zaten bozuk bir durumun üstüne binebilir.
 | 19 | Sil, sonra "Geri al"a bas | Öğe **eski sırasına** dönüyor | 6 |
 | 20 | Ayarlar ikonuna bas, geri oku ve sistem geri tuşuyla dön | Ayarlar açılıyor, iki yol da ana ekrana dönüyor, geri yığınında **birikme yok** | 9b |
 | 21 | Ayarlarda başka bir para birimi seç, uygulamayı tamamen kapat, yeniden aç | Seçim **duruyor**, toplam o para biriminde | 9b |
+| 22 | Ayarlar → Döviz Kurları, USD kurunu değiştir, kaydet, ana ekrana dön | Toplam **yeni kurla** hesaplanıyor | 9b-2 |
+| 23 | Kur ekranında `0`, `-5`, `1,23456`, `1000,0001` gir ve kaydet | Dördü de **alan altında** hata veriyor, hiçbiri kaydedilmiyor, **çökme yok** | 9b-2 |
+| 24 | Kur değiştir, uygulamayı tamamen kapat, yeniden aç | Kur **duruyor**, "Son düzenleme" tarihi görünüyor | 9b-2 |
+| 25 | Kur ekranında "Varsayılana dön" → Sıfırla | Alanlar 42,85 / 46,2 / 53,9'a dönüyor, tarih yerine **"hiç düzenlenmedi"** yazısı geliyor | 9b-2 |
+| 26 | Kur alanına yazarken klavye açıkken Kaydet'e ulaşmaya çalış | **Bilinen kusur:** pencere `adjustPan` ile davrandığı için buton klavyenin altında kalabiliyor; geri tuşuyla klavye kapatılınca erişiliyor (bkz. PROGRESS 9b-2) | 9b-2 |
 
 **Not — beklenen davranışlar, hata değil:**
 - İlk kurulumda liste **boş** başlar. Seed veri yok; boş durum ekranı Faz 8'de.
