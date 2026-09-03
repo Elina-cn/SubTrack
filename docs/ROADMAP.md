@@ -359,6 +359,14 @@ Aylık toplamın zaman içindeki anlık görüntüleri. `PROJECT_SPEC.md` §1'de
 - [ ] DataStore `libdatastore_shared_counter.so` native kütüphanesi getiriyor;
       `stripDebugDebugSymbols` strip edemiyor, olduğu gibi paketleniyor.
       Release APK boyutu ölçülürken göz önünde bulundurulsun.
+- [ ] **API 24/25 üzerinde bir kez test edilsin** — `minSdk` 24 iddiası hiç
+      doğrulanmadı. Fiziksel cihaz API 29, emülatörler 29 ve 34; 24/25 için
+      ayrı bir AVD kurulması gerekiyor. Faz 10a'da `java.time` yüzünden
+      bu aralıkta çökeceği ortaya çıktı ve desugaring ile kapatıldı, ama
+      aralığın kendisi hâlâ hiç çalıştırılmadı.
+- [ ] **`desugar_jdk_libs` APK bedeli R8 sonrası ölçülsün** — bugün
+      ~200-400 KB tahmin ediliyor, `isMinifyEnabled = true` ile ne kaldığı
+      ölçülmedi. Yukarıdaki R8 maddesiyle birlikte yapılır.
 - [ ] Play Console Data Safety formu
 - [ ] Mağaza görselleri ve açıklama metni
 - [ ] Internal testing → production

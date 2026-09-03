@@ -20,6 +20,25 @@ oradan bulunur.
 Geçmeden elle teste başlanmaz — kırmızı bir birim testi varken cihazda gözlem
 yapmak zaman kaybıdır.
 
+**Yeni API kullanan değişikliklerden sonra lint şart**
+
+```bash
+./gradlew :app:lintDebug
+```
+
+`assembleDebug` yeni API kullanımını **yakalamaz**: `compileSdk` sınıf yolunda
+her şey vardır, derleme sessizce geçer. Sorun ancak `minSdk`'ye yakın bir
+cihazda çalışma anında `NoClassDefFoundError` olarak çıkar — yani test
+edilmeyen bir API aralığında, yani muhtemelen kullanıcıda.
+
+Faz 10a'da tam olarak bu oldu: `java.time.LocalDate.now()` `assembleDebug`'dan
+geçti, `lintDebug` ise `Call requires API level 26, or core library
+desugaring (current min is 24) [NewApi]` diye hata verip derlemeyi durdurdu.
+
+Kural: `java.time`, yeni Compose/AndroidX API'si veya platform çağrısı ekleyen
+her değişiklikten sonra lint koşturulur. Yalnızca birim testi ve
+`assembleDebug` yeterli değildir.
+
 Sonra aşağıdaki liste, sırayla ve tek oturumda çalıştırılır. Bir madde kalırsa sonrakilere devam
 etmeden bildirin; sonraki maddeler zaten bozuk bir durumun üstüne binebilir.
 

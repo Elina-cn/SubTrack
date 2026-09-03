@@ -632,3 +632,30 @@ yaratmasıydı. Ölçüldü: sheet'in klavyeli ve klavyesiz bütün koordinatlar
 9b-1 hotfix'indeki değerlerle **birebir aynı** kaldı. Sebebi yapısal — sheet
 kendi dialog penceresinde çizilir ve `windowSoftInputMode` Activity'nin
 penceresine uygulanır, o pencereye değil. İki mekanizma birbirine değmiyor.
+
+## 17. Tarih İşleme
+
+- Saklama: epoch millis `Long` (§6, Room şeması değişmiyor).
+- Domain: `java.time.LocalDate`. Dönüşüm `SubscriptionMapper`'da, sistem
+  saat diliminde.
+- **Gerekçe:** "X gün kaldı" takvim günü farkıdır, zaman damgası farkı
+  değil. 23:00 ile ertesi gün 01:00 arası iki saattir ama bir gündür.
+  `Instant` üzerinden hesaplamak bu farkı kaybeder.
+- `java.time` saf Java'dır, domain saflığını bozmaz (§1).
+- `nextPaymentDate` NULLABLE. Tarih opsiyoneldir; boşsa arayüzde gösterge
+  çıkmaz.
+- **Tarih geçtiğinde otomatik ilerletme yapılmaz**, "gecikmiş" gösterilir.
+  Ne kadar ilerleyeceği `billingPeriod`'a bağlıdır ve o alan Faz 12'ye
+  kadar kullanıcı tarafından seçilmiyor; aylık varsaymak yıllık
+  aboneliklerde veriyi sessizce bozar. İlerletme Faz 12'nin işidir.
+- Geçmiş tarih kabul edilir. Üst sınır bugünden 10 yıl ileridir — kayan
+  tuş vuruşunu yakalayan bir ürün sınırı (`MAX_PRICE` ile aynı mantık).
+- `java.time` API 26'da geldi, `minSdk` 24. Core library desugaring açık
+  (`desugar_jdk_libs`). minSdk 24 KORUNUYOR: API 24/25 hiç test edilmedi,
+  yükseltmek yayın öncesi kullanıcı kaybetmek olur. Desugaring'in APK
+  bedeli Faz 16'daki R8 ölçümünde değerlendirilecek.
+- **Uyarı:** `assembleDebug` bu hatayı YAKALAMAZ — `compileSdk` sınıf
+  yolunda `java.time` vardır, sorun ancak API 24/25 cihazda çalışma anında
+  `NoClassDefFoundError` olarak çıkar. Yakalayan `lintDebug`'dır.
+  `java.time` veya başka yeni API kullanan her değişiklikten sonra lint
+  koşturulmalı.
