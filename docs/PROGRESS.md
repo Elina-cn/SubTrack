@@ -179,6 +179,70 @@ Türkçe metinler `cmd locale set-app-locales tr-TR` ile ayrıca doğrulandı.
 
 ---
 
+### Hotfix — IME insets ölçüldü, çözülmedi (2026-09-03)
+
+**Amaç:** 9b-2'de bulunan "klavye açıkken butonlar altta kalıyor" kusurunu
+`Modifier.imePadding()` ile kapatmak, ve Faz 10 / Faz 15 öncesinde bir
+strateji kurmak. **Ölçüm olumsuz çıktı, uygulama yapılmadı.**
+
+**a. Kur ekranında kaydırma var mı:** var. `ExchangeRatesScreen.kt`'deki kök
+`Column` `verticalScroll(rememberScrollState())` taşıyor. Eksik olan kaydırma
+değil, kaydırma görünümünün klavye kadar küçülmemesi.
+
+**b/c. `WindowInsets.ime` ölçümü.** Kur ekranına geçici bir probe konuldu:
+`Scaffold`'un dışında, composable gövdesinin başında,
+`WindowInsets.ime.getBottom(density)` ve `WindowInsets.navigationBars.getBottom(density)`
+logcat'e yazıldı.
+
+| Cihaz | Klavye | `ime` | `navigationBars` |
+|---|---|---|---|
+| API 29, 360dp | kapalı | 0 | 0 |
+| API 29, 360dp | **açık** | **0** | 0 |
+| API 34, 411dp | kapalı | 0 | 0 |
+| API 34, 411dp | **açık** | **0** | 0 |
+
+Klavye açıkken (`dumpsys input_method` → `mInputShown=true`) tuşa basılarak
+**yeniden kompozisyon zorlandı** ve probe yeni satır yazdı — okunan değer
+bayat değil, gerçekten sıfır.
+
+**d. Sonuç: `imePadding()` iki API'de de işe yaramaz.** Beklenti API 29'un
+sorunlu, API 34'ün sağlam olmasıydı; **ikisi de sıfır** verdi, yani sebep API
+sürümü değil. Kanıt `navigationBars = 0`: iki emülatörde de gezinme çubuğu
+var, insets uygulamaya ulaşsaydı orada sıfırdan başkası görünürdü. Uygulama
+`setDecorFitsSystemWindows(false)` / `enableEdgeToEdge` çağırmadığı için
+insets'i decor view tüketiyor, Compose'a hiç ulaşmıyor. Sıfır bir insets'e
+padding uygulamak hiçbir şey yapmaz.
+
+Promptun kuralı gereği **durdum**: alternatif (`enableEdgeToEdge` veya
+manifestte `adjustResize`) ayrı bir karar ve ikisi de bu promptta yasaktı.
+GÖREV 2 atlandı, üretim kodu değişmedi.
+
+**Sheet'lerin neden sorunu yok:** `ModalBottomSheet` içeriğini
+`Box(Modifier.fillMaxSize().imePadding())` içine koyuyor (material3 1.4.0,
+`ModalBottomSheet.kt:186`) ve kendi dialog penceresinde çiziliyor — o pencere
+insets alıyor. Bu bir tesadüf, uygulamanın kararı değil.
+
+**Temizlik ve doğrulama**
+- Probe `git checkout` ile birebir geri alındı; `git status` temiz, commit'e
+  girmedi.
+- `assembleDebug --rerun-tasks` geçti, yeni uyarı yok.
+- `testDebugUnitTest --rerun-tasks`: **84 test, hepsi geçti.**
+- Üretim kodu değişmediği için emülatör regresyon turu koşulmadı — doğrulanacak
+  bir davranış değişikliği yok.
+- Emülatör ayarları geri alındı (`show_ime_with_hard_keyboard 0`, `font_scale 1.0`).
+
+**Belgeler**
+- `ARCHITECTURE.md` **§16 IME (Klavye) Insets** — ölçüm tablosu, sebep,
+  sheet'in neden ayrıcalıklı olduğu ve iki seçenekli açık karar.
+- `TESTING.md` — metin alanı olan her ekranda klavye açıkken buton
+  erişilebilirliğinin kontrol edileceği madde, ekran listesiyle.
+
+**Not:** API 34 emülatöründe bu turda da "System UI isn't responding"
+diyaloğu çıktı, bu sefer force-stop yapmadan, açılışta. Diyaloğu "Wait" ile
+kapatmak yetiyor; ölçümü etkilemedi.
+
+---
+
 ## [Faz 9b-1] Navigation, DataStore ve Ana Para Birimi Tercihi — 2026-08-30
 
 **Durum:** Tamamlandı (9b-2 — kur düzenleme — ayrı prompt)

@@ -52,6 +52,28 @@ etmeden bildirin; sonraki maddeler zaten bozuk bir durumun üstüne binebilir.
 | 25 | Kur ekranında "Varsayılana dön" → Sıfırla | Alanlar 42,85 / 46,2 / 53,9'a dönüyor, tarih yerine **"hiç düzenlenmedi"** yazısı geliyor | 9b-2 |
 | 26 | Kur alanına yazarken klavye açıkken Kaydet'e ulaşmaya çalış | **Bilinen kusur:** pencere `adjustPan` ile davrandığı için buton klavyenin altında kalabiliyor; geri tuşuyla klavye kapatılınca erişiliyor (bkz. PROGRESS 9b-2) | 9b-2 |
 
+**Klavye açıkken buton erişilebilirliği — her fazda kontrol edilecek**
+
+Metin alanı olan **her** ekranda, klavye açıkken ekranın alt kısmındaki
+eylemlerin erişilebilir olup olmadığı ölçülür. Bugün bu ekranlar:
+
+| Ekran | Kontrol edilecek | Bugünkü durum |
+|---|---|---|
+| Ekleme sheet'i | Kaydet tam görünür, kaydırınca sabit | **Geçiyor** — `ModalBottomSheet` kendi `imePadding()`'ini uyguluyor (Faz 9b-1 hotfix) |
+| Kur ekranı | Kaydet ve "Varsayılana dön" | **Kusurlu** — klavyenin altında kalabiliyor, geri tuşuyla kapatmak gerekiyor |
+| Ayarlar ekranı | — | Metin alanı yok, konu dışı |
+| Faz 10 tarih seçici, Faz 15 düzenleme ekranı | eklenince buraya yazılacak | henüz yok |
+
+Ölçüm `show_ime_with_hard_keyboard 1` ile yapılır (aşağıdaki bölüm), yoksa
+emülatörde klavye hiç çizilmez ve test sessizce yanlış sonuç verir. Klavyenin
+üst kenarı, pencere `adjustResize` ile küçülüyorsa kaydırma düğümünün alt
+sınırından okunur; **küçülmüyorsa** (bugünkü hâl) klavyeli ve klavyesiz iki
+`screencap` farkından bulunur.
+
+Bu kusurun neden düzeltilmediği `ARCHITECTURE.md` §16'da: `WindowInsets.ime`
+API 29'da da API 34'te de **sıfır** okunuyor, çünkü uygulama insets'i decor
+view'dan almıyor. `imePadding()` bu hâliyle hiçbir şey yapmaz.
+
 **Not — beklenen davranışlar, hata değil:**
 - İlk kurulumda liste **boş** başlar. Seed veri yok; boş durum ekranı Faz 8'de.
 - Ardışık silmede **yalnızca son işlem** geri alınabilir; tek undo izleniyor.

@@ -545,3 +545,72 @@ suspend fonksiyonu kullanılır — tek doğruluk kaynağı, yarış yok.
 - Üst sınır `Long` taşmasına göre belirlenir ve testle sabitlenir.
 - Son düzenleme zamanı epoch millis olarak saklanır ve kullanıcıya gösterilir.
   Hiç düzenlenmemişse varsayılanların tahmin olduğu söylenir.
+
+## 16. IME (Klavye) Insets
+
+**Durum: çözülmedi, ölçüldü.** Bu bölüm bir kararı değil, bir kararın neden
+verilemediğini kaydeder.
+
+### Ölçülen
+
+Faz 9b-2 hotfix'inde, kur ekranına geçici bir probe konup
+`WindowInsets.ime.getBottom(density)` ve `WindowInsets.navigationBars.getBottom(density)`
+okundu. Probe `Scaffold`'un dışında, composable gövdesinin en başındaydı.
+
+| Cihaz | Klavye | `WindowInsets.ime` | `WindowInsets.navigationBars` |
+|---|---|---|---|
+| API 29, 360dp | kapalı | 0 | 0 |
+| API 29, 360dp | **açık** (`mInputShown=true`) | **0** | 0 |
+| API 34, 411dp | kapalı | 0 | 0 |
+| API 34, 411dp | **açık** (`mInputShown=true`) | **0** | 0 |
+
+Klavye açıkken tuşa basılarak **yeniden kompozisyon zorlandı** ve probe yeni
+satır yazdı — yani okunan değer bayat değil, gerçekten sıfır.
+
+### Neden sıfır
+
+Beklenen, API 29'da `WindowInsets.ime`'in güvenilmez olması, API 34'te
+çalışmasıydı. **İkisinde de sıfır çıktı**, yani sebep API sürümü değil.
+
+Kanıt `navigationBars = 0`: bu iki emülatörde de gezinme çubuğu var, insets
+uygulamaya ulaşsaydı orada sıfırdan başka bir şey görünürdü. Uygulama
+`setDecorFitsSystemWindows(false)` / `enableEdgeToEdge` çağırmadığı için
+pencere eski moddadır: insets'i decor view tüketir, Compose'a **hiç**
+ulaşmaz. Aynı durum dump'ta da görünür — `android:id/content` API 29'da
+`[0,48][720,1280]`, yani durum çubuğu payı zaten decor tarafından uygulanmış.
+
+**Sonuç: `Modifier.imePadding()` bu kod tabanında iki API'de de işe
+yaramaz — sıfır bir insets'e padding uygulamak hiçbir şey yapmaz.**
+Bu yüzden uygulanmadı.
+
+### Sheet'lerin neden sorunu yok
+
+`ModalBottomSheet` içeriğini `Box(Modifier.fillMaxSize().imePadding())` içine
+koyar (material3 1.4.0, `ModalBottomSheet.kt:186`). Sheet kendi penceresinde
+(dialog) çizilir ve o pencere insets alır; bu yüzden ekleme sheet'i klavyeyle
+doğru davranır. **Bu bir tesadüftür, uygulamanın bir kararı değil:** aynı
+kütüphane kolaylığı normal ekranlarda yoktur.
+
+### Bugünkü davranış
+
+`AndroidManifest.xml`'de `windowSoftInputMode` tanımlı değil; platform
+`adjustPan` gibi davranıyor. Pencere küçülmez, kayar. Kaydırma görünümü de
+küçülmediği için içerik klavyenin altında kalabilir ve kaydırarak
+kurtarılamaz. Ölçülen dört kombinasyon `PROGRESS.md`'deki 9b-2 kaydında.
+
+Kullanıcı için çıkış yolu var: geri tuşu klavyeyi kapatır, ekrandan çıkmaz.
+
+### Açık karar
+
+Çözüm iki seçenekten biri, ikisi de tek ekranın kararı değil:
+
+1. `enableEdgeToEdge()` / `setDecorFitsSystemWindows(false)` — insets'i
+   Compose'a taşır, `imePadding()` anlamlı hâle gelir. Ama **tüm uygulamayı**
+   etkiler: durum çubuğu ve gezinme çubuğu payları her ekranda elle
+   uygulanmak zorunda kalır. Faz 16'daki `targetSdk` yükseltmesiyle birlikte
+   ele alınacak — Android 15'te edge-to-edge zaten zorunlu hâle geliyor.
+2. Manifest'te `windowSoftInputMode="adjustResize"` — dar kapsamlı, insets
+   modelini değiştirmez. Ölçülmedi.
+
+Faz 10 (tarih seçici) ve Faz 15 (düzenleme ekranı) aynı sorunu taşıyacak;
+karar onlardan önce verilmeli.
