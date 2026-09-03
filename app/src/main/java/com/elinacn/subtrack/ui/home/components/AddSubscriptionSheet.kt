@@ -39,6 +39,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
 import com.elinacn.subtrack.R
@@ -169,12 +171,26 @@ fun AddSubscriptionSheet(
             // Read-only: the value only ever comes from the picker, so there is nothing
             // to type and no malformed date to validate. A read-only field does not take
             // taps, hence the transparent layer over it.
+            val dateFormatter = rememberDateFormatter()
+            val dateText = nextPaymentDate?.let(dateFormatter::format).orEmpty()
+            val dateLabel = stringResource(id = R.string.next_payment_date_label)
+            // The tap layer below covers the field, so the tree only ever sees that one node. It
+            // has to carry the whole sentence itself: without this it reports as an unnamed button
+            // and a screen reader user is told nothing about what the control is or holds.
+            val dateValueText = dateText.ifEmpty { stringResource(id = R.string.date_not_set) }
+            val dateDescription = stringResource(
+                id = R.string.next_payment_date_description,
+                dateLabel,
+                // The rejection message is drawn under the field but merged out of the tree with
+                // everything else, so it has to be spoken as part of the field's own label.
+                dateError?.let { "$dateValueText, ${it.asString()}" } ?: dateValueText
+            )
             Box {
                 OutlinedTextField(
-                    value = nextPaymentDate?.let { rememberDateFormatter().format(it) }.orEmpty(),
+                    value = dateText,
                     onValueChange = {},
                     readOnly = true,
-                    label = { Text(stringResource(id = R.string.next_payment_date_label)) },
+                    label = { Text(dateLabel) },
                     placeholder = { Text(stringResource(id = R.string.date_not_set)) },
                     trailingIcon = {
                         Icon(
@@ -191,6 +207,7 @@ fun AddSubscriptionSheet(
                 Box(
                     modifier = Modifier
                         .matchParentSize()
+                        .semantics { contentDescription = dateDescription }
                         .clickable(
                             onClickLabel = stringResource(id = R.string.pick_date),
                             onClick = {

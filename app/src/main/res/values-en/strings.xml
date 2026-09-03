@@ -81,6 +81,8 @@
     <string name="pick_date">Pick a date</string>
     <string name="clear_date">Clear the date</string>
     <string name="date_not_set">Not set</string>
+    <!-- Spoken form of the date field: label, value. -->
+    <string name="next_payment_date_description">%1$s, %2$s</string>
     <string name="due_today">Due today</string>
     <string name="error_date_too_far">The date can be at most %1$d years ahead</string>
     <plurals name="days_until_payment">

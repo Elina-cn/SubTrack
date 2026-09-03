@@ -82,6 +82,8 @@
     <string name="pick_date">Tarih seç</string>
     <string name="clear_date">Tarihi temizle</string>
     <string name="date_not_set">Seçilmedi</string>
+    <!-- Spoken form of the date field: etiket, değer. -->
+    <string name="next_payment_date_description">%1$s, %2$s</string>
     <string name="due_today">Bugün ödenecek</string>
     <string name="error_date_too_far">Tarih en fazla %1$d yıl ileri olabilir</string>
     <!-- Turkish has one plural form; only "other" is used. -->
