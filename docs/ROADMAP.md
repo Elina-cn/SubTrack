@@ -328,6 +328,14 @@ Aylık toplamın zaman içindeki anlık görüntüleri. `PROJECT_SPEC.md` §1'de
 - [ ] Şablon testler kaldırılsın (`ExampleUnitTest`, `ExampleInstrumentedTest`
       — dolgu: `2+2=4` ve paket adı kontrolü)
 - [ ] `targetSdk` Play'in güncel zorunluluğuna yükseltilsin
+- [ ] **Edge-to-edge'e geçilsin** — `targetSdk` yükseltmesiyle aynı işin
+      parçası, Android 15'te zaten zorunlu. `enableEdgeToEdge()` eklenecek,
+      durum ve gezinme çubuğu payları her ekranda elle uygulanacak, klavye
+      için `Modifier.imePadding()` kullanılacak. Bugünkü geçici çözüm olan
+      manifestteki `windowSoftInputMode="adjustResize"` o zaman **kaldırılacak**
+      — edge-to-edge'de sistem onu zaten yok sayıyor. Geçişten sonra
+      `TESTING.md`'deki klavye tablosundaki her satır yeniden ölçülmeli;
+      gerekçe ve ölçümler `ARCHITECTURE.md` §16'da.
 - [ ] Gizlilik politikası — v1.0 çevrimdışı, veri toplanmıyor. **v1.1'de ağ
       eklendiğinde politika ve Data Safety formu güncellenecek**
       (PROJECT_SPEC §4)

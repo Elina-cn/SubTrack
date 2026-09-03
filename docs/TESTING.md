@@ -50,7 +50,7 @@ etmeden bildirin; sonraki maddeler zaten bozuk bir durumun üstüne binebilir.
 | 23 | Kur ekranında `0`, `-5`, `1,23456`, `1000,0001` gir ve kaydet | Dördü de **alan altında** hata veriyor, hiçbiri kaydedilmiyor, **çökme yok** | 9b-2 |
 | 24 | Kur değiştir, uygulamayı tamamen kapat, yeniden aç | Kur **duruyor**, "Son düzenleme" tarihi görünüyor | 9b-2 |
 | 25 | Kur ekranında "Varsayılana dön" → Sıfırla | Alanlar 42,85 / 46,2 / 53,9'a dönüyor, tarih yerine **"hiç düzenlenmedi"** yazısı geliyor | 9b-2 |
-| 26 | Kur alanına yazarken klavye açıkken Kaydet'e ulaşmaya çalış | **Bilinen kusur:** pencere `adjustPan` ile davrandığı için buton klavyenin altında kalabiliyor; geri tuşuyla klavye kapatılınca erişiliyor (bkz. PROGRESS 9b-2) | 9b-2 |
+| 26 | Kur alanına yazarken klavye açıkken Kaydet ve "Varsayılana dön"e ulaş | Pencere klavye kadar küçülüyor, **tek fiskede** ikisine de ulaşılıyor | 9b-2 · `adjustResize` hotfix |
 
 **Klavye açıkken buton erişilebilirliği — her fazda kontrol edilecek**
 
@@ -60,19 +60,25 @@ eylemlerin erişilebilir olup olmadığı ölçülür. Bugün bu ekranlar:
 | Ekran | Kontrol edilecek | Bugünkü durum |
 |---|---|---|
 | Ekleme sheet'i | Kaydet tam görünür, kaydırınca sabit | **Geçiyor** — `ModalBottomSheet` kendi `imePadding()`'ini uyguluyor (Faz 9b-1 hotfix) |
-| Kur ekranı | Kaydet ve "Varsayılana dön" | **Kusurlu** — klavyenin altında kalabiliyor, geri tuşuyla kapatmak gerekiyor |
+| Kur ekranı | Kaydet ve "Varsayılana dön" | **Geçiyor** — `adjustResize` ile pencere küçülüyor, butonlara tek fiskede ulaşılıyor |
 | Ayarlar ekranı | — | Metin alanı yok, konu dışı |
 | Faz 10 tarih seçici, Faz 15 düzenleme ekranı | eklenince buraya yazılacak | henüz yok |
 
 Ölçüm `show_ime_with_hard_keyboard 1` ile yapılır (aşağıdaki bölüm), yoksa
 emülatörde klavye hiç çizilmez ve test sessizce yanlış sonuç verir. Klavyenin
-üst kenarı, pencere `adjustResize` ile küçülüyorsa kaydırma düğümünün alt
-sınırından okunur; **küçülmüyorsa** (bugünkü hâl) klavyeli ve klavyesiz iki
-`screencap` farkından bulunur.
+üst kenarı, kaydırma düğümünün (`android.widget.ScrollView`) alt sınırından
+okunur — pencere `adjustResize` ile küçüldüğü için ikisi aynı çizgidir.
 
-Bu kusurun neden düzeltilmediği `ARCHITECTURE.md` §16'da: `WindowInsets.ime`
-API 29'da da API 34'te de **sıfır** okunuyor, çünkü uygulama insets'i decor
-view'dan almıyor. `imePadding()` bu hâliyle hiçbir şey yapmaz.
+**Sheet için ayrıca çift uygulama kontrolü:** `ModalBottomSheet` kendi
+`imePadding()`'ini uyguluyor, pencere de küçülüyor. Bunlar üst üste binerse
+sheet gereğinden çok kısalır. Kontrol: klavye kapalıyken sheet koordinatları
+önceki ölçümle aynı mı, klavye açıkken Kaydet'in alt kenarı ile sheet'in alt
+kenarı arasındaki boşluk `SheetBottomPadding` (40dp = 80px @320dpi) mu.
+
+**Faz 16 uyarısı:** `adjustResize` geçici bir çözümdür ve uygulama
+edge-to-edge'e geçtiğinde sistem tarafından yok sayılır. `enableEdgeToEdge`
+eklendiği gün bu tablodaki her satır yeniden ölçülmelidir. Gerekçe
+`ARCHITECTURE.md` §16'da.
 
 **Not — beklenen davranışlar, hata değil:**
 - İlk kurulumda liste **boş** başlar. Seed veri yok; boş durum ekranı Faz 8'de.

@@ -179,7 +179,7 @@ Türkçe metinler `cmd locale set-app-locales tr-TR` ile ayrıca doğrulandı.
 
 ---
 
-### Hotfix — IME insets ölçüldü, çözülmedi (2026-09-03)
+### Hotfix — IME insets: ölçüm ve `adjustResize` kararı (2026-09-03)
 
 **Amaç:** 9b-2'de bulunan "klavye açıkken butonlar altta kalıyor" kusurunu
 `Modifier.imePadding()` ile kapatmak, ve Faz 10 / Faz 15 öncesinde bir
@@ -240,6 +240,86 @@ insets alıyor. Bu bir tesadüf, uygulamanın kararı değil.
 **Not:** API 34 emülatöründe bu turda da "System UI isn't responding"
 diyaloğu çıktı, bu sefer force-stop yapmadan, açılışta. Diyaloğu "Wait" ile
 kapatmak yetiyor; ölçümü etkilemedi.
+
+**Devam — `adjustResize` uygulandı (2026-09-03)**
+
+Yukarıdaki ölçüm `imePadding()` yolunu kapattı. Sohbette verilen karar:
+manifestte `MainActivity`'ye `android:windowSoftInputMode="adjustResize"`.
+Tek satır, Compose kodunda hiçbir değişiklik yok.
+
+**Neden `enableEdgeToEdge` değil:** ikisi de sorunu çözer, ama edge-to-edge
+insets modelini baştan değiştirir — durum ve gezinme çubuğu payları her
+ekranda elle uygulanmak zorunda kalır. O iş Faz 16'daki `targetSdk`
+yükseltmesine ait ve ROADMAP'e madde olarak eklendi. `adjustResize`
+**bilinçli olarak geçicidir**: edge-to-edge'e geçildiğinde sistem onu yok
+sayar, o gün kaldırılacak.
+
+**Kur ekranı — asıl sınav.** Klavye üst kenarı artık kaydırma görünümünün alt
+sınırından okunuyor, çünkü pencere gerçekten küçülüyor.
+
+| Cihaz | fs | Klavye üstü | Kaydet (kaydırma sonrası) | Varsayılana dön | Kaç fiske |
+|---|---|---|---|---|---|
+| Dar API 29 | 1.0 | y=**870** | `[32,622][688,718]` | `[32,742][688,838]` | 1 |
+| Dar API 29 | 2.0 | y=**870** | `[32,600][688,707]` | `[32,731][688,838]` | 1 |
+| Geniş API 34 | 1.0 | y=**1633** | `[42,1308][1038,1434]` | `[42,1466][1038,1592]` | 1 |
+| Geniş API 34 | 2.0 | y=**1633** | `[42,1279][1038,1419]` | `[42,1451][1038,1591]` | 1 |
+
+Dördünde de iki buton **tam görünür** ve dokunma alanları eşiğin üstünde
+(dar 96px = 48dp, fs2.0'da 107px = 53,5dp; geniş 126px = 48dp, fs2.0'da
+140px = 53,3dp). Karşılaştırma için 9b-2'deki hâl: dar fs1.0 ve geniş fs2.0
+kombinasyonlarında butonlara **hiç** ulaşılamıyordu, kaydırma payı yoktu.
+
+USD, EUR ve GBP alanları ayrı ayrı odaklandı; üçünde de aynı sonuç — pencere
+aynı yere küçülüyor, alanın hangisi olduğu fark etmiyor.
+
+**Ekleme sheet'i — regresyon yok.** Endişe, `ModalBottomSheet`'in kendi
+`imePadding()`'i ile pencere küçülmesinin üst üste binmesiydi. Dört
+kombinasyon 9b-1 hotfix'indeki değerlerle karşılaştırıldı:
+
+| Cihaz | fs | Klavye | Ölçülen | 9b-1 referansı |
+|---|---|---|---|---|
+| Dar | 1.0 | kapalı | Scroll `[0,513][720,1056]` Kaydet `[48,1104][672,1200]` | **aynı** |
+| Dar | 1.0 | açık | Scroll `[0,144][720,558]` Kaydet `[48,606][672,702]` | **aynı** |
+| Dar | 2.0 | kapalı | Scroll `[0,226][720,1045]` Kaydet `[48,1093][672,1200]` | **aynı** |
+| Geniş | 1.0 | kapalı | Scroll `[0,1328][1080,2043]` Kaydet `[63,2107][1017,2233]` | **aynı** |
+| Geniş | 1.0 | açık | Scroll `[0,508][1080,1223]` Kaydet `[63,1287][1017,1413]` | **aynı** |
+| Geniş | 2.0 | kapalı | Scroll `[0,1098][1080,2029]` Kaydet `[63,2092][1017,2232]` | **aynı** |
+| Geniş | 2.0 | açık | Scroll `[0,278][1080,1209]` Kaydet `[63,1272][1017,1412]` | **aynı** |
+
+Tek farklı satır dar fs2.0 klavye açık: sheet dibi 782 (9b-1'de 870), Kaydet
+`[48,595][672,702]` (9b-1'de `[48,683][672,790]`). **Bu bir regresyon değil,
+klavye yüksekliği farkı:** 9b-1 ölçümünde ondalık klavye açıktı, bu turda ad
+alanına odaklanıldığı için öneri şeridi olan metin klavyesi açıldı ve daha
+uzun. İlişki aynı kaldı — sheet dibi = klavye üst kenarı, Kaydet'in altı
+sheet dibinden tam **80px** (SheetBottomPadding 40dp) yukarıda, iki turda da.
+
+Çift küçülme olsaydı sheet dibi klavye üstünün bir klavye boyu daha yukarısına
+düşerdi; düşmedi. Sebebi yapısal: sheet kendi dialog penceresinde çiziliyor,
+`windowSoftInputMode` Activity'nin penceresine uygulanıyor. İki mekanizma
+birbirine değmiyor. Kaydırınca Kaydet yine sabit kalıyor.
+
+**Diğer ölçümler**
+- Ana ekran ve ayarlar ekranı düzeni klavye kapalıyken **birebir aynı**
+  (`Total Monthly [42,338][1038,633]`, chip'ler `[84,530][152,583]` …).
+  Beklenen: `adjustResize` yalnızca klavye açıkken devreye giriyor.
+- Döndürme, kur ekranı klavye açıkken: yatayda ekran ve yazılan metin
+  ("42.857") korunuyor, viewport 1017'ye küçülüyor, dikeyde geri dönüyor.
+- Döndürme, sheet klavye açıkken: yatayda sheet açık kalıyor, metin duruyor,
+  Kaydet `[423,787][1977,913]`'te görünür.
+- Sabit regresyon listesi **her iki emülatörde** koşuldu, hepsi geçti.
+  API 29'da iki madde cihaz kısıtı yüzünden atlandı ve geniş emülatörde
+  doğrulandı: koyu tema (`cmd uimode night` API 29'da etkisiz) ve Türkçe
+  (`cmd locale` API 33+).
+
+**Doğrulama**
+- `assembleDebug --rerun-tasks` geçti, yeni uyarı yok.
+- `testDebugUnitTest --rerun-tasks`: **84 test, hepsi geçti.**
+- Emülatör ayarları geri alındı.
+
+**Ölçüm sırasında öğrenilen**
+Otomasyon notu: ekranın sağ kenarına 60px'ten yakın başlayan `input swipe`,
+API 34'te **geri hareketi** olarak yorumlanıyor ve uygulamadan çıkıyor.
+Kaydırarak silme testleri kenardan en az 100px içeriden başlatılmalı.
 
 ---
 

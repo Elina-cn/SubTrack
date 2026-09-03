@@ -548,8 +548,8 @@ suspend fonksiyonu kullanılır — tek doğruluk kaynağı, yarış yok.
 
 ## 16. IME (Klavye) Insets
 
-**Durum: çözülmedi, ölçüldü.** Bu bölüm bir kararı değil, bir kararın neden
-verilemediğini kaydeder.
+**Durum: ölçüldü, geçici bir çözümle kapatıldı.** Bu bölüm hem ölçümü hem de
+ondan çıkan kararı kaydeder; kalıcı çözüm Faz 16'ya bağlı.
 
 ### Ölçülen
 
@@ -591,26 +591,44 @@ koyar (material3 1.4.0, `ModalBottomSheet.kt:186`). Sheet kendi penceresinde
 doğru davranır. **Bu bir tesadüftür, uygulamanın bir kararı değil:** aynı
 kütüphane kolaylığı normal ekranlarda yoktur.
 
-### Bugünkü davranış
+### Karardan önceki davranış
 
-`AndroidManifest.xml`'de `windowSoftInputMode` tanımlı değil; platform
-`adjustPan` gibi davranıyor. Pencere küçülmez, kayar. Kaydırma görünümü de
+`AndroidManifest.xml`'de `windowSoftInputMode` tanımlı değildi; platform
+`adjustPan` gibi davranıyordu. Pencere küçülmez, kayar. Kaydırma görünümü de
 küçülmediği için içerik klavyenin altında kalabilir ve kaydırarak
 kurtarılamaz. Ölçülen dört kombinasyon `PROGRESS.md`'deki 9b-2 kaydında.
 
 Kullanıcı için çıkış yolu var: geri tuşu klavyeyi kapatır, ekrandan çıkmaz.
 
-### Açık karar
+### Verilen karar: `windowSoftInputMode="adjustResize"`
 
-Çözüm iki seçenekten biri, ikisi de tek ekranın kararı değil:
+`MainActivity` manifestte `android:windowSoftInputMode="adjustResize"` alır.
+Pencere klavye kadar **küçülür**; kaydırma görünümü de onunla küçülür, yani
+altta kalan içerik kaydırılarak erişilebilir hâle gelir.
 
-1. `enableEdgeToEdge()` / `setDecorFitsSystemWindows(false)` — insets'i
-   Compose'a taşır, `imePadding()` anlamlı hâle gelir. Ama **tüm uygulamayı**
-   etkiler: durum çubuğu ve gezinme çubuğu payları her ekranda elle
-   uygulanmak zorunda kalır. Faz 16'daki `targetSdk` yükseltmesiyle birlikte
-   ele alınacak — Android 15'te edge-to-edge zaten zorunlu hâle geliyor.
-2. Manifest'te `windowSoftInputMode="adjustResize"` — dar kapsamlı, insets
-   modelini değiştirmez. Ölçülmedi.
+**Neden bu, `enableEdgeToEdge` değil:** ikisi de sorunu çözer, ama
+`adjustResize` yalnızca pencere boyutlandırmasını değiştirir ve tek satırdır.
+`enableEdgeToEdge` insets modelini baştan değiştirir; durum ve gezinme çubuğu
+payları her ekranda elle uygulanmak zorunda kalır, yani her ekranın yeniden
+ölçülmesi gerekir. O iş Faz 16'daki `targetSdk` yükseltmesine ait — Android
+15'te edge-to-edge zaten zorunlu.
 
-Faz 10 (tarih seçici) ve Faz 15 (düzenleme ekranı) aynı sorunu taşıyacak;
-karar onlardan önce verilmeli.
+**Bu bilinçli olarak geçici bir çözümdür.** `adjustResize`, uygulama
+edge-to-edge'e geçtiğinde sistem tarafından **yok sayılır**. Faz 16'da
+`enableEdgeToEdge` gelince bu satır kaldırılacak ve yerine `imePadding()`
+konacak; o noktada yukarıdaki ölçüm tekrarlanmalı, çünkü `WindowInsets.ime`
+o zaman sıfırdan farklı okunmaya başlayacak.
+
+### Uygulandıktan sonra ölçülen
+
+`adjustResize` ile kur ekranında kaydırma görünümü klavye üst kenarında
+kesiliyor ve butonlara **tek fiskede** ulaşılıyor; dört kombinasyonun
+hiçbirinde erişilemez buton kalmadı. Sayılar `PROGRESS.md`'deki hotfix
+kaydında.
+
+**Sheet'lerde çift uygulama yok.** Endişe, `ModalBottomSheet`'in kendi
+`imePadding()`'i ile pencere küçülmesinin üst üste binip fazladan boşluk
+yaratmasıydı. Ölçüldü: sheet'in klavyeli ve klavyesiz bütün koordinatları
+9b-1 hotfix'indeki değerlerle **birebir aynı** kaldı. Sebebi yapısal — sheet
+kendi dialog penceresinde çizilir ve `windowSoftInputMode` Activity'nin
+penceresine uygulanır, o pencereye değil. İki mekanizma birbirine değmiyor.
