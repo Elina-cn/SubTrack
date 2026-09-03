@@ -26,8 +26,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import com.elinacn.subtrack.R
+import com.elinacn.subtrack.domain.usecase.PaymentCountdown
 import com.elinacn.subtrack.ui.common.DelayedLoadingIndicator
 import com.elinacn.subtrack.ui.common.rememberMoneyFormatter
 import com.elinacn.subtrack.ui.home.components.AddSubscriptionSheet
@@ -171,15 +173,32 @@ fun HomeScreen(
                 // Its own currency, not a converted figure: the user entered 12,99 USD and that
                 // is what the row has to keep saying.
                 val price = moneyFormatter.format(subscription.price, subscription.currency)
+                val countdown = uiState.countdowns[subscription.id]
+                // The countdown has to reach the spoken description too: the row is one focus stop
+                // with its own label, so anything left out of the label is simply not announced.
+                val countdownText = countdown?.asString()
                 SwipeToDeleteRow(
                     onDelete = { onEvent(HomeEvent.Delete(subscription.id)) },
-                    contentDescription = stringResource(
-                        id = R.string.subscription_row_description,
-                        subscription.name,
-                        price
-                    )
+                    contentDescription = if (countdownText == null) {
+                        stringResource(
+                            id = R.string.subscription_row_description,
+                            subscription.name,
+                            price
+                        )
+                    } else {
+                        stringResource(
+                            id = R.string.subscription_row_description_dated,
+                            subscription.name,
+                            price,
+                            countdownText
+                        )
+                    }
                 ) {
-                    SubscriptionCard(name = subscription.name, price = price)
+                    SubscriptionCard(
+                        name = subscription.name,
+                        price = price,
+                        countdown = countdown
+                    )
                 }
             }
         }
@@ -190,12 +209,27 @@ fun HomeScreen(
             sheetState = sheetState,
             nameError = uiState.nameError,
             priceError = uiState.priceError,
-            onSave = { name, rawPrice, currency ->
-                onEvent(HomeEvent.Save(name, rawPrice, currency))
+            dateError = uiState.dateError,
+            onSave = { name, rawPrice, currency, nextPaymentDate ->
+                onEvent(HomeEvent.Save(name, rawPrice, currency, nextPaymentDate))
             },
             onNameEdited = { onEvent(HomeEvent.ClearNameError) },
             onPriceEdited = { onEvent(HomeEvent.ClearPriceError) },
+            onDateEdited = { onEvent(HomeEvent.ClearDateError) },
             onDismiss = { onEvent(HomeEvent.DismissAddSheet) }
         )
     }
+}
+
+/**
+ * The countdown as one phrase for a screen reader, resolved here because the row's whole label is
+ * built in one place.
+ */
+@Composable
+private fun PaymentCountdown.asString(): String = when (this) {
+    is PaymentCountdown.Upcoming ->
+        pluralStringResource(R.plurals.days_until_payment, days.toInt(), days)
+    PaymentCountdown.DueToday -> stringResource(id = R.string.due_today)
+    is PaymentCountdown.Overdue ->
+        pluralStringResource(R.plurals.days_overdue, days.toInt(), days)
 }

@@ -77,5 +77,21 @@
     <string name="error_rate_too_many_decimals">En fazla dört ondalık basamak girin</string>
     <string name="error_rate_too_large">Kur %1$s\'dan küçük olmalı</string>
     <string name="error_rates_save_failed">Kurlar kaydedilemedi</string>
+    <!-- Next payment date -->
+    <string name="next_payment_date_label">Sonraki Ödeme (isteğe bağlı)</string>
+    <string name="pick_date">Tarih seç</string>
+    <string name="clear_date">Tarihi temizle</string>
+    <string name="date_not_set">Seçilmedi</string>
+    <string name="due_today">Bugün ödenecek</string>
+    <string name="error_date_too_far">Tarih en fazla %1$d yıl ileri olabilir</string>
+    <!-- Turkish has one plural form; only "other" is used. -->
+    <plurals name="days_until_payment">
+        <item quantity="other">%1$d gün kaldı</item>
+    </plurals>
+    <plurals name="days_overdue">
+        <item quantity="other">%1$d gün gecikti</item>
+    </plurals>
+    <!-- Spoken form of a row that has a date. Ad, tutar, geri sayım. -->
+    <string name="subscription_row_description_dated">%1$s, %2$s, %3$s</string>
 
 </resources>

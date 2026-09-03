@@ -11,6 +11,7 @@ import com.elinacn.subtrack.domain.model.SubscriptionCategory
 import com.elinacn.subtrack.domain.repository.SettingsRepository
 import com.elinacn.subtrack.domain.repository.SubscriptionRepository
 import com.elinacn.subtrack.domain.usecase.CurrencyConverter
+import com.elinacn.subtrack.domain.usecase.PaymentCountdown
 import com.elinacn.subtrack.ui.common.UiText
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
@@ -23,13 +24,16 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.math.BigDecimal
 import java.math.RoundingMode
+import java.time.Clock
+import java.time.LocalDate
 import javax.inject.Inject
 
 /** Holds the home screen's state and turns its events into repository calls. */
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val repository: SubscriptionRepository,
-    private val settingsRepository: SettingsRepository
+    private val settingsRepository: SettingsRepository,
+    private val clock: Clock
 ) : ViewModel() {
 
     /** Everything that is not stored: sheet visibility, validation errors, the pending undo. */
@@ -53,8 +57,16 @@ class HomeViewModel @Inject constructor(
         // Built per emission rather than held as a field: the table is now editable, and a
         // converter that outlived it would keep totalling at yesterday's rates.
         val converter = CurrencyConverter(rates)
+        val today = LocalDate.now(clock)
         HomeUiState(
             subscriptions = subscriptions,
+            // Computed here rather than in the composable: it needs today, which is
+            // state, and ARCHITECTURE section 3 keeps calculation out of composables.
+            countdowns = subscriptions.mapNotNull { subscription ->
+                subscription.nextPaymentDate?.let { date ->
+                    subscription.id to PaymentCountdown.between(today, date)
+                }
+            }.toMap(),
             monthlyTotal = converter.totalIn(subscriptions, mainCurrency),
             baseCurrency = mainCurrency,
             isTotalConverted = subscriptions.any { it.currency != mainCurrency },
@@ -62,6 +74,7 @@ class HomeViewModel @Inject constructor(
             isAddSheetOpen = screen.isAddSheetOpen,
             nameError = screen.nameError,
             priceError = screen.priceError,
+            dateError = screen.dateError,
             errorMessage = screen.errorMessage,
             pendingUndo = screen.pendingUndo
         )
@@ -74,19 +87,18 @@ class HomeViewModel @Inject constructor(
     /** Single entry point for everything the screen can ask for. */
     fun onEvent(event: HomeEvent) {
         when (event) {
-            HomeEvent.OpenAddSheet -> screenState.update {
-                it.copy(isAddSheetOpen = true, nameError = null, priceError = null)
-            }
+            HomeEvent.OpenAddSheet -> screenState.update { it.clearedErrors(open = true) }
 
-            HomeEvent.DismissAddSheet -> screenState.update {
-                it.copy(isAddSheetOpen = false, nameError = null, priceError = null)
-            }
+            HomeEvent.DismissAddSheet -> screenState.update { it.clearedErrors(open = false) }
 
-            is HomeEvent.Save -> save(event.name, event.rawPrice, event.currency)
+            is HomeEvent.Save ->
+                save(event.name, event.rawPrice, event.currency, event.nextPaymentDate)
 
             HomeEvent.ClearNameError -> screenState.update { it.copy(nameError = null) }
 
             HomeEvent.ClearPriceError -> screenState.update { it.copy(priceError = null) }
+
+            HomeEvent.ClearDateError -> screenState.update { it.copy(dateError = null) }
 
             is HomeEvent.Delete -> delete(event.id)
 
@@ -102,16 +114,23 @@ class HomeViewModel @Inject constructor(
      * Validates first and only writes if everything checks out. The sheet stays open on a bad
      * entry - closing it would throw away what the user typed along with the explanation.
      */
-    private fun save(name: String, rawPrice: String, currency: Currency) {
+    private fun save(
+        name: String,
+        rawPrice: String,
+        currency: Currency,
+        nextPaymentDate: LocalDate?
+    ) {
         val trimmedName = name.trim()
         val nameError = if (trimmedName.isEmpty()) UiText.Resource(R.string.error_name_empty) else null
         val priceResult = parsePrice(rawPrice)
+        val dateError = validateDate(nextPaymentDate)
 
-        if (nameError != null || priceResult is PriceResult.Invalid) {
+        if (nameError != null || priceResult is PriceResult.Invalid || dateError != null) {
             screenState.update {
                 it.copy(
                     nameError = nameError,
-                    priceError = (priceResult as? PriceResult.Invalid)?.reason
+                    priceError = (priceResult as? PriceResult.Invalid)?.reason,
+                    dateError = dateError
                 )
             }
             return
@@ -127,15 +146,13 @@ class HomeViewModel @Inject constructor(
                         price = price,
                         currency = currency,
                         billingPeriod = BillingPeriod.MONTHLY,
-                        nextPaymentDate = null,
+                        nextPaymentDate = nextPaymentDate,
                         category = SubscriptionCategory.OTHER,
                         iconKey = null,
                         createdAt = System.currentTimeMillis()
                     )
                 )
-                screenState.update {
-                    it.copy(isAddSheetOpen = false, nameError = null, priceError = null)
-                }
+                screenState.update { it.clearedErrors(open = false) }
             } catch (cancellation: CancellationException) {
                 throw cancellation
             } catch (failure: Exception) {
@@ -175,6 +192,22 @@ class HomeViewModel @Inject constructor(
             } catch (failure: Exception) {
                 screenState.update { it.copy(errorMessage = failure.asMessage(R.string.error_save_failed)) }
             }
+        }
+    }
+
+    /**
+     * A past date is fine - someone entering a subscription they already have knows when it
+     * last renewed. Only the far future is refused, for the same reason as [MAX_PRICE]: it
+     * catches a slipped keystroke in the year, not a plausible entry.
+     */
+    private fun validateDate(nextPaymentDate: LocalDate?): UiText? {
+        if (nextPaymentDate == null) return null
+        val furthest = LocalDate.now(clock).plusYears(MAX_YEARS_AHEAD)
+        // The limit travels as an argument so message and constant cannot drift apart.
+        return if (nextPaymentDate.isAfter(furthest)) {
+            UiText.Resource(R.string.error_date_too_far, listOf(MAX_YEARS_AHEAD))
+        } else {
+            null
         }
     }
 
@@ -223,8 +256,17 @@ class HomeViewModel @Inject constructor(
         val isAddSheetOpen: Boolean = false,
         val nameError: UiText? = null,
         val priceError: UiText? = null,
+        val dateError: UiText? = null,
         val errorMessage: UiText? = null,
         val pendingUndo: Subscription? = null
+    )
+
+    /** Opening, dismissing and a successful save all leave the form without complaints. */
+    private fun ScreenState.clearedErrors(open: Boolean) = copy(
+        isAddSheetOpen = open,
+        nameError = null,
+        priceError = null,
+        dateError = null
     )
 
     private sealed interface PriceResult {
@@ -237,6 +279,14 @@ class HomeViewModel @Inject constructor(
         const val STOP_TIMEOUT_MS = 5_000L
 
         const val MINOR_UNIT_DIGITS = 2
+
+        /**
+         * How far ahead a renewal date may be set.
+         *
+         * A product ceiling like [MAX_PRICE], not a technical one: ten years is
+         * longer than any subscription anyone signs, so beyond it is a typed year.
+         */
+        const val MAX_YEARS_AHEAD = 10L
 
         /**
          * A product ceiling, not a Long limit.

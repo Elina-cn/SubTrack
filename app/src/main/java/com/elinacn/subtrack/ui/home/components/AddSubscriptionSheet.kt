@@ -1,5 +1,7 @@
 package com.elinacn.subtrack.ui.home.components
 
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -9,23 +11,33 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDefaults
+import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SheetState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
@@ -35,6 +47,11 @@ import com.elinacn.subtrack.ui.common.CurrencySelector
 import com.elinacn.subtrack.ui.common.UiText
 import com.elinacn.subtrack.ui.theme.Dimens
 import com.elinacn.subtrack.ui.theme.SubTrackTheme
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
 
 /**
  * Form for a new subscription.
@@ -51,15 +68,26 @@ fun AddSubscriptionSheet(
     sheetState: SheetState,
     nameError: UiText?,
     priceError: UiText?,
-    onSave: (name: String, rawPrice: String, currency: Currency) -> Unit,
+    dateError: UiText?,
+    onSave: (
+        name: String,
+        rawPrice: String,
+        currency: Currency,
+        nextPaymentDate: LocalDate?
+    ) -> Unit,
     onNameEdited: () -> Unit,
     onPriceEdited: () -> Unit,
+    onDateEdited: () -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var name by rememberSaveable { mutableStateOf("") }
     var rawPrice by rememberSaveable { mutableStateOf("") }
     var currency by rememberSaveable(stateSaver = CurrencySaver) { mutableStateOf(Currency.Base) }
+    var nextPaymentDate by rememberSaveable(stateSaver = LocalDateSaver) {
+        mutableStateOf<LocalDate?>(null)
+    }
+    var isDatePickerOpen by rememberSaveable { mutableStateOf(false) }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -135,13 +163,50 @@ fun AddSubscriptionSheet(
             )
             Spacer(modifier = Modifier.height(Dimens.SpacerSmall))
             CurrencySelector(selected = currency, onSelect = { currency = it })
+
+            Spacer(modifier = Modifier.height(Dimens.SpacerMedium))
+
+            // Read-only: the value only ever comes from the picker, so there is nothing
+            // to type and no malformed date to validate. A read-only field does not take
+            // taps, hence the transparent layer over it.
+            Box {
+                OutlinedTextField(
+                    value = nextPaymentDate?.let { rememberDateFormatter().format(it) }.orEmpty(),
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text(stringResource(id = R.string.next_payment_date_label)) },
+                    placeholder = { Text(stringResource(id = R.string.date_not_set)) },
+                    trailingIcon = {
+                        Icon(
+                            imageVector = Icons.Default.DateRange,
+                            // Decorative: the label already says what the field is.
+                            contentDescription = null
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    isError = dateError != null,
+                    supportingText = dateError?.let { { Text(it.asString()) } }
+                )
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .clickable(
+                            onClickLabel = stringResource(id = R.string.pick_date),
+                            onClick = {
+                                if (dateError != null) onDateEdited()
+                                isDatePickerOpen = true
+                            }
+                        )
+                )
+            }
         }
 
         // Outside the scrolling column, so it holds its place at the bottom of the sheet however
         // far the form is scrolled. The gap above it was a Spacer inside the form before; as
         // padding here it stays a constant separation instead of scrolling away.
         Button(
-            onClick = { onSave(name, rawPrice, currency) },
+            onClick = { onSave(name, rawPrice, currency, nextPaymentDate) },
             colors = ButtonDefaults.buttonColors(
                 containerColor = MaterialTheme.colorScheme.primaryContainer,
                 contentColor = MaterialTheme.colorScheme.onPrimaryContainer
@@ -155,7 +220,68 @@ fun AddSubscriptionSheet(
             Text(stringResource(id = R.string.save))
         }
     }
+
+    if (isDatePickerOpen) {
+        // DatePicker reports the chosen day as UTC midnight, whatever the device zone is, so the
+        // conversion on both sides of it is UTC. Using the system zone here would move the date by
+        // a day for anyone west of Greenwich.
+        val pickerState = rememberDatePickerState(
+            initialSelectedDateMillis = nextPaymentDate?.atStartOfDay(ZoneOffset.UTC)
+                ?.toInstant()?.toEpochMilli()
+        )
+        DatePickerDialog(
+            onDismissRequest = { isDatePickerOpen = false },
+            colors = DatePickerDefaults.colors(
+                containerColor = MaterialTheme.colorScheme.surface
+            ),
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        pickerState.selectedDateMillis?.let { millis ->
+                            nextPaymentDate = Instant.ofEpochMilli(millis)
+                                .atZone(ZoneOffset.UTC).toLocalDate()
+                        }
+                        isDatePickerOpen = false
+                    }
+                ) {
+                    Text(stringResource(id = R.string.save))
+                }
+            },
+            dismissButton = {
+                // Clearing lives here rather than as a trailing icon on the field: the field is
+                // covered by the tap layer above, so an icon inside it could not be reached.
+                TextButton(
+                    onClick = {
+                        nextPaymentDate = null
+                        isDatePickerOpen = false
+                    }
+                ) {
+                    Text(stringResource(id = R.string.clear_date))
+                }
+            }
+        ) {
+            DatePicker(state = pickerState)
+        }
+    }
 }
+
+/** The reader's own date format, rebuilt only when the language changes. */
+@Composable
+private fun rememberDateFormatter(): DateTimeFormatter {
+    val locale = LocalConfiguration.current.locales[0]
+    return remember(locale) {
+        DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(locale)
+    }
+}
+
+/**
+ * A date survives a rotation as its epoch day. Saving null stores nothing, and the field simply
+ * comes back to its initial null - which is what an unset date is.
+ */
+private val LocalDateSaver = Saver<LocalDate?, Long>(
+    save = { it?.toEpochDay() },
+    restore = { LocalDate.ofEpochDay(it) }
+)
 
 /**
  * Enums cannot go into a Bundle on their own, so the choice is stored by its ISO code and looked
@@ -176,9 +302,11 @@ private fun AddSubscriptionSheetErrorPreview() {
             sheetState = rememberModalBottomSheetState(),
             nameError = UiText.Resource(R.string.error_name_empty),
             priceError = UiText.Resource(R.string.error_price_invalid),
-            onSave = { _, _, _ -> },
+            dateError = null,
+            onSave = { _, _, _, _ -> },
             onNameEdited = {},
             onPriceEdited = {},
+            onDateEdited = {},
             onDismiss = {}
         )
     }
