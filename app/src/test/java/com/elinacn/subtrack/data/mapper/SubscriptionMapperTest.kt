@@ -9,6 +9,8 @@ import com.elinacn.subtrack.domain.model.SubscriptionCategory
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
+import java.time.LocalDate
+import java.time.ZoneId
 
 class SubscriptionMapperTest {
 
@@ -19,7 +21,7 @@ class SubscriptionMapperTest {
             name = "Netflix",
             priceInCents = 15999,
             billingPeriod = "YEARLY",
-            nextPaymentDate = 1_700_000_000_000,
+            nextPaymentDate = MARCH_15_LOCAL_MIDNIGHT,
             category = "ENTERTAINMENT",
             iconKey = "netflix",
             createdAt = 42
@@ -32,7 +34,7 @@ class SubscriptionMapperTest {
         assertEquals(Money(15999), domain.price)
         assertEquals(Currency.TRY, domain.currency)
         assertEquals(BillingPeriod.YEARLY, domain.billingPeriod)
-        assertEquals(1_700_000_000_000, domain.nextPaymentDate)
+        assertEquals(LocalDate.of(2026, 3, 15), domain.nextPaymentDate)
         assertEquals(SubscriptionCategory.ENTERTAINMENT, domain.category)
         assertEquals("netflix", domain.iconKey)
         assertEquals(42L, domain.createdAt)
@@ -45,7 +47,7 @@ class SubscriptionMapperTest {
             name = "Spotify",
             cents = 5990,
             billingPeriod = BillingPeriod.WEEKLY,
-            nextPaymentDate = 99,
+            nextPaymentDate = LocalDate.of(2026, 3, 15),
             category = SubscriptionCategory.HEALTH,
             iconKey = "spotify",
             createdAt = 11
@@ -58,7 +60,7 @@ class SubscriptionMapperTest {
         assertEquals(5990L, entity.priceInCents)
         assertEquals("TRY", entity.currencyCode)
         assertEquals("WEEKLY", entity.billingPeriod)
-        assertEquals(99L, entity.nextPaymentDate)
+        assertEquals(MARCH_15_LOCAL_MIDNIGHT, entity.nextPaymentDate)
         assertEquals("HEALTH", entity.category)
         assertEquals("spotify", entity.iconKey)
         assertEquals(11L, entity.createdAt)
@@ -71,7 +73,7 @@ class SubscriptionMapperTest {
             name = "iCloud",
             cents = 2999,
             billingPeriod = BillingPeriod.MONTHLY,
-            nextPaymentDate = 1234,
+            nextPaymentDate = LocalDate.of(2027, 1, 31),
             category = SubscriptionCategory.PRODUCTIVITY,
             iconKey = "icloud",
             createdAt = 5678
@@ -89,6 +91,25 @@ class SubscriptionMapperTest {
         assertNull(restored.nextPaymentDate)
         assertNull(restored.iconKey)
         assertEquals(original, restored)
+    }
+
+    @Test
+    fun toDomain_middayInstant_isTheSameCalendarDayAsMidnight() {
+        // Anything within the day maps to that day: the conversion is calendar based, and a stored
+        // instant that is not exactly midnight must not slide onto the day before or after.
+        val midday = LocalDate.of(2026, 3, 15).atStartOfDay(ZoneId.systemDefault())
+            .plusHours(13).toInstant().toEpochMilli()
+
+        val domain = entity(nextPaymentDate = midday).toDomain()
+
+        assertEquals(LocalDate.of(2026, 3, 15), domain.nextPaymentDate)
+    }
+
+    @Test
+    fun roundTrip_aDateNearMidnight_survivesUnchanged() {
+        val original = subscription(nextPaymentDate = LocalDate.of(2026, 12, 31))
+
+        assertEquals(LocalDate.of(2026, 12, 31), original.toEntity().toDomain().nextPaymentDate)
     }
 
     @Test
@@ -151,7 +172,7 @@ class SubscriptionMapperTest {
         cents: Long = 1000,
         currency: Currency = Currency.TRY,
         billingPeriod: BillingPeriod = BillingPeriod.MONTHLY,
-        nextPaymentDate: Long? = null,
+        nextPaymentDate: LocalDate? = null,
         category: SubscriptionCategory = SubscriptionCategory.OTHER,
         iconKey: String? = null,
         createdAt: Long = 0
@@ -166,4 +187,10 @@ class SubscriptionMapperTest {
         iconKey = iconKey,
         createdAt = createdAt
     )
+
+    private companion object {
+        /** Local midnight on 15 March 2026, so the expectation does not depend on the test zone. */
+        val MARCH_15_LOCAL_MIDNIGHT: Long = LocalDate.of(2026, 3, 15)
+            .atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+    }
 }

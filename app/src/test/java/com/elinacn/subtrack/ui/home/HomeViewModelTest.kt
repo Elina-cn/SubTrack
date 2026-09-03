@@ -7,6 +7,7 @@ import com.elinacn.subtrack.domain.model.Currency
 import com.elinacn.subtrack.domain.model.Money
 import com.elinacn.subtrack.domain.model.Subscription
 import com.elinacn.subtrack.domain.model.SubscriptionCategory
+import com.elinacn.subtrack.domain.usecase.PaymentCountdown
 import com.elinacn.subtrack.fake.FakeSettingsRepository
 import com.elinacn.subtrack.fake.FakeSubscriptionRepository
 import com.elinacn.subtrack.ui.common.UiText
@@ -26,6 +27,9 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import java.time.Clock
+import java.time.LocalDate
+import java.time.ZoneId
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class HomeViewModelTest {
@@ -35,13 +39,20 @@ class HomeViewModelTest {
     private lateinit var settingsRepository: FakeSettingsRepository
     private lateinit var viewModel: HomeViewModel
 
+    /** A fixed clock, so "today" is a date the assertions can name rather than whenever CI ran. */
+    private val clock = Clock.fixed(
+        LocalDate.of(2026, 3, 15).atStartOfDay(ZoneId.of("UTC")).toInstant(),
+        ZoneId.of("UTC")
+    )
+    private val today: LocalDate = LocalDate.of(2026, 3, 15)
+
     @Before
     fun setUp() {
         // viewModelScope runs on Dispatchers.Main, which does not exist off-device.
         Dispatchers.setMain(dispatcher)
         repository = FakeSubscriptionRepository()
         settingsRepository = FakeSettingsRepository()
-        viewModel = HomeViewModel(repository, settingsRepository)
+        viewModel = HomeViewModel(repository, settingsRepository, clock)
     }
 
     @After
@@ -333,6 +344,118 @@ class HomeViewModelTest {
         advanceUntilIdle()
 
         assertNull(viewModel.uiState.value.priceError)
+    }
+
+    // --- next payment date ----------------------------------------------------------------
+
+    @Test
+    fun save_withADate_storesIt() = runTest {
+        collectState()
+
+        viewModel.onEvent(
+            HomeEvent.Save("Netflix", "159,99", Currency.TRY, today.plusDays(5))
+        )
+        advanceUntilIdle()
+
+        assertEquals(today.plusDays(5), repository.inserted.single().nextPaymentDate)
+        assertNull(viewModel.uiState.value.dateError)
+    }
+
+    @Test
+    fun save_withoutADate_storesNullAndIsAccepted() = runTest {
+        collectState()
+
+        viewModel.onEvent(HomeEvent.Save("Netflix", "159,99", Currency.TRY, null))
+        advanceUntilIdle()
+
+        assertNull(repository.inserted.single().nextPaymentDate)
+        assertEquals(false, viewModel.uiState.value.isAddSheetOpen)
+    }
+
+    @Test
+    fun save_aPastDate_isAccepted() = runTest {
+        collectState()
+
+        // Someone entering a subscription they already have knows when it last renewed.
+        viewModel.onEvent(
+            HomeEvent.Save("Netflix", "159,99", Currency.TRY, today.minusMonths(2))
+        )
+        advanceUntilIdle()
+
+        assertEquals(today.minusMonths(2), repository.inserted.single().nextPaymentDate)
+    }
+
+    @Test
+    fun save_exactlyTenYearsAhead_isAccepted() = runTest {
+        collectState()
+
+        viewModel.onEvent(
+            HomeEvent.Save("Netflix", "159,99", Currency.TRY, today.plusYears(10))
+        )
+        advanceUntilIdle()
+
+        assertEquals(today.plusYears(10), repository.inserted.single().nextPaymentDate)
+        assertNull(viewModel.uiState.value.dateError)
+    }
+
+    @Test
+    fun save_aDayBeyondTenYears_isRejectedAndCarriesTheLimit() = runTest {
+        collectState()
+        viewModel.onEvent(HomeEvent.OpenAddSheet)
+
+        viewModel.onEvent(
+            HomeEvent.Save("Netflix", "159,99", Currency.TRY, today.plusYears(10).plusDays(1))
+        )
+        advanceUntilIdle()
+
+        val error = viewModel.uiState.value.dateError as UiText.Resource
+        assertEquals(R.string.error_date_too_far, error.id)
+        assertEquals(listOf(10L), error.args)
+        assertTrue(repository.inserted.isEmpty())
+        assertTrue(viewModel.uiState.value.isAddSheetOpen)
+    }
+
+    @Test
+    fun clearDateError_afterRejection_removesTheMessage() = runTest {
+        collectState()
+        viewModel.onEvent(
+            HomeEvent.Save("Netflix", "159,99", Currency.TRY, today.plusYears(11))
+        )
+        advanceUntilIdle()
+
+        viewModel.onEvent(HomeEvent.ClearDateError)
+        advanceUntilIdle()
+
+        assertNull(viewModel.uiState.value.dateError)
+    }
+
+    // --- countdowns -----------------------------------------------------------------------
+
+    @Test
+    fun uiState_datedSubscriptions_carryTheirCountdown() = runTest {
+        repository.setSubscriptions(
+            listOf(
+                subscription(id = 1, name = "Future").copy(nextPaymentDate = today.plusDays(3)),
+                subscription(id = 2, name = "Today").copy(nextPaymentDate = today),
+                subscription(id = 3, name = "Past").copy(nextPaymentDate = today.minusDays(4))
+            )
+        )
+        collectState()
+
+        val countdowns = viewModel.uiState.value.countdowns
+        assertEquals(PaymentCountdown.Upcoming(days = 3), countdowns[1])
+        assertEquals(PaymentCountdown.DueToday, countdowns[2])
+        assertEquals(PaymentCountdown.Overdue(days = 4), countdowns[3])
+    }
+
+    @Test
+    fun uiState_subscriptionWithoutADate_hasNoCountdownEntry() = runTest {
+        repository.setSubscriptions(listOf(subscription(id = 1, name = "No date")))
+        collectState()
+
+        // Absent rather than a placeholder: the card shows nothing at all for these.
+        assertTrue(viewModel.uiState.value.countdowns.isEmpty())
+        assertNull(viewModel.uiState.value.subscriptions.single().nextPaymentDate)
     }
 
     // --- deleting and undo ----------------------------------------------------------------
