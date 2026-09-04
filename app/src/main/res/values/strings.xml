@@ -96,4 +96,16 @@
     <!-- Spoken form of a row that has a date. Ad, tutar, geri sayım. -->
     <string name="subscription_row_description_dated">%1$s, %2$s, %3$s</string>
 
+    <!-- Payment reminder notification -->
+    <string name="notification_channel_name">Ödeme hatırlatmaları</string>
+    <string name="notification_channel_description">Yaklaşan ve yeni gecikmiş ödemeler için günlük hatırlatma</string>
+    <!-- Neutral on purpose: one notification can cover both upcoming and overdue payments. -->
+    <plurals name="notification_title">
+        <item quantity="other">Ödeme hatırlatması: %1$d abonelik</item>
+    </plurals>
+    <!-- Ad — durum -->
+    <string name="notification_entry">%1$s — %2$s</string>
+    <string name="notification_entry_separator">", "</string>
+    <string name="notification_due_today">bugün</string>
+    <string name="notification_due_tomorrow">yarın</string>
 </resources>

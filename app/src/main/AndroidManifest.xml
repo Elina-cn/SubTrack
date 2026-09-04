@@ -2,6 +2,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!-- Runtime request on API 33+ arrives in phase 10c; until then the reminder simply stays
+         quiet when the permission is not granted. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
     <application
         android:name=".SubTrackApplication"
         android:allowBackup="true"

@@ -96,4 +96,17 @@
     <!-- Spoken form of a row that has a date. Name, amount, countdown. -->
     <string name="subscription_row_description_dated">%1$s, %2$s, %3$s</string>
 
+    <!-- Payment reminder notification -->
+    <string name="notification_channel_name">Payment reminders</string>
+    <string name="notification_channel_description">A daily reminder about upcoming and recently overdue payments</string>
+    <!-- Neutral on purpose: one notification can cover both upcoming and overdue payments. -->
+    <plurals name="notification_title">
+        <item quantity="one">Payment reminder: %1$d subscription</item>
+        <item quantity="other">Payment reminder: %1$d subscriptions</item>
+    </plurals>
+    <!-- Name — state -->
+    <string name="notification_entry">%1$s — %2$s</string>
+    <string name="notification_entry_separator">", "</string>
+    <string name="notification_due_today">today</string>
+    <string name="notification_due_tomorrow">tomorrow</string>
 </resources>

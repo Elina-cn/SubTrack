@@ -1,0 +1,14 @@
+<!--
+  Status bar icon. One flat white silhouette on a transparent ground: from API 26 the system
+  masks this to its own shape and tints it, so any colour or detail here would show up as a
+  smudge. Placeholder until the brand icon set arrives in phase 16.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M12,3C8.7,3 6,5.7 6,9v5l-2,2v1h16v-1l-2,-2V9c0,-3.3 -2.7,-6 -6,-6zM10,20h4c0,1.1 -0.9,2 -2,2s-2,-0.9 -2,-2z" />
+</vector>
