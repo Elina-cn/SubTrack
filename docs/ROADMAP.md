@@ -234,12 +234,17 @@ ekranı + Navigation + DataStore, **9b-2** düzenlenebilir kurlar. **Hepsi bitti
 
 ---
 
-## ⬜ Faz 10 — Yenilenme Tarihi + Hatırlatma
+## 🟡 Faz 10 — Yenilenme Tarihi + Hatırlatma
 
-- [ ] Tarih seçici, sonraki ödeme tarihi
-- [ ] "X gün kaldı" göstergesi
-- [ ] WorkManager + yerel bildirim
-- [ ] `POST_NOTIFICATIONS` izin akışı (Android 13+)
+Üç promptta yürütülüyor: **10a** tarih seçici ve geri sayım **(bitti)**,
+**10b** WorkManager + bildirim, **10c** izin akışı.
+
+- [x] **10a:** Tarih seçici, sonraki ödeme tarihi — opsiyonel, geçmiş tarih
+      kabul, üst sınır 10 yıl (ARCHITECTURE §17)
+- [x] **10a:** "X gün kaldı" göstergesi — gelecek, bugün ve gecikmiş; tarih
+      yoksa gösterge çıkmaz. Tarih geçince **ilerletme yok**, o Faz 12'nin işi
+- [ ] **10b:** WorkManager + yerel bildirim
+- [ ] **10c:** `POST_NOTIFICATIONS` izin akışı (Android 13+)
 
 **Bitti:** Yaklaşan ödeme için bildirim geliyor, izin reddedilse de uygulama çalışıyor.
 
@@ -300,6 +305,10 @@ Aylık toplamın zaman içindeki anlık görüntüleri. `PROJECT_SPEC.md` §1'de
       tanımsız, seçilmemiş chip etiketi ve ayarlar açıklama metni koyu temada
       **#CAC4D0**, açık temada **#49454F**. İkisi de mor-gri, kontrast AA geçiyor
       (koyu 9.66:1, açık 6.85:1) — sorun okunabilirlik değil, palet tutarlılığı.
+      Faz 10a'da üçüncüsü eklendi: `error` tanımsız, "gecikmiş" göstergesi
+      Material baseline kırmızısına düşüyor. Kartta metin olarak okunabilen tek
+      alternatif `onSurface`'ti ve o "bir şey ters" demiyor, o yüzden `error`
+      bilerek seçildi — ama tanımlanması gereken rollerden biri.
       Paletimiz mavi-camgöbeği ailesinde. Tüm `colorScheme`
       rolleri gözden geçirilip eksikler tanımlanmalı, sadece bunlar değil.
 - [ ] Para birimi gösterimi tutarlı hale getirilsin: `NumberFormat` locale'e göre

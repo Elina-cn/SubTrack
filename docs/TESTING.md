@@ -70,6 +70,12 @@ etmeden bildirin; sonraki maddeler zaten bozuk bir durumun üstüne binebilir.
 | 24 | Kur değiştir, uygulamayı tamamen kapat, yeniden aç | Kur **duruyor**, "Son düzenleme" tarihi görünüyor | 9b-2 |
 | 25 | Kur ekranında "Varsayılana dön" → Sıfırla | Alanlar 42,85 / 46,2 / 53,9'a dönüyor, tarih yerine **"hiç düzenlenmedi"** yazısı geliyor | 9b-2 |
 | 26 | Kur alanına yazarken klavye açıkken Kaydet ve "Varsayılana dön"e ulaş | Pencere klavye kadar küçülüyor, **tek fiskede** ikisine de ulaşılıyor | 9b-2 · `adjustResize` hotfix |
+| 27 | Ekleme formunda tarih seç, kaydet | Kartta doğru gün sayısı: cihaz tarihi ile seçilen tarih arasındaki **takvim günü** farkı | 10a |
+| 28 | Tarih **seçmeden** kaydet | Kayıt oluşuyor, kartta gösterge **yok**, yer tutucu da yok, çökme yok | 10a |
+| 29 | Geçmiş bir tarih seç | Kart "gecikmiş" diyor, tarih **ilerletilmiyor** | 10a |
+| 30 | Bugünün tarihini seç | Kart "Bugün ödenecek" diyor | 10a |
+| 31 | Seçicinin metin girişinden 10 yıldan uzak bir tarih gir, kaydet | Alan altında hata, **kaydedilmiyor**, sheet açık kalıyor, çökme yok | 10a |
+| 32 | Tarih seçili haldeyken sheet açıkken döndür | Tarih **korunuyor** | 10a |
 
 **Klavye açıkken buton erişilebilirliği — her fazda kontrol edilecek**
 

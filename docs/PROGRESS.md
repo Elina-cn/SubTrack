@@ -27,6 +27,163 @@ Her faz sonunda **en üste** yeni kayıt eklenir. Eski kayıtlar silinmez.
 
 ---
 
+## [Faz 10a] Sonraki Ödeme Tarihi — 2026-09-04
+
+**Durum:** Tamamlandı. Bildirim, WorkManager ve izin akışı **yok** — 10b ve 10c.
+
+**Desugaring ölçümü (Görev 0a)**
+- `minSdk = 24`, `coreLibraryDesugaringEnabled` **tanımlı değildi**,
+  `coreLibraryDesugaring` bağımlılığı **yoktu**.
+- Tek satırlık `LocalDate.now()` denemesi: **`assembleDebug` GEÇTİ.** Derleyici
+  şikâyet etmiyor çünkü `compileSdk 36` sınıf yolunda `java.time` var. Sorun
+  ancak API 24/25 cihazda çalışma anında `NoClassDefFoundError` olurdu.
+- **`lintDebug` HATA VERDİ** ve derlemeyi durdurdu:
+  `Call requires API level 26, or core library desugaring (current min is 24):
+  java.time.LocalDate#now [NewApi]`
+- Sonuç sohbete taşındı, desugaring onaylandı, `minSdk 24` korundu.
+
+**Desugaring sürüm seçimi**
+`desugar_jdk_libs 2.1.5` seçildi. 2.x hattı AGP 8+/9'un beklediği hat; 2.1.5
+AGP 9.0.1'in gerekli AGP sürümünü yükseltmeden kabul ettiği en yeni sürüm.
+Doğrulama: `assembleDebug --rerun-tasks` yeni bir `l8DexDesugarLibDebug`
+görevi çalıştırdı (desugar edilmiş kütüphanenin dex'lenmesi — açık olduğunun
+kanıtı) ve **`lintDebug` temiz geçti**. APK bedeli ~200-400 KB, Faz 16'daki
+R8 maddesinde ölçülecek.
+
+**Yapılanlar**
+- `Subscription.nextPaymentDate` `Long?` → **`LocalDate?`**. Room şeması
+  değişmedi; dönüşüm `SubscriptionMapper`'da, **sistem saat diliminde**.
+  Yön açıkça yazıldı: saklanan an o günün yerel takvim günü olarak okunuyor,
+  yazarken yerel gece yarısına çevriliyor. UTC okumak Greenwich'in doğu veya
+  batısındaki kullanıcı için tarihi bir gün kaydırırdı.
+- `PaymentCountdown` domain'de saf: `Upcoming(days)` / `DueToday` /
+  `Overdue(days)`. **Bugünün tarihi parametre**, içeride `LocalDate.now()`
+  yok. Üç durumu imzasız sayı yerine tip olarak ayırdım — ekran üç farklı şey
+  söylüyor, çağıran her seferinde sınırları yeniden keşfetmesin.
+- `Clock` Hilt'ten geliyor (`di/TimeModule`). ViewModel'ın "bugün"ü
+  enjekte edilebilir olduğu için 10a testleri sabit bir tarihte koşuyor.
+- Geri sayım **ViewModel'da** hesaplanıyor, `HomeUiState.countdowns` map'ine
+  id ile konuyor. Composable'da hesap yok (§3). Abonelik nesnesinin içine
+  konmadı: geri sayım aboneliğin değil, **abonelik ile bugünün** özelliği.
+- Ekleme formuna Material3 `DatePicker`. Alan salt okunur — değer yalnızca
+  seçiciden gelir, yazılacak bir şey yok. Temizleme diyaloğun içinde
+  ("Tarihi temizle"), çünkü alanın üstündeki dokunma katmanı alan içindeki
+  bir ikonu erişilemez kılardı.
+- Kartta "X gün kaldı". Tarih yoksa **hiçbir şey** yok, yer tutucu yok.
+
+**Renk kararı — `error` rolü**
+Gecikmiş durum için `MaterialTheme.colorScheme.error` seçildi; yeni renk
+eklenmedi. Kartta metin olarak okunabilen tanımlı roller yalnızca `primary`
+(fiyat için kullanılıyor) ve `onSurface` (ad için kullanılıyor);
+`secondary`/`tertiary` pastel, beyaz kart üstünde metin olarak okunmuyor.
+`error` "bir şey ters" diyen tek anlamsal rol. **Ama şemamızda tanımlı
+değil** — Material baseline kırmızısına düşüyor. Faz 14'teki tanımsız rol
+listesine eklendi (`outline`, `onSurfaceVariant` ile birlikte).
+
+**Testler**
+- 84 → **101 birim testi**, hepsi geçti.
+- `PaymentCountdownTest`: yarın, bugün, dün, hafta, yıl, **artık gün**
+  (2028-02-28 → 2028-03-01 = 2 gün, 29 Şubat arada) ve yıl dönümü.
+  Hepsi kendi tarihlerini adlandırıyor, hiçbiri koşma anına bağlı değil.
+- Mapper: `Long? ↔ LocalDate?`, null, **gün ortası an** (13:00 saklanan an
+  aynı takvim gününe düşüyor, bir gün kaymıyor).
+- ViewModel: tarihli/tarihsiz kayıt, geçmiş tarih kabulü, tam 10 yıl kabul,
+  10 yıl + 1 gün reddi (sınır mesajda argüman olarak), geri sayım map'i.
+- Enstrümantasyon **9/9, iki emülatörde**.
+- `lintDebug` temiz.
+
+**Değişen dosyalar**
+- `domain/model/Subscription.kt` — `LocalDate?`
+- `domain/usecase/PaymentCountdown.kt` — yeni
+- `data/mapper/SubscriptionMapper.kt` — dönüşüm
+- `di/TimeModule.kt` — yeni, `Clock`
+- `ui/home/HomeUiState.kt`, `HomeViewModel.kt`, `HomeScreen.kt`
+- `ui/home/components/AddSubscriptionSheet.kt`, `SubscriptionCard.kt`
+- `res/values/strings.xml`, `res/values-en/strings.xml` — plurals dahil
+- `app/build.gradle.kts`, `gradle/libs.versions.toml` — desugaring
+- `docs/ARCHITECTURE.md` §17, `docs/ROADMAP.md`, `docs/TESTING.md`
+
+**Commit'ler**
+- `b373c14` docs: add date handling decisions
+- `22f8ecf` build: enable core library desugaring for java.time
+- `d5dae83` feat: model the next payment date as a calendar day
+- `9f83b47` feat: pick a next payment date and count down to it
+- `6d2acd0` test: cover the countdown, date mapping and date validation
+- `581f954` fix: name the date field and its error for screen readers
+
+**Emülatörde bulunan ve düzeltilen — erişilebilirlik**
+Tarih alanının üstündeki saydam dokunma katmanı alt ağacı birleştiriyor, bu
+yüzden alan ekran okuyucuya **isimsiz bir buton** olarak görünüyordu:
+`cd=''`. `clickable(onClickLabel = ...)` eylemi adlandırıyor, düğümü değil.
+Katmana `semantics { contentDescription }` eklendi; artık
+`"Next Payment (optional), Sep 10, 2026"` diye okunuyor. Aynı sebeple hata
+metni de ağaçta yoktu — o da açıklamaya katıldı:
+`"..., Dec 31, 2040, The date can be at most 10 years ahead"`.
+
+Emülatörde bulunan ikinci hata: açıklama metni ilk turda ham `%1$s`
+gösteriyordu, `stringResource` argümanı verilmemişti (9b-2'deki hatanın
+aynısı — aynı tuzağa iki kez düşüldü).
+
+**Emülatör test sonuçları** (cihaz tarihi 3-4 Eylül 2026)
+
+| # | Test | Dar (API 29, 360dp) | Geniş (API 34, 411dp) |
+|---|---|---|---|
+| 1 | Tarih seç, kaydet, gün sayısı | geçti — 3 Eylül'de 10 Eylül seçildi → **"7 days left"** | geçti — 4 Eylül'de 11 Eylül → **"7 days left"** |
+| 2 | Tarihsiz kayıt | geçti — "NoDate, TRY 10.00", gösterge yok, çökme yok | — |
+| 3 | Geçmiş tarih | geçti — 1 Eylül → **"2 days overdue"** | — |
+| 4 | Bugün | geçti — 3 Eylül → **"Due today"** | — |
+| 5 | 10 yıldan uzak | geçti — 31.12.2040 girildi, alan hatası, **kaydedilmedi**, çökme yok | — |
+| 6 | Sheet layout regresyonu | geçti — aşağıda | geçti — aşağıda |
+| 7 | fs2.0 taşma | geçti — seçici `[0,96][720,1232]`, kart satırları büyüyor, kırpılma yok | — |
+| 8 | Döndürme, tarih seçili | geçti — "Sep 25, 2026" yatay-dikey korundu | — |
+| 9 | Sabit regresyon listesi | **21/21 geçti** | **21/21 geçti** |
+
+**Test 1 elle doğrulama:** cihaz `date` çıktısı `Thu Sep 3 2026`, seçilen gün
+`Thursday, September 10, 2026` → 10 − 3 = **7**. Kart "7 days left" dedi.
+Geniş cihazda `Fri Sep 4` + `September 11` → 7, aynı sonuç.
+
+**Test 6 — 9b-1 hotfix'i ayakta.** Yeni alan kaydırma bölgesine girdi,
+Kaydet butonunun koordinatı **hiçbir kombinasyonda değişmedi**:
+
+| Cihaz | fs | Klavye | Kaydet (10a) | 9b-2 referansı |
+|---|---|---|---|---|
+| Dar | 1.0 | kapalı | `[48,1104][672,1200]` | **aynı** |
+| Dar | 1.0 | açık | `[48,606][672,702]` | **aynı** |
+| Geniş | 1.0 | kapalı | `[63,2107][1017,2233]` | **aynı** |
+| Geniş | 1.0 | açık | `[63,1287][1017,1413]` | **aynı** |
+| Geniş | 2.0 | kapalı | `[63,2092][1017,2232]` | **aynı** |
+| Geniş | 2.0 | açık | `[63,1272][1017,1412]` | **aynı** |
+
+Değişen tek şey kaydırma bölgesinin **yukarı doğru büyümesi** (dar fs1.0'da
+`[0,513]` → `[0,361]`, geniş fs1.0'da `[0,1328]` → `[0,1128]`): sheet uzadı,
+Kaydet yerinde kaldı. Kaydırınca da sabit kalıyor.
+
+**Gözlem — düzeltilmedi**
+font_scale 2.0'da uzun abonelik adları kartta kırpılıyor ("TodayDue" →
+"TodayDu"). Ad sütununun genişliği bu fazda değişmedi (`weight(1f)` aynı
+kaldı, sadece içine ikinci satır eklendi), yani bu **mevcut bir davranış**,
+geri sayımın getirdiği bir şey değil. Faz 14 veya 15'te ele alınabilir.
+
+**Karşılaşılan sorunlar**
+- Emülatörler oturum boyunca üç kez kendiliğinden kapandı. Bir turda bunu
+  fark etmeden ölçüm alındı ve **eski dump dosyaları okundu**; sonuç
+  geçersiz sayıldı ve emülatörler yeniden başlatılıp tekrarlandı.
+  Ders: `adb devices` boşsa okunan dosya bir öncekinin kalıntısıdır.
+- Geniş emülatörde regresyon turunun ilki `uiautomator dump`'ın
+  `null root node` dönmesi yüzünden ilk aboneliği ekleyemedi; tur baştan
+  koşuldu.
+
+**Sonraki faz için not**
+- 10b: WorkManager + bildirim. `PaymentCountdown` ve `Clock` hazır;
+  zamanlama `java.time` üzerinden kurulacak (desugaring artık açık).
+- Geri sayım her emisyonda hesaplanıyor; **gece yarısını açık geçen bir
+  oturum** dünün sayısını gösterir. 10b'nin zamanlayıcısı bunu da
+  tazeleyebilir.
+- `billingPeriod` hâlâ UI'a bağlı değil ve tarih geçince **ilerletme yok** —
+  Faz 12'nin işi (§17).
+
+---
+
 ## [Faz 9b-2] Düzenlenebilir Döviz Kurları — 2026-09-02
 
 **Durum:** Tamamlandı. Faz 9 kapandı.
