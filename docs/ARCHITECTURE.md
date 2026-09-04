@@ -659,3 +659,97 @@ penceresine uygulanır, o pencereye değil. İki mekanizma birbirine değmiyor.
   `NoClassDefFoundError` olarak çıkar. Yakalayan `lintDebug`'dır.
   `java.time` veya başka yeni API kullanan her değişiklikten sonra lint
   koşturulmalı.
+
+---
+## 18. Hatırlatma ve Bildirim
+
+### Ürün kuralı
+
+Bildirilenler: **bugün ödenecek**, **1 gün kalan**, ve gecikmesi **1-3 gün**
+olanlar. Tarihi olmayan abonelik bildirilmez. Abonelik başına ayrı bildirim
+yok — tek özet bildirim, sabit id, günde en fazla bir tane. Bildirimde tutar
+yazmaz.
+
+Başlık kapsanan abonelik **sayısını** söyler ve fiil kullanmaz. Aynı bildirim
+hem bugün ödenecek hem üç gün gecikmiş bir aboneliği taşıyabildiği için
+"yenileniyor" gibi tek duruma bağlanan bir başlık zamanın yarısında yanlış
+olurdu.
+
+### Gecikme penceresi neden var
+
+§17 gereği **tarih geçtiğinde otomatik ilerletme yapılmıyor**. Yani gecikmiş
+durum kalıcıdır; pencere olmasaydı bildirim de kalıcı olurdu ve kullanıcı her
+gün aynı satırı görürdü.
+
+İki eşik de `PaymentReminderSelection` içinde adlandırılmış sabittir
+(`UPCOMING_WITHIN_DAYS`, `OVERDUE_WITHIN_DAYS`), koda gömülü sayı değil.
+
+> **Faz 12 uyarısı:** ödeme periyodu gelip tarih ilerletilmeye başlandığında
+> gecikmiş durum artık kalıcı olmayacak. Pencerenin gerekçesi o gün ortadan
+> kalkar; eşikler yeniden değerlendirilmeli.
+
+### Neden periyodik tarama, exact alarm değil
+
+`setExactAndAllowWhileIdle` Android 12+'ta `SCHEDULE_EXACT_ALARM` izin rejimine
+giriyor ve Play bu izni gerçekten saniyesi önemli işler için istiyor. Bir
+abonelik hatırlatması o eşiği hak etmiyor.
+
+**Bedeli açıkça kabul edildi:** WorkManager dakika garantisi vermez. Hedef
+yerel 09:00'dır, taahhüt değil — Doze altında saatlerce kayabilir. Hatırlatma
+için bu kabul edilebilir; ödeme anına bağlı bir iş olsaydı olmazdı.
+
+### `KEEP` zorunludur
+
+İş uygulamanın **her açılışında** `enqueueUniquePeriodicWork` ile kuyruğa
+konuyor. `UPDATE` veya `REPLACE` ilk gecikmeyi her seferinde sıfırlar; yani
+uygulamayı her gün açan bir kullanıcıda iş **hiç çalışmaz**. `KEEP` bir tercih
+değil, tek doğru politika.
+
+Constraint eklenmiyor: iş yerel veriyi okuyup bildirim gönderiyor, ağ da şarj
+da boşta cihaz da gerekmiyor. Herhangi birini istemek yalnızca geciktirirdi.
+
+### `InitializationProvider` paylaşılıyor
+
+WorkManager'ın otomatik başlatıcısı kaldırıldı — worker'ın Hilt'ten gelen
+fabrikaya ihtiyacı var, bu yüzden `Application` `Configuration.Provider`
+uyguluyor ve WorkManager talep üzerine kuruluyor.
+
+**Ama provider'ın kendisi kaldırılamaz.** `androidx.startup`'ın tek
+`InitializationProvider`'ı emoji2, lifecycle ve profileinstaller tarafından da
+kullanılıyor (Faz 10b Görev 0'da birleşik manifestte ölçüldü). Kaldırılırsa o
+üç initializer de ölür. Yalnızca `androidx.work.WorkManagerInitializer`
+`meta-data` satırı `tools:node="remove"` ile çıkarılır, provider
+`tools:node="merge"` ile durur.
+
+`Configuration.Provider` üyesi **property**'dir (`workManagerConfiguration`);
+androidx.work 2.9'da fonksiyondan property'ye döndü.
+
+### Bildirim durumu neden ayrı repository
+
+Son bildirim günü **kullanıcı tercihi değil**, işin kendisi hakkında tuttuğu
+kayıttır ve hiçbir ekranda görünmez. Bu yüzden `SettingsRepository`'nin
+arayüzüne eklenmedi, ayrı ve küçük bir `ReminderStateRepository` aldı.
+
+Depolama aynı: Hilt'in verdiği **mevcut** `DataStore<Preferences>` örneği
+kullanılıyor. Aynı dosya için ikinci bir instance çalışma zamanı hatasıdır
+(§14), ve tek bir `Long` için ikinci bir dosya ileride taşınacak fazladan bir
+dosya olurdu. Gün **epoch day** olarak saklanır, epoch millis değil: "bugün
+gönderildi mi" bir takvim sorusudur.
+
+### `POST_NOTIFICATIONS`
+
+İzin manifestte bildirilmiştir; **runtime isteği Faz 10c'nin işidir.** Gönderim
+öncesi `NotificationManagerCompat.areNotificationsEnabled()` kontrol edilir —
+API 33+'ta reddedilmiş izin zaten bunu `false` yapar, yani 10c gelene kadar
+beklenen davranış sessiz kalmaktır.
+
+Ayrıca lint'in `MissingPermission` hatası için **API 33 ve üstünde koşullu**
+bir `ContextCompat.checkSelfPermission` kontrolü var. Koşul şarttır: izin API
+33'ün altında tanımlı değildir ve orada `checkSelfPermission` "reddedildi"
+cevabı verip hatırlatmayı her eski cihazda susturur.
+
+Kanal her gönderimden önce yeniden oluşturulur. Var olan bir kanalı oluşturmak
+işlemsizdir; asıl kazanç, cihaz dili değişince kanal adının ve açıklamasının
+güncellenmesidir.
+
+---

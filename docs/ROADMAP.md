@@ -261,6 +261,11 @@ ekranı + Navigation + DataStore, **9b-2** düzenlenebilir kurlar. **Hepsi bitti
 - [ ] Aylık/yıllık/haftalık seçimi
 - [ ] Yıllık → aylık maliyet normalizasyonu
 - [ ] Aylık/yıllık toplam görünümü arasında geçiş
+- [ ] **Hatırlatmadaki gecikme penceresi gözden geçirilsin.** Faz 10b'deki 1-3
+      günlük pencerenin tek gerekçesi, tarihin otomatik ilerlememesi yüzünden
+      gecikmiş durumun kalıcı olmasıydı. İlerletme bu fazda gelince o gerekçe
+      ortadan kalkar. Eşikler `PaymentReminderSelection`'da adlandırılmış
+      sabit; gerekçe `ARCHITECTURE.md` §18'de.
 
 ---
 
@@ -328,7 +333,9 @@ Aylık toplamın zaman içindeki anlık görüntüleri. `PROJECT_SPEC.md` §1'de
 
 ## ⬜ Faz 16 — Play Store Hazırlığı
 
-- [ ] Uygulama ikonu (adaptive) ve marka kimliği
+- [ ] Uygulama ikonu (adaptive) ve marka kimliği. **Bildirim ikonu da bu işin
+      parçası:** `res/drawable/ic_notification.xml` Faz 10b'de konan geçici bir
+      siluet, marka çalışmasıyla birlikte yenilenecek.
 - [ ] Release imzalama yapılandırması, keystore güvenliği
 - [ ] ProGuard/R8 kuralları, release build testi
 - [ ] `isMinifyEnabled = true` (R8) — APK boyutu ve açılış süresi düşer
@@ -365,9 +372,12 @@ Aylık toplamın zaman içindeki anlık görüntüleri. `PROJECT_SPEC.md` §1'de
       `checkable="true"`, seçili olan `checked="true"`. Hotfix'teki ters
       bulgu yanlış düğüme bakmaktan gelmişti. Geriye yalnızca **TalkBack'in
       bunu gerçekten seslendirdiği** doğrulaması kaldı.
-- [ ] DataStore `libdatastore_shared_counter.so` native kütüphanesi getiriyor;
-      `stripDebugDebugSymbols` strip edemiyor, olduğu gibi paketleniyor.
-      Release APK boyutu ölçülürken göz önünde bulundurulsun.
+- [ ] Strip edilemeyen native kütüphaneler: DataStore'un
+      `libdatastore_shared_counter.so`'su ve Compose'un `androidx.graphics:graphics-path`
+      üzerinden gelen `libandroidx.graphics.path.so`'su. `stripDebugDebugSymbols`
+      ikisini de strip edemiyor, olduğu gibi paketleniyor. Release APK boyutu
+      ölçülürken göz önünde bulundurulsun. (İkincisi Faz 10b Görev 0'da fark
+      edildi; WorkManager'dan gelmiyor, temiz tabanda da vardı.)
 - [ ] **API 24/25 üzerinde bir kez test edilsin** — `minSdk` 24 iddiası hiç
       doğrulanmadı. Fiziksel cihaz API 29, emülatörler 29 ve 34; 24/25 için
       ayrı bir AVD kurulması gerekiyor. Faz 10a'da `java.time` yüzünden
@@ -376,6 +386,11 @@ Aylık toplamın zaman içindeki anlık görüntüleri. `PROJECT_SPEC.md` §1'de
 - [ ] **`desugar_jdk_libs` APK bedeli R8 sonrası ölçülsün** — bugün
       ~200-400 KB tahmin ediliyor, `isMinifyEnabled = true` ile ne kaldığı
       ölçülmedi. Yukarıdaki R8 maddesiyle birlikte yapılır.
+- [ ] **WorkManager'ın manifeste otomatik eklediği izinler Play Console'da
+      görünecek:** `WAKE_LOCK`, `ACCESS_NETWORK_STATE`, `RECEIVE_BOOT_COMPLETED`,
+      `FOREGROUND_SERVICE`. Dördü de kütüphaneden geliyor, uygulama kodu
+      istemiyor. Birleşik manifestte ölçüldü (Faz 10b Görev 0). İzin beyanında
+      ve gizlilik politikasında bunlar da açıklanmalı.
 - [ ] Play Console Data Safety formu
 - [ ] Mağaza görselleri ve açıklama metni
 - [ ] Internal testing → production

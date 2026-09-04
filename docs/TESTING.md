@@ -239,6 +239,57 @@ ANDROID_SERIAL=emulator-5554 ./gradlew :app:connectedDebugAndroidTest
 `connectedDebugAndroidTest` bitince uygulamayı **kaldırıyor**. Ekran
 görüntüsü veya elle test yapılacaksa testten sonra yeniden kurun.
 
+### Periyodik WorkManager işi — kuyruğu görmek kolay, erken çalıştırmak mümkün değil
+
+**Kuyruğa girip girmediği** ve **hangi ayarlarla** girdiği iki yoldan okunur.
+
+Diagnostics yayını iş adını, sınıfını ve durumunu logcat'e yazar:
+
+```bash
+adb logcat -c
+adb shell am broadcast -a "androidx.work.diagnostics.REQUEST_DIAGNOSTICS" -p com.elinacn.subtrack
+adb logcat -d -s WM-DiagnosticsWrkr:V
+```
+
+Periyot, ilk gecikme ve constraint'ler bu çıktıda **yok**. Onlar WorkManager'ın
+kendi veritabanındadır — `databases/` altında değil, `no_backup/` altında:
+
+```bash
+adb exec-out run-as com.elinacn.subtrack cat no_backup/androidx.work.workdb > work.db
+adb exec-out run-as com.elinacn.subtrack cat no_backup/androidx.work.workdb-wal > work.db-wal
+```
+
+`WorkSpec` tablosunda `interval_duration`, `initial_delay`, `state`,
+`period_count` ve `requires_*` sütunları; `WorkName` tablosunda unique ad
+karşılığı vardır. **`-wal` dosyası da çekilmeli** — tablolar çoğu zaman ana
+dosyaya henüz yazılmamıştır ve yalnız `.db` "file is not a database" der.
+
+JobScheduler tarafı:
+
+```bash
+adb shell dumpsys jobscheduler | grep -A25 "JOB #u0a<UID>/0:"
+```
+
+`Requires:` satırı constraint'leri, `Run time: earliest=` ilk gecikmeyi gösterir.
+
+**Erken çalıştırmak bu imajlarda mümkün değil.** Denenen ve tükenen yollar:
+
+| Yol | Sonuç |
+|---|---|
+| `adb shell cmd jobscheduler run -f com.elinacn.subtrack <id>` | Komut çalışır (`Running job [FORCED]`) ama **worker gövdesi koşmaz.** WorkManager kendi denetimini yapar: `WM-WorkerWrapper: Delaying execution for … because it is being executed before schedule. Status … is ENQUEUED; not doing any work and rescheduling for later execution` |
+| `adb root` | `adbd cannot run as root in production builds` |
+| `adb shell date <MMDDhhmmYYYY>` | `date: cannot set date: Operation not permitted` |
+| `adb shell setprop persist.sys.timezone …` | `setprop: failed to set property` |
+
+Yani JobScheduler'ı zorlamak yetmiyor; WorkManager `lastEnqueueTime +
+initial_delay` geçmeden çalışmıyor ve o eşiği aşmanın tek yolu duvar saatini
+ileri almak — o da root istiyor. `google_apis_playstore` imajlarında root yok.
+
+**Sonuç: ilk gecikmesi olan periyodik bir işin gövdesi, gecikme dolmadan
+emülatörde gözlemlenemez.** İşin kuyruğa doğru girdiği yukarıdaki iki yolla
+kanıtlanabilir; çalıştığı kanıtlanamaz. Gövdenin davranışı ya gecikme dolana
+kadar beklenerek ya da başka bir yolla doğrulanmalı — bu karar açık.
+
 ### Açılış süresi
 
 ```bash
