@@ -1,7 +1,9 @@
 package com.elinacn.subtrack.di
 
+import com.elinacn.subtrack.data.repository.ReminderStateRepositoryImpl
 import com.elinacn.subtrack.data.repository.SettingsRepositoryImpl
 import com.elinacn.subtrack.data.repository.SubscriptionRepositoryImpl
+import com.elinacn.subtrack.domain.repository.ReminderStateRepository
 import com.elinacn.subtrack.domain.repository.SettingsRepository
 import com.elinacn.subtrack.domain.repository.SubscriptionRepository
 import dagger.Binds
@@ -33,4 +35,11 @@ abstract class RepositoryModule {
     abstract fun bindSettingsRepository(
         impl: SettingsRepositoryImpl
     ): SettingsRepository
+
+    /** Reminder bookkeeping, kept apart from user preferences. See ARCHITECTURE section 18. */
+    @Binds
+    @Singleton
+    abstract fun bindReminderStateRepository(
+        impl: ReminderStateRepositoryImpl
+    ): ReminderStateRepository
 }
