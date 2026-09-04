@@ -189,7 +189,9 @@ bütünlüğü olarak doğrulandı; renk kontrastı dump'tan ölçülemez.
 - `df33817` feat: show the day's payment reminders in one notification
 - `4ae0f6b` feat: run the payment reminder once a day
 - `5478ea4` docs: record the reminder decisions and the WorkManager trigger limits
+- `26b1b70` test: run the reminder worker on device through the real graph
 - `eb4ac6e` test: fix the reminder test order so the once-a-day guard cannot hide a run
+- `c4ced4c` docs: record phase 10b and the working way to run the reminder job
 
 **Sonraki faz için not**
 - 10c runtime izin akışını getirecek. Yukarıdaki "gün işaretleme" davranışı
