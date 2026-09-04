@@ -69,6 +69,11 @@ dependencies {
     implementation(libs.androidx.hilt.navigation.compose)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.datastore.preferences)
+    implementation(libs.androidx.work.runtime.ktx)
+    implementation(libs.androidx.hilt.work)
+    // Generates the worker factory entries. Dagger's own hilt-android-compiler stays: this one
+    // only knows about the androidx integrations, not about @HiltAndroidApp or @HiltViewModel.
+    ksp(libs.androidx.hilt.compiler)
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.turbine)
