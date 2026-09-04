@@ -232,6 +232,8 @@ kütüphanesi yok ve kurulmuyor.
 
 ### Otomatik testler
 
+Bugün **11 enstrümantasyon testi** var: 8 DAO + 1 şablon + 2 hatırlatma worker'ı.
+
 ```bash
 ANDROID_SERIAL=emulator-5554 ./gradlew :app:connectedDebugAndroidTest
 ```
@@ -239,7 +241,31 @@ ANDROID_SERIAL=emulator-5554 ./gradlew :app:connectedDebugAndroidTest
 `connectedDebugAndroidTest` bitince uygulamayı **kaldırıyor**. Ekran
 görüntüsü veya elle test yapılacaksa testten sonra yeniden kurun.
 
-### Periyodik WorkManager işi — kuyruğu görmek kolay, erken çalıştırmak mümkün değil
+**Bildirim gözlemlenecekse bu görevi kullanmayın** — uygulama kaldırıldığı için
+bildirim de ekrandan gider. Onun yerine iki APK'yı kurup testi doğrudan
+çalıştırın:
+
+```bash
+adb shell pm clear com.elinacn.subtrack
+./gradlew :app:installDebug :app:installDebugAndroidTest
+adb shell pm list instrumentation                      # tam adı buradan al
+adb shell am instrument -w -e class com.elinacn.subtrack.reminder.PaymentReminderWorkerTest   com.elinacn.subtrack.test/androidx.test.runner.AndroidJUnitRunner
+adb logcat -d -s ReminderWorkerTest:V
+```
+
+API 33+ cihazda önce izin verilmeli, yoksa bildirim hiç gönderilmez:
+
+```bash
+adb shell pm grant com.elinacn.subtrack android.permission.POST_NOTIFICATIONS
+```
+
+**`pm clear` şart.** Worker günde en fazla bir bildirim gönderir ve gönderdiği
+günü kaydeder; aynı gün ikinci koşu tasarım gereği hiçbir şey yapmaz. Aynı
+sebeple test metodlarının sırası `@FixMethodOrder(NAME_ASCENDING)` ile
+sabitlenmiştir — "bildirimler kapalı" durumu da günü işaretliyor, bu yüzden
+ikinci sırada olmak zorunda.
+
+### Periyodik WorkManager işi — gövdesi gecikmesiz bir `OneTimeWorkRequest` ile koşturulur
 
 **Kuyruğa girip girmediği** ve **hangi ayarlarla** girdiği iki yoldan okunur.
 
@@ -285,10 +311,28 @@ Yani JobScheduler'ı zorlamak yetmiyor; WorkManager `lastEnqueueTime +
 initial_delay` geçmeden çalışmıyor ve o eşiği aşmanın tek yolu duvar saatini
 ileri almak — o da root istiyor. `google_apis_playstore` imajlarında root yok.
 
-**Sonuç: ilk gecikmesi olan periyodik bir işin gövdesi, gecikme dolmadan
-emülatörde gözlemlenemez.** İşin kuyruğa doğru girdiği yukarıdaki iki yolla
-kanıtlanabilir; çalıştığı kanıtlanamaz. Gövdenin davranışı ya gecikme dolana
-kadar beklenerek ya da başka bir yolla doğrulanmalı — bu karar açık.
+**Sonuç: ilk gecikmesi olan periyodik bir işin gövdesi, adb'den erken
+çalıştırılamaz.** Yukarıdaki iki yol yalnızca işin kuyruğa doğru girdiğini
+kanıtlar.
+
+### Çalışan yöntem: gecikmesiz `OneTimeWorkRequest`
+
+WorkManager'ın "zamanından önce çalıştırma" denetimi **yalnızca gecikmeli veya
+geri çekilmiş** işler içindir. Bekleyecek hiçbir şeyi olmayan tek seferlik bir
+iş anında koşar. Enstrümantasyon testi bunu kullanır:
+
+```kotlin
+WorkManager.getInstance(context).enqueue(OneTimeWorkRequestBuilder<PaymentReminderWorker>().build())
+```
+
+Enstrümantasyon uygulamayla **aynı süreçte** koştuğu için buradaki
+`WorkManager`, uygulamanın kendi `Configuration.Provider`'ıyla kurulmuş
+örneğidir; worker'ı gerçek `HiltWorkerFactory` üretir. Sahte fabrika,
+`work-testing` bağımlılığı veya `TestListenableWorkerBuilder` gerekmez ve
+kullanılmaz — koşan sınıf üretimde koşanın aynısıdır.
+
+Periyodik işin **zamanlaması** hâlâ bu yolla doğrulanamaz; o `WorkSpec`
+tablosundan ve `dumpsys jobscheduler`'dan okunur.
 
 ### Açılış süresi
 

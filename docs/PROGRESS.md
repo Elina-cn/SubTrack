@@ -27,6 +27,179 @@ Her faz sonunda **en üste** yeni kayıt eklenir. Eski kayıtlar silinmez.
 
 ---
 
+## [Faz 10b] WorkManager + Yerel Bildirim — 2026-09-04
+
+**Durum:** Tamamlandı. İzin isteme akışı (runtime `POST_NOTIFICATIONS`) **yok** — 10c.
+
+**Bağımlılık ölçümü (Görev 0)**
+- `work-runtime-ktx` **2.11.2** (en güncel kararlı; 2.12.0 hattı hâlâ
+  alpha/beta/rc) ve `androidx.hilt` **1.3.0** (`hilt-work` + `hilt-compiler`)
+  mevcut taban üzerinde **ilk denemede** çözüldü. `checkDebugAarMetadata` hiç
+  patlamadı, alt sürüme inmek gerekmedi. AGP 9.0.1 / compileSdk 36.1 korundu.
+- `androidx.hilt` tek sürüm grubu olduğu için `hilt-work` ve `hilt-compiler`,
+  `hilt-navigation-compose` ile **aynı** `version.ref`'i paylaşıyor.
+- Dagger'ın `hilt-android-compiler`'ı yerinde kaldı. KSP iki compiler'la
+  sorunsuz derledi ve `@HiltWorker`'ı gerçekten işledi:
+  `PaymentReminderWorker_AssistedFactory`, `_AssistedFactory_Impl`, `_Factory`,
+  `_HiltModule` üretildi.
+- Lint uyarı **kümesi** değişmedi; yalnızca iki yeni "1.4.0 mevcut"
+  (`GradleDependency`) satırı eklendi. 0 hata.
+- Birleşik manifest ölçüldü: `androidx.startup.InitializationProvider`
+  probe'tan **önce de vardı** ve emoji2, lifecycle, profileinstaller
+  tarafından kullanılıyordu. WorkManager dördüncü olarak katıldı, bu yüzden
+  provider'ın kendisi kaldırılamaz.
+- WorkManager manifeste dört izin ekliyor: `WAKE_LOCK`,
+  `ACCESS_NETWORK_STATE`, `RECEIVE_BOOT_COMPLETED`, `FOREGROUND_SERVICE`.
+  Faz 16'ya not düşüldü.
+- `stripDebugDebugSymbols`'ün strip edemediği `libandroidx.graphics.path.so`
+  WorkManager'dan **gelmiyor** — temiz tabanda da vardı, Compose'un
+  `androidx.graphics:graphics-path` bağımlılığından geliyor.
+
+**Yapılanlar**
+- `PaymentReminderSelection` — saf, bugünün tarihi parametre. `PaymentCountdown`
+  yeniden yazılmadı, çağrıldı. İki eşik adlandırılmış sabit
+  (`UPCOMING_WITHIN_DAYS = 1`, `OVERDUE_WITHIN_DAYS = 3`). Sonuç
+  `PaymentReminder(subscription, countdown)` taşıyor; çağıran geri sayımı
+  ikinci kez hesaplamıyor.
+- `ReminderStateRepository` — son bildirim günü epoch day olarak. Ayrı arayüz,
+  çünkü bu bir kullanıcı tercihi değil, işin kendi kaydı. Depolama **mevcut**
+  `DataStore<Preferences>` örneği; ikinci instance açılmadı (§14).
+- `PaymentReminderNotifier` — `NotificationChannelCompat` + tek özet bildirim,
+  `BigTextStyle`, `setAutoCancel(true)`, `PendingIntent.FLAG_IMMUTABLE`. Kanal
+  her gönderimde yeniden kuruluyor (dil değişince ad güncellensin diye).
+- `PaymentReminderWorker` — `@HiltWorker` + `CoroutineWorker`, `try/catch` yok.
+- `PaymentReminderScheduler` — `KEEP`, constraint yok, ilk gecikme enjekte
+  `Clock`'tan sonraki yerel 09:00.
+- `SubTrackApplication` artık `Configuration.Provider`. Üye **property**;
+  `javap` ile doğrulandı (`getWorkManagerConfiguration()`).
+- Manifest: `POST_NOTIFICATIONS` bildirildi; `WorkManagerInitializer`
+  `meta-data`'sı `tools:node="remove"` ile çıkarıldı, provider
+  `tools:node="merge"` ile kaldı.
+- Bildirim ikonu `res/drawable/ic_notification.xml` — tek path, düz beyaz,
+  geçici. Faz 16'da marka ikonuyla yenilenecek.
+
+**Yeniden kullanılan metin**
+Gecikme günü için yeni bir plurals açılmadı; 10a'daki `days_overdue`
+kullanıldı. Aynı dilde aynı olguyu söylüyor, ikinci bir çeviri çifti tekrar
+olurdu. Yeni plurals yalnızca başlık sayısı için (`notification_title`), ve
+başlık **fiilsiz**: aynı bildirim hem bugün ödenecek hem gecikmiş abonelik
+taşıyabiliyor.
+
+**`cmd jobscheduler run -f` duvarı ve nasıl dolanıldı**
+İlk doğrulama denemesi başarısız oldu ve bu, fazın en pahalı bulgusu:
+
+```
+$ adb shell cmd jobscheduler run -f com.elinacn.subtrack 0
+Running job [FORCED]
+WM-WorkerWrapper: Delaying execution for ...PaymentReminderWorker because it is
+  being executed before schedule.
+WM-WorkerWrapper: Status ... is ENQUEUED; not doing any work and rescheduling
+```
+
+JobScheduler'ı zorlamak WorkManager'ın kendi `lastEnqueueTime + initial_delay`
+denetimini geçmiyor. Duvar saatini ileri almanın üç yolu da kapalı:
+`adb root` → *adbd cannot run as root in production builds*;
+`adb shell date …` → *Operation not permitted*;
+`setprop persist.sys.timezone` → *failed to set property*.
+
+**Çözüm:** o denetim yalnızca gecikmeli işler için çalışıyor. Gecikmesiz bir
+`OneTimeWorkRequest` anında koşuyor. Enstrümantasyon uygulamayla aynı süreçte
+koştuğu için `WorkManager.getInstance()` uygulamanın kendi örneğini veriyor ve
+worker'ı gerçek `HiltWorkerFactory` üretiyor — sahte fabrika, `work-testing`
+bağımlılığı veya `TestListenableWorkerBuilder` kullanılmadı.
+
+**Testler**
+- 101 → **112 birim testi** (11 yeni, `PaymentReminderSelectionTest`), 0 hata.
+- 9 → **11 enstrümantasyon testi**, iki emülatörde de **11/11**.
+- `lintDebug` 0 hata. Uyarı kümesi Görev 0'daki 15 ile aynı.
+- Worker için birim testi yazılmadı, `work-testing` eklenmedi.
+
+**Emülatör sonuçları** (cihaz tarihi 4 Eylül 2026, GMT)
+
+Bildirim içeriği iki cihazda **birebir aynı**:
+
+```
+EXTRA_TITLE    = [Payment reminder: 4 subscriptions]
+EXTRA_TEXT     = [DueToday — today, Tomorrow — tomorrow, OneDayLate — 1 day overdue,
+                  ThreeDaysLate — 3 days overdue]
+EXTRA_BIG_TEXT = (aynısı)
+channelId      = [payment_reminders]
+contentIntent is null = false      FLAG_AUTO_CANCEL set = true
+```
+
+Ham `%` yok. `TwoDaysOut`, `FourDaysLate` ve `NoDate` metinde **yok**.
+İkinci koşuda `postTime` değişmedi (dar: 1788549186749, geniş: 1788549195339 —
+ikisi de iki koşuda aynı), aktif bildirim sayısı 1'de kaldı.
+
+Bildirime dokunma: dar cihazda `(360,779)`, geniş cihazda `(587,730)` →
+`ResumedActivity: com.elinacn.subtrack/.MainActivity`. Bildirim `mArchive`'e
+düştü, yani `autoCancel` çalıştı.
+
+İzin kapalı tur (yalnız API 34, `pm clear` + `pm revoke` sonrası):
+`areNotificationsEnabled=false`, worker **SUCCEEDED**, aktif bildirim 0,
+`logcat -b crash` boş.
+
+**Bulunan ve düzeltilmeyen — ürün davranışı**
+Worker, seçim boş değilse `notifier.notify(...)` çağırdıktan **sonra** günü
+işaretliyor; bildirimin gerçekten gösterilip gösterilmediğine bakmıyor.
+Sonucu: bildirimler kapalıyken koşan bir gün "bildirildi" sayılıyor, kullanıcı
+o gün izni açsa bile ertesi güne kadar hiçbir şey görmüyor.
+
+Bu, testte önce sıra bağımlılığı olarak ortaya çıktı: "bildirimler kapalı"
+metodu günü işaretleyince asıl metot bildirim gönderemiyordu. Test tarafı
+`@FixMethodOrder(NAME_ASCENDING)` ile sabitlendi ve `pm clear` ön koşulu
+belgelendi. **Üretim kodu değiştirilmedi** — davranışın doğru olup olmadığı
+ayrı bir karar, muhtemelen 10c'nin konusu.
+
+**Regresyon listesi**
+32 maddenin tamamı iki emülatörde de geçti, iki istisnayla: **#15 (koyu tema)**
+API 29'da ölçülemiyor (TESTING.md'de kayıtlı sınır), yalnız API 34'te
+koşturuldu; **#16 (dil)** API 29'da ayarlar arayüzü gerektiriyor, API 34'te
+`cmd locale set-app-locales` ile koşturuldu ve Türkçe metinler geldi
+("Aylık Toplam, ₺159,99", "Aboneliklerim"). #15 yalnızca çökme ve ağaç
+bütünlüğü olarak doğrulandı; renk kontrastı dump'tan ölçülemez.
+
+Ölçüm sırasında iki tuzak çıktı, ikisi de test yöntemine ait:
+- API 34'te ekranın **en sağ kenarından** başlayan kaydırma sistem geri
+  jestini tetikliyor ve uygulamadan çıkıyor. Kaydırma testleri kenardan uzak
+  başlatılmalı.
+- Soğuk açılıştan 3 sn sonra alınan `uiautomator dump` bayat toplam
+  gösterebiliyor; 6 sn sonra doğru değer geliyor. Kalıcı bir durum değil.
+
+**Değişen dosyalar**
+- `domain/usecase/PaymentReminderSelection.kt` — yeni
+- `domain/repository/ReminderStateRepository.kt` — yeni
+- `data/repository/ReminderStateRepositoryImpl.kt` — yeni
+- `reminder/PaymentReminderNotifier.kt`, `PaymentReminderWorker.kt`,
+  `PaymentReminderScheduler.kt` — yeni paket
+- `di/RepositoryModule.kt` — yeni bağlama
+- `SubTrackApplication.kt` — `Configuration.Provider`
+- `AndroidManifest.xml` — izin + initializer kaldırma
+- `res/drawable/ic_notification.xml`, `res/values/strings.xml`,
+  `res/values-en/strings.xml`
+- `gradle/libs.versions.toml`, `app/build.gradle.kts`
+- `androidTest/.../PaymentReminderWorkerTest.kt` — yeni
+- `test/.../PaymentReminderSelectionTest.kt` — yeni
+- `docs/ARCHITECTURE.md` §18, `docs/ROADMAP.md`, `docs/TESTING.md`
+
+**Commit'ler**
+- `1da6572` build: add WorkManager and the androidx Hilt worker integration
+- `db76073` feat: pick which payments are worth a reminder
+- `81760d8` feat: remember the day a reminder was last shown
+- `df33817` feat: show the day's payment reminders in one notification
+- `4ae0f6b` feat: run the payment reminder once a day
+- `5478ea4` docs: record the reminder decisions and the WorkManager trigger limits
+- `eb4ac6e` test: fix the reminder test order so the once-a-day guard cannot hide a run
+
+**Sonraki faz için not**
+- 10c runtime izin akışını getirecek. Yukarıdaki "gün işaretleme" davranışı
+  orada yeniden değerlendirilmeli: izin yeni verildiğinde o günkü hatırlatma
+  kaçıyor.
+- Faz 12 tarih ilerletmeyi getirdiğinde 1-3 günlük gecikme penceresinin
+  gerekçesi ortadan kalkıyor (ARCHITECTURE §18).
+
+---
+
 ## [Faz 10a] Sonraki Ödeme Tarihi — 2026-09-04
 
 **Durum:** Tamamlandı. Bildirim, WorkManager ve izin akışı **yok** — 10b ve 10c.

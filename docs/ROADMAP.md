@@ -237,13 +237,15 @@ ekranı + Navigation + DataStore, **9b-2** düzenlenebilir kurlar. **Hepsi bitti
 ## 🟡 Faz 10 — Yenilenme Tarihi + Hatırlatma
 
 Üç promptta yürütülüyor: **10a** tarih seçici ve geri sayım **(bitti)**,
-**10b** WorkManager + bildirim, **10c** izin akışı.
+**10b** WorkManager + bildirim **(bitti)**, **10c** izin akışı.
 
 - [x] **10a:** Tarih seçici, sonraki ödeme tarihi — opsiyonel, geçmiş tarih
       kabul, üst sınır 10 yıl (ARCHITECTURE §17)
 - [x] **10a:** "X gün kaldı" göstergesi — gelecek, bugün ve gecikmiş; tarih
       yoksa gösterge çıkmaz. Tarih geçince **ilerletme yok**, o Faz 12'nin işi
-- [ ] **10b:** WorkManager + yerel bildirim
+- [x] **10b:** WorkManager + yerel bildirim — günde bir kez, yerel 09:00 hedefi,
+      tek özet bildirim. Bildirilenler: bugün, 1 gün kalan, 1-3 gün gecikmiş
+      (ARCHITECTURE §18)
 - [ ] **10c:** `POST_NOTIFICATIONS` izin akışı (Android 13+)
 
 **Bitti:** Yaklaşan ödeme için bildirim geliyor, izin reddedilse de uygulama çalışıyor.
