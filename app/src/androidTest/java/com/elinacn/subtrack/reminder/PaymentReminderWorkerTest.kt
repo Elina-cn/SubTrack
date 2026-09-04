@@ -24,8 +24,10 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeFalse
+import org.junit.FixMethodOrder
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.junit.runners.MethodSorters
 import java.time.LocalDate
 import java.util.concurrent.TimeUnit
 
@@ -39,8 +41,14 @@ import java.util.concurrent.TimeUnit
  * The request is one-time and undelayed on purpose. WorkManager refuses to run work before its
  * scheduled time, which is what makes the daily job impossible to trigger early from adb; that
  * check does not apply to work with nothing to wait for.
+ *
+ * **Run this against freshly cleared app data** (`adb shell pm clear com.elinacn.subtrack`). The
+ * worker notifies at most once a day and records the day it did, so a second run on the same day
+ * is a no-op by design. The method order is fixed for the same reason: the disabled-notifications
+ * case also marks the day, so it has to come second.
  */
 @RunWith(AndroidJUnit4::class)
+@FixMethodOrder(MethodSorters.NAME_ASCENDING)
 class PaymentReminderWorkerTest {
 
     private val context = InstrumentationRegistry.getInstrumentation().targetContext
