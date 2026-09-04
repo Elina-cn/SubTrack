@@ -39,7 +39,7 @@ Claude Code'a gider. Claude Code kendi başına mimari karar almaz.
    → sorun varsa düzeltme promptu üretilir
    → sorun yoksa PROGRESS.md güncellenir, faz kapanır
 
-7. Faz kapanınca CC tag atar (prompt istediğinde)
+7. Faz kapanınca KULLANICI tag atar (CC atmaz)
    git tag phase-N-done
 ```
 
@@ -120,9 +120,9 @@ Belgeler kodla çelişirse **belge güncellenir** — kod belgeye uydurulmaz,
 Tag'ler bu boşluğu dolduruyor — bir faz bozulursa `git log phase-3-done..HEAD`
 ile ne değiştiğini görür, gerekirse o noktaya dönersin.
 
-Tag'i Claude Code atar, ama sadece prompt açıkça istediğinde.
-Kendiliğinden faz sonu tag'i atmaz — fazın gerçekten bittiğini elle test
-belirler, CC bunu doğrulayamaz. Tag eklemek geçmişi değiştirmez;
+Tag'i **kullanıcı** atar. CC tag atmaz, prompt istese bile — fazın gerçekten
+bittiğini elle test belirler ve o noktayı kodu yazan değil, test edip kabul
+eden işaretler. Tag eklemek geçmişi değiştirmez;
 tag silme veya taşıma sorulmadan yapılmaz.
 
 ---
