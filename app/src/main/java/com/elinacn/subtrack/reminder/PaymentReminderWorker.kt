@@ -44,8 +44,15 @@ class PaymentReminderWorker @AssistedInject constructor(
         // today can still produce a reminder on the next run.
         if (reminders.isEmpty()) return Result.success()
 
-        notifier.notify(reminders)
-        reminderState.setLastNotifiedDay(today.toEpochDay())
+        // Only a reminder that actually reached the shade counts. When notifications are switched
+        // off nothing was shown, so recording the day would swallow the reminder for good - the
+        // user who turns them back on an hour later would still see nothing until tomorrow.
+        if (notifier.notify(reminders)) {
+            reminderState.setLastNotifiedDay(today.toEpochDay())
+        }
+
+        // Success either way: notifications being off is a choice, not a failure, and retrying
+        // would only burn battery waiting for a setting this job cannot change.
         return Result.success()
     }
 }

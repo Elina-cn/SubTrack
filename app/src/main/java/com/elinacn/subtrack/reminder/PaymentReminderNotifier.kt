@@ -32,15 +32,17 @@ class PaymentReminderNotifier @Inject constructor(
     /**
      * Shows [reminders] as one notification, replacing yesterday's if it is still on screen.
      *
-     * Does nothing when the user has notifications switched off. On API 33+ that is also what a
-     * denied POST_NOTIFICATIONS permission looks like, which is the expected state until the
-     * runtime request arrives in phase 10c.
+     * Returns whether one actually went out. It does nothing when the user has notifications
+     * switched off - on API 33+ that is also what a denied POST_NOTIFICATIONS permission looks
+     * like, the expected state until the runtime request arrives in phase 10c. The caller needs
+     * to tell the two apart, because a day on which nothing was shown must not be recorded as a
+     * day on which the user was reminded. See ARCHITECTURE section 18.
      */
-    fun notify(reminders: List<PaymentReminder>) {
-        if (reminders.isEmpty()) return
+    fun notify(reminders: List<PaymentReminder>): Boolean {
+        if (reminders.isEmpty()) return false
 
         val manager = NotificationManagerCompat.from(context)
-        if (!manager.areNotificationsEnabled()) return
+        if (!manager.areNotificationsEnabled()) return false
         // areNotificationsEnabled already covers a denied POST_NOTIFICATIONS, but lint wants the
         // permission itself checked before notify(). The version guard matters: the permission
         // does not exist below API 33, where checkSelfPermission would answer "denied" for it and
@@ -49,7 +51,7 @@ class PaymentReminderNotifier @Inject constructor(
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
             PackageManager.PERMISSION_GRANTED
         ) {
-            return
+            return false
         }
 
         // Rebuilt every time on purpose. Creating a channel that exists is a no-op, and it is what
@@ -66,6 +68,7 @@ class PaymentReminderNotifier @Inject constructor(
         }
 
         manager.notify(NOTIFICATION_ID, build(title(reminders.size), body))
+        return true
     }
 
     /**
