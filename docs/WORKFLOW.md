@@ -108,7 +108,9 @@ Belgeler kodla çelişirse **belge güncellenir** — kod belgeye uydurulmaz,
 - `Elina` — ana ve tek çalışma branch'i. Tüm commit'ler buraya gider.
 - **Branch açılmaz.** Faz başına ayrı branch kuralı kaldırıldı; tek kişilik
   geliştirmede gereksiz sürtünme yaratıyordu.
-- Faz bitince **CC** tag atar (prompt açıkça istediğinde): `git tag phase-N-done`
+- Faz sonu tag'ini (`git tag phase-N-done`) **KULLANICI atar. CC tag atmaz,
+  prompt istese bile.** Branch yok; tag'ler tek geri dönüş noktası ve o noktayı
+  kodu yazan değil, test edip kabul eden işaretler.
   Örnek: `git tag phase-2-done`
 - Commit: Conventional Commits, İngilizce, imperative
 - Küçük adımlarda birkaç adımda bir commit; büyük/riskli adımdan sonra mutlaka
