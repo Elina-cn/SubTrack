@@ -118,4 +118,9 @@
     <string name="reminder_rationale_title">Hatırlatmalara izin verin</string>
     <string name="reminder_rationale_message">Ödeme günü yaklaşan abonelikleriniz için günde en fazla bir bildirim gönderilir. Başka hiçbir şey için bildirim almazsınız.</string>
     <string name="reminder_rationale_confirm">İzin iste</string>
+    <!-- Empty state -->
+    <string name="empty_subscriptions_title">Henüz abonelik yok</string>
+    <string name="empty_subscriptions_message">Eklemek için + düğmesine dokun</string>
+    <!-- Başlık ve alt satır tek odak durağı olarak okunur. -->
+    <string name="empty_state_description">%1$s, %2$s</string>
 </resources>

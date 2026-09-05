@@ -119,4 +119,9 @@
     <string name="reminder_rationale_title">Allow reminders</string>
     <string name="reminder_rationale_message">You get at most one notification a day, about subscriptions whose payment date is close. Nothing else is notified.</string>
     <string name="reminder_rationale_confirm">Ask for permission</string>
+    <!-- Empty state -->
+    <string name="empty_subscriptions_title">No subscriptions yet</string>
+    <string name="empty_subscriptions_message">Tap + to add one</string>
+    <!-- Title and message read as a single focus stop. -->
+    <string name="empty_state_description">%1$s, %2$s</string>
 </resources>

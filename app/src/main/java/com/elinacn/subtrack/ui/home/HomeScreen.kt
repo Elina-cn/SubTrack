@@ -34,6 +34,7 @@ import androidx.compose.ui.res.stringResource
 import com.elinacn.subtrack.R
 import com.elinacn.subtrack.domain.usecase.PaymentCountdown
 import com.elinacn.subtrack.ui.common.DelayedLoadingIndicator
+import com.elinacn.subtrack.ui.common.EmptySubscriptions
 import com.elinacn.subtrack.ui.common.rememberMoneyFormatter
 import com.elinacn.subtrack.ui.home.components.AddSubscriptionSheet
 import com.elinacn.subtrack.ui.home.components.DashboardCard
@@ -185,6 +186,15 @@ fun HomeScreen(
 
             item {
                 DelayedLoadingIndicator(isLoading = uiState.isLoading)
+            }
+
+            // Only once the list is known to be empty, never while it is still unknown. isLoading
+            // and the list arrive in the same emission, so there is no frame where the screen has
+            // one without the other and flashes "nothing here" at a user who has ten rows.
+            if (!uiState.isLoading && uiState.subscriptions.isEmpty()) {
+                item {
+                    EmptySubscriptions()
+                }
             }
 
             items(

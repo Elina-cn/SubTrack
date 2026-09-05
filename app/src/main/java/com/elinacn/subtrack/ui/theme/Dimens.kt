@@ -56,6 +56,12 @@ object Dimens {
     /** Size of the leading icon on a subscription card. */
     val IconSize = 24.dp
 
+    /** The glyph above an empty-state message. Large enough to read as an illustration. */
+    val EmptyStateIconSize = 72.dp
+
+    /** Breathing room around an empty-state message, which sits alone on the screen. */
+    val EmptyStatePadding = 32.dp
+
     /** Gap between an icon and the text that follows it. */
     val IconSpacing = 16.dp
 
