@@ -3,6 +3,7 @@ package com.elinacn.subtrack.ui.home
 import com.elinacn.subtrack.domain.model.Currency
 import com.elinacn.subtrack.domain.model.Money
 import com.elinacn.subtrack.domain.model.Subscription
+import com.elinacn.subtrack.domain.model.SubscriptionCategory
 import com.elinacn.subtrack.domain.usecase.PaymentCountdown
 import java.time.LocalDate
 import com.elinacn.subtrack.ui.common.UiText
@@ -41,6 +42,14 @@ data class HomeUiState(
     val isLoading: Boolean = true,
     /** Owned here rather than by the composable: whether it may close depends on validation. */
     val isAddSheetOpen: Boolean = false,
+    /**
+     * The category the add form has selected.
+     *
+     * Optional for the user: leaving it alone stores [SubscriptionCategory.OTHER], because
+     * PROJECT_SPEC section 3 puts a fifteen second ceiling on adding a subscription and a
+     * required field on a bucket nobody has to care about would spend part of it.
+     */
+    val selectedCategory: SubscriptionCategory = SubscriptionCategory.OTHER,
     val nameError: UiText? = null,
     val priceError: UiText? = null,
     val dateError: UiText? = null,
@@ -77,6 +86,9 @@ sealed interface HomeEvent {
         val currency: Currency,
         val nextPaymentDate: LocalDate? = null
     ) : HomeEvent
+
+    /** The user picked a category in the add form. */
+    data class SelectCategory(val category: SubscriptionCategory) : HomeEvent
 
     /** Sent as the user edits, so a stale error stops contradicting what is on screen. */
     data object ClearNameError : HomeEvent

@@ -123,4 +123,12 @@
     <string name="empty_subscriptions_message">Eklemek için + düğmesine dokun</string>
     <!-- Başlık ve alt satır tek odak durağı olarak okunur. -->
     <string name="empty_state_description">%1$s, %2$s</string>
+    <!-- Category -->
+    <string name="category_label">Kategori</string>
+    <string name="category_entertainment">Eğlence</string>
+    <string name="category_productivity">Üretkenlik</string>
+    <string name="category_health">Sağlık</string>
+    <string name="category_other">Diğer</string>
+    <!-- Satırın okunan hâline kategoriyi ekler: (mevcut cümle), kategori. -->
+    <string name="subscription_row_description_with_category">%1$s, %2$s</string>
 </resources>

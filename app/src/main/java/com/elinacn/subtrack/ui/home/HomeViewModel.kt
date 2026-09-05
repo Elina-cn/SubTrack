@@ -77,6 +77,7 @@ class HomeViewModel @Inject constructor(
             isTotalConverted = subscriptions.any { it.currency != mainCurrency },
             isLoading = false,
             isAddSheetOpen = screen.isAddSheetOpen,
+            selectedCategory = screen.selectedCategory,
             nameError = screen.nameError,
             priceError = screen.priceError,
             dateError = screen.dateError,
@@ -99,6 +100,9 @@ class HomeViewModel @Inject constructor(
 
             is HomeEvent.Save ->
                 save(event.name, event.rawPrice, event.currency, event.nextPaymentDate)
+
+            is HomeEvent.SelectCategory ->
+                screenState.update { it.copy(selectedCategory = event.category) }
 
             HomeEvent.ClearNameError -> screenState.update { it.copy(nameError = null) }
 
@@ -146,6 +150,9 @@ class HomeViewModel @Inject constructor(
         }
 
         val price = (priceResult as PriceResult.Valid).money
+        // Read before the coroutine starts, so the reset that follows a successful write cannot
+        // race the read.
+        val category = screenState.value.selectedCategory
         viewModelScope.launch {
             try {
                 repository.insert(
@@ -156,7 +163,7 @@ class HomeViewModel @Inject constructor(
                         currency = currency,
                         billingPeriod = BillingPeriod.MONTHLY,
                         nextPaymentDate = nextPaymentDate,
-                        category = SubscriptionCategory.OTHER,
+                        category = category,
                         iconKey = null,
                         createdAt = System.currentTimeMillis()
                     )
@@ -299,15 +306,23 @@ class HomeViewModel @Inject constructor(
         val dateError: UiText? = null,
         val errorMessage: UiText? = null,
         val pendingUndo: Subscription? = null,
-        val shouldRequestNotificationPermission: Boolean = false
+        val shouldRequestNotificationPermission: Boolean = false,
+        val selectedCategory: SubscriptionCategory = SubscriptionCategory.OTHER
     )
 
-    /** Opening, dismissing and a successful save all leave the form without complaints. */
+    /**
+     * Opening, dismissing and a successful save all leave the form without complaints.
+     *
+     * The category resets with them. It lives here rather than in the sheet, so without this a
+     * pick that was never saved would still be selected the next time the form opened, next to
+     * a blank name and a blank price.
+     */
     private fun ScreenState.clearedErrors(open: Boolean) = copy(
         isAddSheetOpen = open,
         nameError = null,
         priceError = null,
-        dateError = null
+        dateError = null,
+        selectedCategory = SubscriptionCategory.OTHER
     )
 
     private sealed interface PriceResult {

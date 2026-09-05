@@ -45,6 +45,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
 import com.elinacn.subtrack.R
 import com.elinacn.subtrack.domain.model.Currency
+import com.elinacn.subtrack.domain.model.SubscriptionCategory
+import com.elinacn.subtrack.ui.common.CategorySelector
 import com.elinacn.subtrack.ui.common.CurrencySelector
 import com.elinacn.subtrack.ui.common.UiText
 import com.elinacn.subtrack.ui.theme.Dimens
@@ -71,6 +73,8 @@ fun AddSubscriptionSheet(
     nameError: UiText?,
     priceError: UiText?,
     dateError: UiText?,
+    selectedCategory: SubscriptionCategory,
+    onSelectCategory: (SubscriptionCategory) -> Unit,
     onSave: (
         name: String,
         rawPrice: String,
@@ -165,6 +169,21 @@ fun AddSubscriptionSheet(
             )
             Spacer(modifier = Modifier.height(Dimens.SpacerSmall))
             CurrencySelector(selected = currency, onSelect = { currency = it })
+
+            Spacer(modifier = Modifier.height(Dimens.SpacerMedium))
+
+            // Directly under the currency chips: the two chip rows are the only choices in the
+            // form and reading as one group beats scattering them. It sits after currency because
+            // currency changes what the price above it means, while the category changes nothing
+            // else on the form - and before the date, which opens a dialog and ends the sequence.
+            Text(
+                text = stringResource(id = R.string.category_label),
+                modifier = Modifier.fillMaxWidth(),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Spacer(modifier = Modifier.height(Dimens.SpacerSmall))
+            CategorySelector(selected = selectedCategory, onSelect = onSelectCategory)
 
             Spacer(modifier = Modifier.height(Dimens.SpacerMedium))
 
@@ -320,6 +339,8 @@ private fun AddSubscriptionSheetErrorPreview() {
             nameError = UiText.Resource(R.string.error_name_empty),
             priceError = UiText.Resource(R.string.error_price_invalid),
             dateError = null,
+            selectedCategory = SubscriptionCategory.OTHER,
+            onSelectCategory = {},
             onSave = { _, _, _, _ -> },
             onNameEdited = {},
             onPriceEdited = {},
