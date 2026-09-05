@@ -18,7 +18,24 @@ import com.elinacn.subtrack.ui.common.UiText
  * field to point at, such as the database refusing a write.
  */
 data class HomeUiState(
+    /** Already narrowed by [categoryFilter]; the screen draws this list and no other. */
     val subscriptions: List<Subscription> = emptyList(),
+    /**
+     * Which category the list is narrowed to, or null for all of them.
+     *
+     * Null rather than a fifth enum constant: "no filter" is the absence of a choice, and a
+     * constant for it would have to be excluded by hand everywhere a category is stored or shown.
+     *
+     * Deliberately not persisted. A filter that survived a restart would meet the user as a list
+     * with subscriptions missing from it and nothing on screen explaining why.
+     */
+    val categoryFilter: SubscriptionCategory? = null,
+    /**
+     * Whether anything is stored at all, before the filter.
+     *
+     * Tells the two empty states apart: nothing yet, or nothing in this category.
+     */
+    val hasAnySubscriptions: Boolean = false,
     /**
      * How far off each subscription's next payment is, keyed by id, for the ones that have a date.
      *
@@ -83,6 +100,9 @@ sealed interface HomeEvent {
         val nextPaymentDate: LocalDate? = null,
         val category: SubscriptionCategory = SubscriptionCategory.OTHER
     ) : HomeEvent
+
+    /** Narrow the list to one category, or to all of them with null. */
+    data class SelectCategoryFilter(val category: SubscriptionCategory?) : HomeEvent
 
     /** Sent as the user edits, so a stale error stops contradicting what is on screen. */
     data object ClearNameError : HomeEvent

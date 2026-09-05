@@ -35,6 +35,8 @@ import com.elinacn.subtrack.R
 import com.elinacn.subtrack.domain.model.SubscriptionCategory
 import com.elinacn.subtrack.domain.usecase.PaymentCountdown
 import com.elinacn.subtrack.ui.common.DelayedLoadingIndicator
+import com.elinacn.subtrack.ui.common.CategoryFilterBar
+import com.elinacn.subtrack.ui.common.EmptyCategory
 import com.elinacn.subtrack.ui.common.EmptySubscriptions
 import com.elinacn.subtrack.ui.common.labelRes
 import com.elinacn.subtrack.ui.common.rememberMoneyFormatter
@@ -184,6 +186,11 @@ fun HomeScreen(
                     style = MaterialTheme.typography.titleLarge,
                     color = MaterialTheme.colorScheme.onBackground
                 )
+
+                CategoryFilterBar(
+                    selected = uiState.categoryFilter,
+                    onSelect = { onEvent(HomeEvent.SelectCategoryFilter(it)) }
+                )
             }
 
             item {
@@ -193,9 +200,12 @@ fun HomeScreen(
             // Only once the list is known to be empty, never while it is still unknown. isLoading
             // and the list arrive in the same emission, so there is no frame where the screen has
             // one without the other and flashes "nothing here" at a user who has ten rows.
+            //
+            // Two different emptinesses, and they must not be confused: nothing stored at all, or
+            // nothing that survived the filter. hasAnySubscriptions is what tells them apart.
             if (!uiState.isLoading && uiState.subscriptions.isEmpty()) {
                 item {
-                    EmptySubscriptions()
+                    if (uiState.hasAnySubscriptions) EmptyCategory() else EmptySubscriptions()
                 }
             }
 

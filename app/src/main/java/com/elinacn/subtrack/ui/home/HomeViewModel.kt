@@ -63,18 +63,28 @@ class HomeViewModel @Inject constructor(
         // converter that outlived it would keep totalling at yesterday's rates.
         val converter = CurrencyConverter(rates)
         val today = LocalDate.now(clock)
+        // Filtered here rather than in the DAO: four categories over a list this size is not a
+        // query, and a second query would have to be kept in step with the one the screen already
+        // observes. The composable gets a list it only draws (ARCHITECTURE section 3).
+        val visible = screen.categoryFilter
+            ?.let { filter -> subscriptions.filter { it.category == filter } }
+            ?: subscriptions
         HomeUiState(
-            subscriptions = subscriptions,
+            subscriptions = visible,
+            categoryFilter = screen.categoryFilter,
+            hasAnySubscriptions = subscriptions.isNotEmpty(),
             // Computed here rather than in the composable: it needs today, which is
             // state, and ARCHITECTURE section 3 keeps calculation out of composables.
-            countdowns = subscriptions.mapNotNull { subscription ->
+            countdowns = visible.mapNotNull { subscription ->
                 subscription.nextPaymentDate?.let { date ->
                     subscription.id to PaymentCountdown.between(today, date)
                 }
             }.toMap(),
-            monthlyTotal = converter.totalIn(subscriptions, mainCurrency),
+            // The total follows the filter: the number under the heading has to be the sum of
+            // the rows the user can see, or it is answering a question nobody asked.
+            monthlyTotal = converter.totalIn(visible, mainCurrency),
             baseCurrency = mainCurrency,
-            isTotalConverted = subscriptions.any { it.currency != mainCurrency },
+            isTotalConverted = visible.any { it.currency != mainCurrency },
             isLoading = false,
             isAddSheetOpen = screen.isAddSheetOpen,
             nameError = screen.nameError,
@@ -99,6 +109,9 @@ class HomeViewModel @Inject constructor(
 
             is HomeEvent.Save ->
                 save(event.name, event.rawPrice, event.currency, event.nextPaymentDate, event.category)
+
+            is HomeEvent.SelectCategoryFilter ->
+                screenState.update { it.copy(categoryFilter = event.category) }
 
             HomeEvent.ClearNameError -> screenState.update { it.copy(nameError = null) }
 
@@ -300,7 +313,9 @@ class HomeViewModel @Inject constructor(
         val dateError: UiText? = null,
         val errorMessage: UiText? = null,
         val pendingUndo: Subscription? = null,
-        val shouldRequestNotificationPermission: Boolean = false
+        val shouldRequestNotificationPermission: Boolean = false,
+        /** Survives a rotation with the ViewModel, and dies with the process. */
+        val categoryFilter: SubscriptionCategory? = null
     )
 
     /** Opening, dismissing and a successful save all leave the form without complaints. */

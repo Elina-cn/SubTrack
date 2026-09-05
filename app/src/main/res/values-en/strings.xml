@@ -132,4 +132,8 @@
     <string name="category_other">Other</string>
     <!-- Appends the category to the spoken row: (sentence so far), category. -->
     <string name="subscription_row_description_with_category">%1$s, %2$s</string>
+    <!-- Category filter -->
+    <string name="filter_all">All</string>
+    <string name="empty_category_title">No subscriptions in this category</string>
+    <string name="empty_category_message">Try another category</string>
 </resources>

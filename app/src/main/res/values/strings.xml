@@ -131,4 +131,8 @@
     <string name="category_other">Diğer</string>
     <!-- Satırın okunan hâline kategoriyi ekler: (mevcut cümle), kategori. -->
     <string name="subscription_row_description_with_category">%1$s, %2$s</string>
+    <!-- Category filter -->
+    <string name="filter_all">Tümü</string>
+    <string name="empty_category_title">Bu kategoride abonelik yok</string>
+    <string name="empty_category_message">Başka bir kategori seç</string>
 </resources>
