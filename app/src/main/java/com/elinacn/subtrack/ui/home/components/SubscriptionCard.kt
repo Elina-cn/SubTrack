@@ -25,7 +25,9 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import com.elinacn.subtrack.R
+import com.elinacn.subtrack.domain.model.SubscriptionCategory
 import com.elinacn.subtrack.domain.usecase.PaymentCountdown
+import com.elinacn.subtrack.ui.common.labelRes
 import com.elinacn.subtrack.ui.theme.Dimens
 import com.elinacn.subtrack.ui.theme.SubTrackTheme
 
@@ -43,7 +45,8 @@ fun SubscriptionCard(
     name: String,
     price: String,
     modifier: Modifier = Modifier,
-    countdown: PaymentCountdown? = null
+    countdown: PaymentCountdown? = null,
+    category: SubscriptionCategory = SubscriptionCategory.OTHER
 ) {
     Card(
         modifier = modifier
@@ -82,6 +85,20 @@ fun SubscriptionCard(
                         } else {
                             MaterialTheme.colorScheme.onSurface
                         },
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+                // OTHER is the default nobody has to choose, so printing it on every row would
+                // be a word that means "no answer" repeated down the whole list. Rows keep the
+                // height they had unless the user actually filed the subscription somewhere -
+                // the same rule the countdown already follows.
+                if (category != SubscriptionCategory.OTHER) {
+                    Text(
+                        text = stringResource(id = category.labelRes()),
+                        // onSurface, not onSurfaceVariant: that role is undefined in our scheme
+                        // and falls back to the Material baseline's purple-grey (ARCHITECTURE
+                        // section 12). The smaller type already separates it from the name.
+                        color = MaterialTheme.colorScheme.onSurface,
                         style = MaterialTheme.typography.bodySmall
                     )
                 }

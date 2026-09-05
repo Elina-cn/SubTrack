@@ -32,9 +32,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import com.elinacn.subtrack.R
+import com.elinacn.subtrack.domain.model.SubscriptionCategory
 import com.elinacn.subtrack.domain.usecase.PaymentCountdown
 import com.elinacn.subtrack.ui.common.DelayedLoadingIndicator
 import com.elinacn.subtrack.ui.common.EmptySubscriptions
+import com.elinacn.subtrack.ui.common.labelRes
 import com.elinacn.subtrack.ui.common.rememberMoneyFormatter
 import com.elinacn.subtrack.ui.home.components.AddSubscriptionSheet
 import com.elinacn.subtrack.ui.home.components.DashboardCard
@@ -208,27 +210,45 @@ fun HomeScreen(
                 // The countdown has to reach the spoken description too: the row is one focus stop
                 // with its own label, so anything left out of the label is simply not announced.
                 val countdownText = countdown?.asString()
+                // Left out when it is OTHER, exactly as the card leaves it out: a screen reader
+                // should hear the row the sighted user sees, not a default nobody chose.
+                val categoryText = subscription.category
+                    .takeIf { it != SubscriptionCategory.OTHER }
+                    ?.let { stringResource(id = it.labelRes()) }
+                // Built in two steps rather than as four separate resources: name/price and the
+                // optional countdown make the sentence, then the category is appended when there
+                // is one. Four combinations would otherwise need four strings to translate.
+                val rowSentence = if (countdownText == null) {
+                    stringResource(
+                        id = R.string.subscription_row_description,
+                        subscription.name,
+                        price
+                    )
+                } else {
+                    stringResource(
+                        id = R.string.subscription_row_description_dated,
+                        subscription.name,
+                        price,
+                        countdownText
+                    )
+                }
                 SwipeToDeleteRow(
                     onDelete = { onEvent(HomeEvent.Delete(subscription.id)) },
-                    contentDescription = if (countdownText == null) {
-                        stringResource(
-                            id = R.string.subscription_row_description,
-                            subscription.name,
-                            price
-                        )
+                    contentDescription = if (categoryText == null) {
+                        rowSentence
                     } else {
                         stringResource(
-                            id = R.string.subscription_row_description_dated,
-                            subscription.name,
-                            price,
-                            countdownText
+                            id = R.string.subscription_row_description_with_category,
+                            rowSentence,
+                            categoryText
                         )
                     }
                 ) {
                     SubscriptionCard(
                         name = subscription.name,
                         price = price,
-                        countdown = countdown
+                        countdown = countdown,
+                        category = subscription.category
                     )
                 }
             }
@@ -246,6 +266,8 @@ fun HomeScreen(
             },
             onNameEdited = { onEvent(HomeEvent.ClearNameError) },
             onPriceEdited = { onEvent(HomeEvent.ClearPriceError) },
+            selectedCategory = uiState.selectedCategory,
+            onSelectCategory = { onEvent(HomeEvent.SelectCategory(it)) },
             onDateEdited = { onEvent(HomeEvent.ClearDateError) },
             onDismiss = { onEvent(HomeEvent.DismissAddSheet) }
         )
