@@ -105,6 +105,31 @@ fun EmptySubscriptions(modifier: Modifier = Modifier) {
     )
 }
 
+/**
+ * The empty state for a category filter that matches nothing.
+ *
+ * The same glyph as [EmptySubscriptions] on purpose: the two states are the same situation seen
+ * through different windows, and the words are what tell them apart. It also keeps the icon set
+ * phase 16 has to narrow down at nine names.
+ */
+@Composable
+fun EmptyCategory(modifier: Modifier = Modifier) {
+    EmptyState(
+        icon = Icons.AutoMirrored.Filled.List,
+        title = stringResource(id = R.string.empty_category_title),
+        message = stringResource(id = R.string.empty_category_message),
+        modifier = modifier
+    )
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun EmptyCategoryPreview() {
+    SubTrackTheme {
+        EmptyCategory()
+    }
+}
+
 @Preview(showBackground = true)
 @Composable
 private fun EmptySubscriptionsPreview() {
