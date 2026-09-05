@@ -259,10 +259,17 @@ Dört promptta yürütüldü: **10a** tarih seçici ve geri sayım, **10b** Work
 
 ---
 
-## ⬜ Faz 11 — Kategoriler
+## 🟡 Faz 11 — Kategoriler
 
-- [ ] Kategori seçimi, kategoriye göre filtre, kategori bazlı toplam
-- [ ] **Filtre hiçbir şeyle eşleşmediğinde boş durum** — Faz 8b'deki
+İki promptta yürütülüyor: **11a** kategori seçimi ve gösterimi **(bitti)**,
+**11b** filtre ve kategori bazlı toplam.
+
+- [x] **11a:** Kategori seçimi — ekleme formunda `FilterChip` sırası
+      (para birimi seçicisinin deseni), varsayılan `OTHER`, zorunlu değil
+- [x] **11a:** Kartta gösterim — kategori yalnızca `OTHER` değilse çizilir,
+      erişilebilirlik cümlesine de eklenir
+- [ ] **11b:** Kategoriye göre filtre, kategori bazlı toplam
+- [ ] **11b:** **Filtre hiçbir şeyle eşleşmediğinde boş durum** — Faz 8b'deki
       `ui/common/EmptyState` bileşeninin varyantı olacak. Bileşen ikon, başlık
       ve alt satırı parametre alacak şekilde yazıldı; yalnızca yeni metinler ve
       (gerekiyorsa) yeni bir ikon gerekiyor, yeni bileşen değil.

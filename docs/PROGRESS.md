@@ -27,6 +27,152 @@ Her faz sonunda **en üste** yeni kayıt eklenir. Eski kayıtlar silinmez.
 
 ---
 
+## [Faz 11a] Kategori Seçimi ve Gösterimi — 2026-09-05
+
+**Durum:** Tamamlandı. **Faz 11 KAPANMADI** — filtre ve kategori bazlı toplam
+11b'nin işi, ROADMAP'teki o maddeler açık bırakıldı.
+
+**Domain kontrolü — enum spec'le uyuşuyor, dokunulmadı**
+`SubscriptionCategory` dört sabit taşıyor: `ENTERTAINMENT`, `PRODUCTIVITY`,
+`HEALTH`, `OTHER`. PROJECT_SPEC §4'teki "Eğlence / Üretkenlik / Sağlık / Diğer"
+ile birebir. Durup sormayı gerektiren bir fark yok. Mapper'daki `OTHER`
+fallback'ine (ARCHITECTURE §12) dokunulmadı; Room şeması ve `app/schemas/`
+değişmedi.
+
+> Not: prompt "beş chip" diyordu, kategori **dört** tane.
+
+**Yapılanlar**
+- `ui/common/CategorySelector` — `CurrencySelector`'ın deseni: `FlowRow` +
+  `FilterChip`, tek dokunuş. Para birimi chip'lerindeki `contentDescription`
+  ezmesi burada **yok**, çünkü o ezme ISO kodunun ("TRY") kelime gibi
+  okunmasını düzeltmek içindi; kategori chip'i zaten anlamı olan kelimeyi
+  gösteriyor.
+- `SubscriptionCategory.labelRes()` — exhaustive `when`, UI katmanında.
+  Enum İngilizce kalıyor ve ekrana hiç çıkmıyor; domain'e string resource
+  ID'si sokulmadı.
+- `HomeUiState.selectedCategory` + `HomeEvent.SelectCategory`. Kayıtta
+  repository'ye gidiyor; `clearedErrors` içinde `OTHER`'a dönüyor, yani
+  açılış, vazgeçme ve başarılı kayıt üçü de formu sıfırlıyor.
+- `SubscriptionCard`'da kategori satırı, **yalnızca `OTHER` değilse**.
+
+**Formdaki yeri — para birimi chip'lerinin hemen altı**
+Gerekçe: iki chip sırası formdaki tek "seçim" öğesi, bir arada okunmaları
+dağınık durmalarından iyi. Para biriminden **sonra**, çünkü para birimi
+üstündeki fiyatın anlamını değiştiriyor; kategori formda başka hiçbir şeyi
+değiştirmiyor. Tarihten **önce**, çünkü tarih bir diyalog açıp sırayı bitiriyor.
+
+**Kartta gösterim kararı**
+Kart bugün ad, fiyat ve geri sayım taşıyor; dördüncü öğe sıkışıklık riski.
+Seçilen çözüm: **adın altında ayrı bir satır, yalnızca kategori `OTHER`
+değilken**. Üç gerekçe:
+
+1. Dikey bir satır adın **yatay** alanından hiçbir şey almıyor — fs 2.0'daki
+   bilinen ad kırpılması bu yüzden kötüleşemez.
+2. `OTHER` "cevap yok" demek; her satıra yazmak listenin tamamında anlamsız
+   bir kelime tekrarı olurdu.
+3. Aynı kural geri sayımda zaten var: "tarihi olmayan satırlar eski
+   yüksekliğini korur, olmayan bir şey için yer ayırmaz".
+
+Renk `onSurface`. `onSurfaceVariant` **bilerek kullanılmadı** — tanımsız ve
+Material baseline'ının mor-grisine düşüyor (ARCHITECTURE §12). Hiyerarşiyi
+punto farkı taşıyor.
+
+**Erişilebilirlik cümlesi**
+Kategori okunan cümleye de eklendi, yoksa duyurulmazdı (8a dersi). Dört ayrı
+string yerine iki adımda kuruluyor: ad/fiyat (+ varsa geri sayım) cümleyi
+yapıyor, sonra kategori varsa `subscription_row_description_with_category` ile
+ekleniyor. Dört kombinasyon dört çeviri gerektirirdi.
+
+**Testler**
+- 136 → **143 birim testi** (7 yeni), 0 hata.
+- Kapsanan: seçim state'e yansıyor · kayıt doğru kategoriyle gidiyor ·
+  seçilmezse `OTHER` · kayıttan sonra `OTHER` · vazgeçmeden sonra `OTHER` ·
+  reddedilen kayıtta seçim korunuyor.
+- Mapper'ın enum dönüşümü **tekrar edilmedi**: `SubscriptionMapperTest` iki
+  yönü ve tanınmayan isim fallback'ini zaten kapsıyor (kontrol edildi).
+- `lintDebug` **0 hata, 20 uyarı** — sayı değişmedi.
+
+**Emülatör sonuçları**
+
+**(a) Chip'ler ve yerleşim** — dört chip **tek satıra sığmıyor**, `FlowRow`
+sardı. Yatay kaydırma gerekmedi, kırpılma yok.
+
+| | API 29 (360dp) | API 34 (411dp) |
+|---|---|---|
+| 1. satır | Eğlence `[48,767][291,863]`, Üretkenlik `[307,767][523,863]` | Eğlence `[63,1507][379,1633]`, Üretkenlik `[400,…]`, Sağlık `[702,…][894,1633]` |
+| 2. satır | Sağlık `[48,879][195,975]`, Diğer `[211,879][345,975]` | Diğer `[63,1654][239,1780]` |
+
+Tek satır gerekseydi API 29'da 788 px lazımdı, kullanılabilir genişlik 624 px.
+
+**(b)** Eğlence seçilip kaydedildi → kart: **`"Netflix, TRY 159.99, Entertainment"`**
+**(c)** Dokunmadan kaydedildi → kart: **`"Plain, TRY 20.00"`** (kategori yok)
+**(d)** Kayıttan sonra FAB → `Diğer = checked`, diğer üçü `false`, alanlar boş
+**(e)** Seçiliyken döndürüldü → seçim korundu (API 29 Eğlence, API 34 Sağlık)
+
+**(f) fs 2.0 karşılaştırması** — aynı dump içinde kategorisiz satır referans:
+
+| | kategorisiz | kategorili |
+|---|---|---|
+| API 29 fs 1.0 | 144 px | 166 px |
+| API 29 fs 2.0 | 162 px | 290 px |
+| API 34 fs 1.0 | 189 px | 217 px |
+| API 34 fs 2.0 | 212 px | 380 px |
+
+Kategorili satır fs 2.0'da belirgin biçimde uzuyor. Bu **büyüme**, kırpılma
+değil: kart uzuyor, liste kaydırılıyor, hiçbir şey kesilmiyor.
+**Yatay kırpılma ölçülemedi** — kart tek birleşik erişilebilirlik düğümü
+olduğu için içindeki ad kutusunun sınırları ağaçta yok. Kategorinin adın
+yatay alanını almadığı **kod düzeyinde kesin** (aynı `Column` içinde ayrı bir
+`Text`, `Row`'daki `weight(1f)` dağılımı değişmiyor), ama bu bir ölçüm değil.
+
+**(g) Erişilebilirlik**
+- Chip'ler `checkable="true"`; seçili olan `checked="true"`. Para birimi
+  chip'leriyle aynı yapı (9b-2'de doğrulanmıştı).
+- Kart hâlâ **tek düğüm** — 8a'daki tek odak durağı bozulmadı. API 29
+  `[0,560][720,726]`, API 34 `[0,989][1080,1206]`.
+- Dört parçalı cümle de doğrulandı: **`"Dated, TRY 30.00, 6 days left, Health"`**
+
+**(h) Klavye açıkken Kaydet** — yeni alan Kaydet'i itmedi:
+
+| | klavye açık | klavye kapalı |
+|---|---|---|
+| API 29 | `[329,634][391,674]` | buton kutusu `[48,1104][672,1200]` — **10a referansıyla aynı** |
+| API 34 | `[500,1323][580,1376]` | `[500,2143][580,2196]` — 10c-2 ölçümüyle aynı |
+
+**(i) Regresyon — 55 maddelik liste**
+Sabit listeye 11a'nın beş maddesi eklendi (51-55), liste 50 → **55**.
+50 maddenin tamamı iki emülatörde koşuldu ve geçti. Kayıtlı istisnalar:
+**#15/#16** API 29'da ölçülemiyor (API 34'te geçti); **#34-#37, #41-#45**
+API 33+ davranışları, API 29'daki karşılığı **#46** ve o geçti; **#40**
+yalnızca API < 33 maddesi.
+
+**Değişen dosyalar**
+- `ui/common/CategorySelector.kt` — yeni
+- `ui/home/HomeUiState.kt`, `HomeViewModel.kt`, `HomeScreen.kt`
+- `ui/home/components/AddSubscriptionSheet.kt`, `SubscriptionCard.kt`
+- `res/values/strings.xml`, `res/values-en/strings.xml`
+- `test/ui/home/HomeViewModelCategoryTest.kt` — yeni
+- `docs/ROADMAP.md`, `docs/TESTING.md`
+
+**Bir tutarsızlık — raporlanıyor, düzeltilmedi**
+Prompt kategoriyi `HomeUiState` + `HomeEvent` üzerinden istedi ve öyle yapıldı.
+Ama formun diğer alanları (ad, fiyat, para birimi, tarih) sheet'in kendi
+`rememberSaveable` state'inde duruyor — sheet'in KDoc'u bunu "geçici görsel
+durum, ARCHITECTURE §3 izin veriyor" diye gerekçelendiriyor. Yani kategori
+kardeşlerinden farklı bir yerde yaşıyor.
+
+İhlal değil (ViewModel her zaman state tutabilir) ve pratikte iki avantajı
+oldu: döndürmede seçim bedava korunuyor ve sıfırlama tek yerde. Ama beş form
+alanından dördü bir yerde, biri başka yerde. Para birimi ve tarihi de
+ViewModel'a taşımak mı, kategoriyi sheet'e indirmek mi — karar sohbetin.
+
+**Sonraki faz için not**
+- 11b: filtre, kategori bazlı toplam, filtre boşluğu (`EmptyState` varyantı).
+- Faz 14'te kart yeniden ele alınırken fs 2.0'da kategorili satırın yüksekliği
+  göz önünde bulundurulmalı; bugün kırpılma yok ama satır iki katına çıkıyor.
+
+---
+
 ## [Faz 8b] Boş Durum Ekranı — 2026-09-05
 
 **Durum:** Tamamlandı. **Faz 8'in tamamı kapandı.**

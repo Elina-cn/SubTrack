@@ -98,6 +98,12 @@ etmeden bildirin; sonraki maddeler zaten bozuk bir durumun üstüne binebilir.
 | 49 | Tek aboneliği sil | Boş durum **geri geliyor**, undo Snackbar'ı ile çakışmıyor | 8b |
 | 50 | Veri varken uygulamayı aç | Boş durum **hiç görünmüyor** (yükleme sırasında da) | 8b |
 
+| 51 | Ekleme formunda kategori seçici | Dört chip: Eğlence / Üretkenlik / Sağlık / Diğer. **Diğer** seçili gelir (ağaçta `checked="true"`) | 11a |
+| 52 | Kategori seçip kaydet | Kartta kategori adı görünüyor; satır tek odak durağı olarak "Ad, tutar, (geri sayım,) kategori" diye okunuyor | 11a |
+| 53 | Kategoriye dokunmadan kaydet | Kayıt oluşuyor, kartta kategori satırı **yok** (Diğer yazılmaz) | 11a |
+| 54 | Kaydettikten sonra FAB'a tekrar bas | Kategori **Diğer**'e dönmüş | 11a |
+| 55 | Kategori seçili haldeyken sheet açıkken döndür | Seçim **korunuyor** | 11a |
+
 **Klavye açıkken buton erişilebilirliği — her fazda kontrol edilecek**
 
 Metin alanı olan **her** ekranda, klavye açıkken ekranın alt kısmındaki
