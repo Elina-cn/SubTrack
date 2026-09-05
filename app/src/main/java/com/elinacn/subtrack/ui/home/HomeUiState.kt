@@ -46,7 +46,16 @@ data class HomeUiState(
     val dateError: UiText? = null,
     val errorMessage: UiText? = null,
     /** Set for as long as a deletion can still be undone; drives the snackbar. */
-    val pendingUndo: Subscription? = null
+    val pendingUndo: Subscription? = null,
+    /**
+     * Set once, after the first dated subscription is stored, when the notification permission
+     * can still be asked for.
+     *
+     * A one-shot flag rather than a Channel: ARCHITECTURE section 5 keeps the screen reading one
+     * value, and the screen clears this through an event as soon as it has acted on it, so a
+     * rotation cannot fire the request a second time.
+     */
+    val shouldRequestNotificationPermission: Boolean = false
 )
 
 /** Everything the home screen can ask for. One channel instead of a lambda per action. */
@@ -86,4 +95,7 @@ sealed interface HomeEvent {
     data object DismissUndo : HomeEvent
 
     data object DismissError : HomeEvent
+
+    /** The screen has shown the permission request; the trigger must not fire again. */
+    data object NotificationRequestHandled : HomeEvent
 }

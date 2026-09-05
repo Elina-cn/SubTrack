@@ -8,10 +8,12 @@ import com.elinacn.subtrack.domain.model.Currency
 import com.elinacn.subtrack.domain.model.Money
 import com.elinacn.subtrack.domain.model.Subscription
 import com.elinacn.subtrack.domain.model.SubscriptionCategory
+import com.elinacn.subtrack.domain.repository.ReminderStateRepository
 import com.elinacn.subtrack.domain.repository.SettingsRepository
 import com.elinacn.subtrack.domain.repository.SubscriptionRepository
 import com.elinacn.subtrack.domain.usecase.CurrencyConverter
 import com.elinacn.subtrack.domain.usecase.PaymentCountdown
+import com.elinacn.subtrack.reminder.ReminderNotificationStatus
 import com.elinacn.subtrack.ui.common.UiText
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
@@ -19,6 +21,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -33,6 +36,8 @@ import javax.inject.Inject
 class HomeViewModel @Inject constructor(
     private val repository: SubscriptionRepository,
     private val settingsRepository: SettingsRepository,
+    private val reminderState: ReminderStateRepository,
+    private val notificationStatus: ReminderNotificationStatus,
     private val clock: Clock
 ) : ViewModel() {
 
@@ -76,7 +81,8 @@ class HomeViewModel @Inject constructor(
             priceError = screen.priceError,
             dateError = screen.dateError,
             errorMessage = screen.errorMessage,
-            pendingUndo = screen.pendingUndo
+            pendingUndo = screen.pendingUndo,
+            shouldRequestNotificationPermission = screen.shouldRequestNotificationPermission
         )
     }.stateIn(
         scope = viewModelScope,
@@ -107,6 +113,9 @@ class HomeViewModel @Inject constructor(
             HomeEvent.DismissUndo -> screenState.update { it.copy(pendingUndo = null) }
 
             HomeEvent.DismissError -> screenState.update { it.copy(errorMessage = null) }
+
+            HomeEvent.NotificationRequestHandled ->
+                screenState.update { it.copy(shouldRequestNotificationPermission = false) }
         }
     }
 
@@ -153,6 +162,7 @@ class HomeViewModel @Inject constructor(
                     )
                 )
                 screenState.update { it.clearedErrors(open = false) }
+                armNotificationRequest(nextPaymentDate)
             } catch (cancellation: CancellationException) {
                 throw cancellation
             } catch (failure: Exception) {
@@ -252,13 +262,44 @@ class HomeViewModel @Inject constructor(
     private fun Exception.asMessage(fallback: Int): UiText =
         message?.takeIf { it.isNotBlank() }?.let { UiText.Raw(it) } ?: UiText.Resource(fallback)
 
+    /**
+     * Asks for the notification permission the moment reminders first become worth having: the
+     * first subscription with a date on it.
+     *
+     * Every condition is a reason not to ask. Reminders already visible - nothing to gain. No
+     * runtime permission on this build, or the permission already held while reminders are still
+     * off - asking would do nothing, only the system settings can help (ARCHITECTURE §18). Asked
+     * before - the system closes the door after a second refusal, so the one chance is spent.
+     * Not the first dated subscription - the moment has passed.
+     */
+    private suspend fun armNotificationRequest(savedDate: LocalDate?) {
+        if (savedDate == null) return
+        if (notificationStatus.areRemindersVisible()) return
+        if (!notificationStatus.isRuntimePermissionRequired()) return
+        if (notificationStatus.isPermissionGranted()) return
+        if (reminderState.wasPermissionRequested()) return
+
+        // Read back rather than counted from the state above: the stored list is the truth, and
+        // the flow behind uiState has not necessarily emitted the new row yet. No new query - the
+        // same observeAll the screen already lives on, taken once.
+        val datedCount = repository.observeAll().first().count { it.nextPaymentDate != null }
+        if (datedCount != FIRST_DATED_SUBSCRIPTION) return
+
+        // Written as the request is armed, not when it returns: the same record the settings row
+        // reads, so a refusal here leaves that row saying "turn it on in system settings" instead
+        // of offering an ask that would never appear.
+        reminderState.setPermissionRequested()
+        screenState.update { it.copy(shouldRequestNotificationPermission = true) }
+    }
+
     private data class ScreenState(
         val isAddSheetOpen: Boolean = false,
         val nameError: UiText? = null,
         val priceError: UiText? = null,
         val dateError: UiText? = null,
         val errorMessage: UiText? = null,
-        val pendingUndo: Subscription? = null
+        val pendingUndo: Subscription? = null,
+        val shouldRequestNotificationPermission: Boolean = false
     )
 
     /** Opening, dismissing and a successful save all leave the form without complaints. */
@@ -279,6 +320,9 @@ class HomeViewModel @Inject constructor(
         const val STOP_TIMEOUT_MS = 5_000L
 
         const val MINOR_UNIT_DIGITS = 2
+
+        /** The list holds exactly one dated subscription only right after the first one lands. */
+        const val FIRST_DATED_SUBSCRIPTION = 1
 
         /**
          * How far ahead a renewal date may be set.
