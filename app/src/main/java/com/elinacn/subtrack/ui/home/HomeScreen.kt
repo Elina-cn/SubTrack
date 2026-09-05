@@ -1,5 +1,8 @@
 package com.elinacn.subtrack.ui.home
 
+import android.Manifest
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -104,6 +107,24 @@ fun HomeScreen(
     // Keep the sheet composed while it animates away, otherwise closing it is an instant cut.
     LaunchedEffect(uiState.isAddSheetOpen) {
         if (!uiState.isAddSheetOpen && sheetState.isVisible) sheetState.hide()
+    }
+
+    // Registered unconditionally. A launcher created inside an if would already be gone by the
+    // time the system handed the answer back.
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { /* Whatever the answer, the row in settings is where it can be changed from now on. */ }
+
+    // Exactly the condition that keeps the sheet in the tree, read the other way round: the sheet
+    // is gone only when the state says closed AND the hide animation has finished. Asking before
+    // that puts the system dialog on top of a sheet still sliding away and clips both.
+    val isAddSheetGone = !uiState.isAddSheetOpen && !sheetState.isVisible
+
+    LaunchedEffect(uiState.shouldRequestNotificationPermission, isAddSheetGone) {
+        if (!uiState.shouldRequestNotificationPermission || !isAddSheetGone) return@LaunchedEffect
+        permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        // Cleared straight away, so a rotation while the dialog is up cannot ask twice.
+        onEvent(HomeEvent.NotificationRequestHandled)
     }
 
     Scaffold(
