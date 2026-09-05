@@ -13,4 +13,16 @@ interface ReminderStateRepository {
 
     /** Records that a reminder went out on [epochDay]. */
     suspend fun setLastNotifiedDay(epochDay: Long)
+
+    /**
+     * Whether the notification permission has ever been asked for.
+     *
+     * The system cannot answer this: it gives the same "no rationale needed" for a permission
+     * never requested and one denied for good, so only our own record tells the two apart. See
+     * ARCHITECTURE §18.
+     */
+    suspend fun wasPermissionRequested(): Boolean
+
+    /** Records that the permission request was put to the user, whatever they answered. */
+    suspend fun setPermissionRequested()
 }
