@@ -93,6 +93,11 @@ etmeden bildirin; sonraki maddeler zaten bozuk bir durumun üstüne binebilir.
 | 45 | Diyalog açıkken ekranı döndür | Diyalog **tek** kalıyor, kapatılınca yeniden çıkmıyor | 10c-2 |
 | 46 | (API < 33) Tarihli ilk aboneliği kaydet | İzin diyaloğu **hiç** çıkmıyor, uygulama normal | 10c-2 |
 
+| 47 | Temiz kurulumda uygulamayı aç | Listede **boş durum** görünüyor: ikon + "Henüz abonelik yok" + "Eklemek için + düğmesine dokun". Dashboard kartı (0,00) ve FAB yerinde | 8b |
+| 48 | Bir abonelik ekle | Boş durum **kayboluyor**, liste geliyor | 8b |
+| 49 | Tek aboneliği sil | Boş durum **geri geliyor**, undo Snackbar'ı ile çakışmıyor | 8b |
+| 50 | Veri varken uygulamayı aç | Boş durum **hiç görünmüyor** (yükleme sırasında da) | 8b |
+
 **Klavye açıkken buton erişilebilirliği — her fazda kontrol edilecek**
 
 Metin alanı olan **her** ekranda, klavye açıkken ekranın alt kısmındaki
@@ -122,7 +127,8 @@ eklendiği gün bu tablodaki her satır yeniden ölçülmelidir. Gerekçe
 `ARCHITECTURE.md` §16'da.
 
 **Not — beklenen davranışlar, hata değil:**
-- İlk kurulumda liste **boş** başlar. Seed veri yok; boş durum ekranı Faz 8'de.
+- İlk kurulumda liste **boş** başlar. Seed veri yok; bu durumda **boş durum ekranı**
+  görünür (Faz 8b), dashboard kartı ve FAB yerinde kalır.
 - Ardışık silmede **yalnızca son işlem** geri alınabilir; tek undo izleniyor.
 
 ---

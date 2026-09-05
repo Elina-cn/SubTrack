@@ -27,6 +27,115 @@ Her faz sonunda **en üste** yeni kayıt eklenir. Eski kayıtlar silinmez.
 
 ---
 
+## [Faz 8b] Boş Durum Ekranı — 2026-09-05
+
+**Durum:** Tamamlandı. **Faz 8'in tamamı kapandı.**
+
+**Yapılanlar**
+- `ui/common/EmptyState` — ikon, başlık ve alt satırı **parametre** alan bir
+  composable. Faz 11'deki filtre boşluğu aynı bileşenin varyantı olacak;
+  o varyant bu fazda yazılmadı.
+- `ui/common/EmptySubscriptions` — abonelik listesi için hazır metinlerle
+  sarmalayan ince bir katman.
+- `HomeScreen`: `!isLoading && subscriptions.isEmpty()` olduğunda boş durum,
+  değilse liste. Dashboard kartı ve FAB her iki durumda da yerinde.
+- Düğme yok. FAB zaten sağ altta; ikinci bir giriş noktası aynı odaya iki kapı
+  açmak olurdu.
+
+**İkon seçimi — yeni ikon eklenmedi**
+`Icons.AutoMirrored.Filled.List` seçildi. Gerekçe: bu ikon **zaten pakette**,
+`SubscriptionCard` Spotify için kullanıyor. Faz 16'da
+`material-icons-extended` daraltılacak ve o listeye yeni bir isim eklememek
+önemliydi. Anlamı da doğru: boş bir listenin yerinde bir liste simgesi duruyor.
+
+Mevcut ikon kümesi (9 isim): `ArrowBack`, `List`, `Add`, `Cloud`, `DateRange`,
+`Delete`, `PlayArrow`, `Settings`, `Star`. Bu faz **sayıyı artırmadı.**
+
+**Renk rolleri — `onSurfaceVariant` bilerek kullanılmadı**
+ARCHITECTURE §12'ye göre o rol şemamızda **tanımsız** ve Material baseline'ının
+mor-grisine düşüyor. Bunun yerine:
+
+| Öğe | Rol | Neden |
+|---|---|---|
+| İkon | `primary` (DeepBlue) | §12: metin/ikon `primary` ailesinden, dolu yüzeyler `*Container`. `primaryContainer` ikon olarak beyaz üstünde 1.78:1 verirdi |
+| Başlık | `onSurface` | Tanımlı |
+| Alt satır | `onSurface` | Tanımlı. Alpha ile soluklaştırılmadı — DashboardCard'ın 8a'daki dersi: 0.7 alpha kontrastı 3.6:1'e düşürüyor, hiyerarşiyi boyut/ağırlık farkı zaten taşıyor |
+
+Boyutlar `Dimens`'e eklendi: `EmptyStateIconSize = 72.dp`, `EmptyStatePadding = 32.dp`.
+
+**Erişilebilirlik — `clearAndSetSemantics`, `mergeDescendants` değil**
+Prompt "8a'daki `mergeDescendants` deseni" diyordu, ama `DashboardCard`'ın
+kendi yorumu bunun **yetmediğini** kaydediyor: birleştirme çocukları ağaçta
+bırakıyor (erişilebilirlik köprüsü birleştirilmemiş ağacı yürüyor), kart yine
+üç durak veriyordu. Orada `clearAndSetSemantics` ile çözülmüştü; burada da o
+kullanıldı. Ölçüm doğruladı: iki emülatörde de **tek düğüm**.
+
+**Yükleme ile çakışma**
+`isLoading` ve liste **aynı emisyonda** geliyor — `combine` bloğu ikisini
+birlikte üretiyor. Yani "yükleniyor bitti ama liste henüz gelmedi" diye bir kare
+yok; boş durum yalnızca listenin gerçekten boş olduğu bilindiğinde çiziliyor.
+8a'daki 300 ms gecikmeli gösterge de yerinde duruyor. Ölçüldü: veri varken
+açılışta boş durum **hiç** görünmüyor (iki dump'ta da 0 eşleşme).
+
+**Testler**
+- Birim testi yazılmadı; bu saf UI. **136 test** değişmedi, 0 hata.
+- `lintDebug` **0 hata, 20 uyarı** — uyarı sayısı da değişmedi.
+- `HomeScreenEmptyPreview` zaten `isLoading = false` ile duruyordu, artık yeni
+  boş durumu render ediyor. Bileşenin kendi preview'ı da eklendi.
+
+**Emülatör sonuçları**
+
+| Ölçüm | API 29 (720x1280) | API 34 (1080x2400) |
+|---|---|---|
+| (a) boş durum düğümü | `[64,624][656,902]` | `[84,884][996,1249]` |
+| (a) dashboard | `[32,208][688,433]` "Total Monthly, TRY 0.00" | `[42,338][1038,633]` |
+| (a) FAB | `[608,1168][656,1216]` | `[933,2190][996,2253]` |
+| (c) abonelik eklendi | Boş durum gitti, liste geldi | aynı |
+| (d) silindi | Boş durum geri geldi | aynı |
+| (d) Snackbar | `[56,1044][313,1084]` — boş durumun altı 902, **142 px boşluk** | `[74,2026][415,2079]` — üstü 1249, **777 px boşluk** |
+| (e) fs 2.0 | `[64,703][656,1044]` — 278 → 341 px, kırpılma yok, FAB'la çakışma yok | `[84,987][996,1434]` — 365 → 447 px, aynı |
+| (g) ağaçtaki hâli | **1 düğüm**, "No subscriptions yet, Tap + to add one" | aynı, aynı isim |
+
+**(b) yükleme/boş durum çakışması:** veri varken uygulama kapatılıp açıldı ve
+iki ayrı dump alındı; ikisinde de `No subscriptions yet` **0 kez** geçti,
+ardından liste göründü.
+
+**(f) koyu tema (API 34):** boş durum ağaçta, uygulama çökmedi
+(`logcat -b crash` uygulama için 0 satır). Kullanılan roller `primary` ve
+`onSurface`; ikisi de tanımlı ve daha önceki fazlarda ölçülmüş. **Renk
+kontrastının kendisi dump'tan ölçülemez** — okunabilirlik iddiası bu ölçümle
+kanıtlanmadı, yalnızca çizildiği ve çökmediği doğrulandı.
+
+**Regresyon — 50 maddelik liste**
+
+Sabit listeye 8b'nin dört maddesi eklendi (47-50), liste 46 → **50**.
+Tamamı iki emülatörde koşuldu ve geçti. Kayıtlı istisnalar: **#15/#16** API
+29'da ölçülemiyor (API 34'te geçti); **#34-#37 ve #41-#45** API 33+ davranışları,
+API 29'da karşılığı **#46** ve o geçti; **#40** yalnızca API < 33 maddesi.
+
+**Ölçüm sırasında çıkan engel**
+Geniş emülatör taze açılışta iki kez sistem ANR diyaloğu gösterdi
+("Process system isn't responding" / "System UI isn't responding"). İlki
+"Wait" tuşuna basılmasına rağmen kapanmadı — `system_server` yanıt vermiyordu —
+ve emülatör yeniden başlatıldı. Uygulamayla ilgisi yok: diyalog altındaki
+`topResumedActivity` bizim `MainActivity`'mizdi ve crash logu boştu.
+
+**Değişen dosyalar**
+- `ui/common/EmptyState.kt` — yeni
+- `ui/home/HomeScreen.kt` — bağlama
+- `ui/theme/Dimens.kt` — iki yeni değer
+- `res/values/strings.xml`, `res/values-en/strings.xml`
+- `docs/ROADMAP.md`, `docs/TESTING.md`
+
+**Sonraki faz için not**
+- Faz 8 ve Faz 10 kapandı. Sırada Faz 11 (kategoriler); oradaki filtre boşluğu
+  `EmptyState`'in varyantı olacak, ROADMAP'e yazıldı.
+- fs 2.0'da uzun metin kırpılması Faz 14'ün konusu; bu bileşende kırpılma
+  görülmedi ama ölçüm yalnızca blok sınırlarından yapıldı, tek tek satırlardan
+  değil (`clearAndSetSemantics` çocukları ağaçtan kaldırıyor).
+
+---
+
 ## [Faz 10c-2] Bağlamsal İzin İsteği — 2026-09-05
 
 **Durum:** Tamamlandı. **Faz 10c ve Faz 10'un tamamı kapandı.**

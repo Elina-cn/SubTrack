@@ -188,12 +188,14 @@ cihazda geçiyor (9 test), kritik yollar kapsanmış.
 
 ---
 
-## 🟡 Faz 8 — UX Cilası
+## ✅ Faz 8 — UX Cilası
 
-**8a** yükleme/hata/erişilebilirlik **(bitti)**, **8b** boş durum ekranı —
-tasarım kararı bekliyor, ileri bir tarihe ertelendi.
+İki promptta yürütüldü: **8a** yükleme/hata/erişilebilirlik, **8b** boş durum
+ekranı. **Hepsi bitti.**
 
-- [ ] **8b:** Boş durum ekranı
+- [x] **8b:** Boş durum ekranı — soluk ikon + başlık + alt satır, düğme yok
+      (FAB zaten sağ altta). `ui/common/EmptyState` metinleri parametre alır;
+      Faz 11'deki filtre boşluğu aynı bileşenin varyantı olacak
 - [x] **8a:** Yükleme durumu — 300 ms gecikmeli gösterge, kırpışmıyor
 - [x] **8a:** Hata gösterimi (Snackbar) — Faz 6'da kurulmuştu, doğrulandı
 - [x] **8a:** Erişilebilirlik: `contentDescription`, dokunma alanı ≥ 48dp.
@@ -260,6 +262,10 @@ Dört promptta yürütüldü: **10a** tarih seçici ve geri sayım, **10b** Work
 ## ⬜ Faz 11 — Kategoriler
 
 - [ ] Kategori seçimi, kategoriye göre filtre, kategori bazlı toplam
+- [ ] **Filtre hiçbir şeyle eşleşmediğinde boş durum** — Faz 8b'deki
+      `ui/common/EmptyState` bileşeninin varyantı olacak. Bileşen ikon, başlık
+      ve alt satırı parametre alacak şekilde yazıldı; yalnızca yeni metinler ve
+      (gerekiyorsa) yeni bir ikon gerekiyor, yeni bileşen değil.
 
 ---
 
