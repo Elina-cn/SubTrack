@@ -38,10 +38,14 @@ fun SettingsRow(
     Column(
         modifier = modifier
             .fillMaxWidth()
+            // clickable first, then the merging semantics: measured on both emulators, this is
+            // the shape that puts the description directly under the focusable node. Reversing
+            // the two, or adding a role, only splits the row into more nodes - see the note in
+            // TESTING.md.
             .clickable(onClick = onClick)
+            .semantics(mergeDescendants = true) { contentDescription = rowDescription }
             .defaultMinSize(minHeight = Dimens.MinTouchTarget)
-            .padding(vertical = Dimens.SpacerMedium)
-            .semantics(mergeDescendants = true) { contentDescription = rowDescription },
+            .padding(vertical = Dimens.SpacerMedium),
         verticalArrangement = Arrangement.Center
     ) {
         Text(
