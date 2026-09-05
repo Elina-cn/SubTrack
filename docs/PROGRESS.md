@@ -27,6 +27,125 @@ Her faz sonunda **en üste** yeni kayıt eklenir. Eski kayıtlar silinmez.
 
 ---
 
+## [Faz 10c-2] Bağlamsal İzin İsteği — 2026-09-05
+
+**Durum:** Tamamlandı. **Faz 10c ve Faz 10'un tamamı kapandı.**
+
+**Yapılanlar**
+- `HomeUiState`'e tek seferlik `shouldRequestNotificationPermission` bayrağı ve
+  `HomeEvent.NotificationRequestHandled`. Yeni `Channel`/`SharedFlow` açılmadı
+  (ARCHITECTURE §5).
+- `HomeViewModel.armNotificationRequest` — kayıt başarılı olduktan sonra çalışan,
+  altı koşullu bir kapı: tarih var mı · bildirimler zaten görünüyor mu · bu
+  derlemede runtime izin gerekiyor mu · izin zaten verili mi · daha önce
+  sorulmuş mu · listedeki tarihli abonelik sayısı 1 mi.
+- Sayım, **mevcut** `repository.observeAll()` bir kez okunarak yapılıyor. Yeni
+  DAO sorgusu, yeni repository fonksiyonu, yeni DataStore anahtarı açılmadı.
+  `uiState`'ten okunmadı çünkü arkasındaki Flow yeni satır için henüz emit
+  etmemiş olabilir.
+- `HomeScreen`'e koşulsuz kayıtlı `RequestPermission` launcher'ı ve sıralamayı
+  kuran efekt.
+
+**Sıralama nasıl kuruldu**
+
+Sheet'i ağaçta tutan koşulun tersi kullanıldı:
+
+```kotlin
+val isAddSheetGone = !uiState.isAddSheetOpen && !sheetState.isVisible
+LaunchedEffect(uiState.shouldRequestNotificationPermission, isAddSheetGone) { … }
+```
+
+`isAddSheetOpen` durumun kapandığını, `sheetState.isVisible` gizlenme
+animasyonunun bittiğini söyler; istek ancak ikisi de sağlandığında gönderiliyor.
+Tetik gönderildiği anda `NotificationRequestHandled` ile temizleniyor.
+
+**Bayrak yazımı — prompttan bilinçli sapma**
+
+Prompt "bayrak yazma işi 10c-1'deki akışın sahibinde kalsın, iki yerden
+yazılmasın" diyordu; aynı promptun ürün kuralı ise "reddedilirse **bayrak
+yazıldığı için** bu yol bir daha çalışmaz" diyordu. İkisi birlikte tutmuyor:
+`HomeViewModel` yazmazsa bayrak `false` kalır, Ayarlar satırı kullanıcıya az
+önce sorulduğunu bilmez ve açıklama diyaloğunu atlar; tarihli aboneliklerin
+hepsi silinip yenisi eklenirse istek tekrar çıkar.
+
+**Aynı anahtar, iki çağrı yeri** seçildi: `HomeViewModel` de
+`reminderState.setPermissionRequested()` çağırıyor. İkinci bir anahtar
+açılmadı. Gerekçe ARCHITECTURE §18'e yazıldı.
+
+**Testler**
+- 127 → **136 birim testi** (9 yeni), 0 hata.
+- Kapının her dalı `HomeViewModel`'ın public yüzeyinden test edildi: tarihli ilk
+  kayıt · tarihsiz kayıt · tarihli ikinci kayıt · daha önce sorulmuş · zaten
+  görünür · izin verili ama bildirim kapalı · API < 33 · tetiğin tüketilmesi ·
+  doğrulamada takılan kayıt.
+- `lintDebug` **0 hata, 19 → 20 uyarı**. Tek yeni uyarı `HomeScreen.kt:125`,
+  `InlinedApi` (`POST_NOTIFICATIONS`, API 33 sabiti) — diğer üçüyle aynı sınıf,
+  derleme anında satır içine alınan `String` sabiti.
+
+**Emülatör turu — API 34**
+
+| Adım | Kanıt |
+|---|---|
+| (a) tarihli ilk abonelik, Kaydet | Diyalog çıktığı anda alınan dump'ta **sheet ağaçta yok** (`New Subscription` sayısı 0). Pencere listesinde yalnızca `GrantPermissionsActivity` ve `MainActivity` var — sheet'in penceresi de yok |
+| (b) Allow | `granted=true` · kayıt "Netflix, TRY 159.99, 6 days left" · Ayarlar satırı **"Payment reminders, On"** |
+| (c) `pm clear` + **tarihsiz** abonelik | `permissioncontroller` düğüm sayısı **0**, izin hâlâ `granted=false`, kayıt oluştu ("NoDate, TRY 20.00") |
+| (d) aynı turda tarihli abonelik | Diyalog **çıktı**, sheet yine ağaçta değil. "Don't allow" → `granted=false, USER_SET` |
+| (e) ikinci tarihli abonelik | `permissioncontroller` **0** — tek sefer kuralı tuttu. Kayıt oluştu ("Second, TRY 40.00, 6 days left") |
+| (f) döndürme | Diyalog çıktı (`grant_dialog` = 1) → yatay çevrildi → hâlâ **1** → kapatıldı → **0** → dikeye dönüldü → **0**. İkinci diyalog yok |
+| — | İzin verilmişken (ENABLED) tarihli abonelik eklendi → `permissioncontroller` **0** |
+
+**(f) nasıl kurgulandı:** tetik anını yakalamak yerine diyalog açıkken
+döndürüldü. Kod tetiği gönderdiği anda temizlediği için asıl risk buradadır:
+ekran yeniden kurulurken bayrak hâlâ duruyorsa istek ikinci kez gider.
+Ölçümde gitmedi.
+
+**Emülatör turu — API 29**
+
+Tarihli ilk abonelik kaydedildi: `permissioncontroller` düğüm sayısı **0**,
+kayıt normal oluştu ("Dated, TRY 30.00, 6 days left"), `logcat -b crash` boş.
+Beklenen davranış: `CAN_REQUEST` dalı o platformda hiç oluşmuyor.
+
+**Regresyon — 46 maddelik liste**
+
+Sabit listeye 10c-2'nin altı maddesi eklendi (41-46), liste 40 → **46**.
+Tamamı iki emülatörde koşuldu ve geçti. Kayıtlı istisnalar: **#15 (koyu tema)**
+ve **#16 (dil)** API 29'da ölçülemiyor, API 34'te koşuldu ve geçti;
+**#34-#37** yalnızca API 33+ maddeleri, API 29'da konu dışı.
+
+Seçme kanıtlar: #11 toplam tam **219.89** · #19 undo satırı eski sırasına
+döndü (`[0,560][720,704]` / `[0,800][1080,989]`) · #23 dört geçersiz kur da
+alan altında hata verdi · #26 klavye açıkken `ScrollView` küçüldü ve iki butona
+da ulaşıldı · #27 11 Eylül seçildi, cihaz tarihi 5 Eylül → **"6 days left"** ·
+#31 31.12.2040 reddedildi, kaydedilmedi · #39 kanal `mImportance=0` iken
+uygulama izni `granted=true` kaldı ve satır doğru şekilde kapalı dedi
+(pid iki cihazda da değişmedi: 16610 ve 14825).
+
+**Ölçüm sırasında öğrenilen**
+
+`pm revoke` gibi, **sistem ayarlarından bildirimleri kapatmak da API 33+'ta
+uygulama sürecini öldürüyor** (pid 14061 → 14350). Açmak öldürmüyor (10c-1'de
+6715 → 6715 ölçülmüştü). Yani `ON_RESUME` tazelemesi yalnızca "açma" yönünde
+süreç korunarak gösterilebiliyor; kapatma yönünde satır yine doğru güncelleniyor
+ama süreç yeni.
+
+**Değişen dosyalar**
+- `ui/home/HomeUiState.kt` — tetik alanı + olay
+- `ui/home/HomeViewModel.kt` — `armNotificationRequest`
+- `ui/home/HomeScreen.kt` — launcher ve sıralama
+- `test/ui/home/HomeViewModelReminderTriggerTest.kt` — yeni
+- `test/ui/home/HomeViewModelTest.kt` — yeni fake'ler
+- `docs/ARCHITECTURE.md` §18, `docs/TESTING.md`, `docs/ROADMAP.md`
+
+**Sonraki faz için not**
+- Faz 10 kapandı. Sırada ROADMAP'e göre Faz 11 (kategoriler); Faz 8b (boş durum
+  ekranı) hâlâ tasarım kararı bekliyor.
+- Faz 12 tarih ilerletmeyi getirdiğinde 1-3 günlük gecikme penceresi yeniden
+  değerlendirilecek (ARCHITECTURE §18).
+- Ayarlar satırlarının erişilebilirlik ağacında iki düğüm vermesi ROADMAP
+  Faz 16'daki TalkBack maddesinde duruyor; bu fazda değişmedi.
+
+---
+
 ## [Faz 10c-1] Bildirim Durumu ve İzin Akışı (Ayarlar) — 2026-09-05
 
 **Durum:** Tamamlandı. **Faz 10c KAPANMADI** — bağlamsal tetikleyici (tarihli

@@ -234,10 +234,11 @@ ekranı + Navigation + DataStore, **9b-2** düzenlenebilir kurlar. **Hepsi bitti
 
 ---
 
-## 🟡 Faz 10 — Yenilenme Tarihi + Hatırlatma
+## ✅ Faz 10 — Yenilenme Tarihi + Hatırlatma
 
-Üç promptta yürütülüyor: **10a** tarih seçici ve geri sayım **(bitti)**,
-**10b** WorkManager + bildirim **(bitti)**, **10c** izin akışı.
+Dört promptta yürütüldü: **10a** tarih seçici ve geri sayım, **10b** WorkManager
++ bildirim, **10c-1** Ayarlar'daki izin akışı, **10c-2** bağlamsal izin isteği.
+**Hepsi bitti.**
 
 - [x] **10a:** Tarih seçici, sonraki ödeme tarihi — opsiyonel, geçmiş tarih
       kabul, üst sınır 10 yıl (ARCHITECTURE §17)
@@ -246,7 +247,11 @@ ekranı + Navigation + DataStore, **9b-2** düzenlenebilir kurlar. **Hepsi bitti
 - [x] **10b:** WorkManager + yerel bildirim — günde bir kez, yerel 09:00 hedefi,
       tek özet bildirim. Bildirilenler: bugün, 1 gün kalan, 1-3 gün gecikmiş
       (ARCHITECTURE §18)
-- [ ] **10c:** `POST_NOTIFICATIONS` izin akışı (Android 13+)
+- [x] **10c-1:** `POST_NOTIFICATIONS` izin akışı, Ayarlar'dan — üç halli durum
+      makinesi (açık / istenebilir / yalnızca sistem ayarları), kanal düzeyi
+      tespit dahil (ARCHITECTURE §18)
+- [x] **10c-2:** Bağlamsal istek — tarihi olan **ilk** abonelik kaydedildiğinde,
+      sheet kapandıktan sonra, yalnızca bir kez
 
 **Bitti:** Yaklaşan ödeme için bildirim geliyor, izin reddedilse de uygulama çalışıyor.
 

@@ -845,6 +845,62 @@ Karar tek yerdedir; bu satır aynı sorunun aracın görebileceği biçimde
 tekrarıdır, ikinci bir görüş değil. `@SuppressLint` yasak olduğu için
 (CLAUDE.md §4) alternatifi yok.
 
+### İzin bağlamsal olarak da istenir — tarihli ilk abonelikte
+
+Kullanıcı Ayarlar'a kendiliğinden gitmez. Bu yüzden izin, hatırlatmanın ilk kez
+anlam kazandığı anda da istenir: **tarihi olan ilk abonelik kaydedildiğinde.**
+
+Tetiklenme koşulları, hepsi "isteme" sebebi:
+
+| Koşul | Neden |
+|---|---|
+| Kaydedilen abonelikte tarih var | Tarihsiz abonelik için hatırlatılacak bir şey yok |
+| Listedeki tarihli abonelik sayısı **1** | Bu, o ilk tarihli abonelik; sonrakilerde an geçmiş olur |
+| Bildirimler görünmüyor | Görünüyorsa istenecek bir şey yok |
+| Bu derlemede runtime izin gerekiyor | API < 33'te istenecek izin yok |
+| İzin verili değil | Verili ama bildirim kapalıysa istek hiçbir şeyi değiştirmez |
+| Daha önce hiç sorulmamış | Aşağıdaki gerekçe |
+
+Yani yalnızca `CAN_REQUEST` dalında ve yalnızca **bir kez** istenir.
+`ENABLED` ve `SETTINGS_ONLY` durumlarında hiçbir şey yapılmaz.
+
+**Neden tek sefer:** sistem ikinci retten sonra kapıyı kapatıyor
+(`USER_FIXED`), ondan sonra istek diyaloğu hiç görünmüyor. Elimizde bir tane
+şans var ve o şans, özelliğin yeni yararlı hâle geldiği ana harcanıyor.
+Reddedilirse ısrar edilmez; kullanıcının yolu Ayarlar satırıdır.
+
+**Bayrak tek anahtardır, iki yerden yazılır.** Aynı
+`ReminderStateRepository.wasPermissionRequested` kaydı hem Ayarlar akışında hem
+burada yazılır — istek gönderildiği anda, cevabından bağımsız. İki ayrı anahtar
+açılmaz: Ayarlar satırının "bir kez soruldu" bilgisine ihtiyacı var ve bu
+istek de bir sorudur. Yazılmasaydı, kullanıcı burada reddettikten sonra Ayarlar
+satırı hâlâ "hiç sorulmadı" sanıp açıklama diyaloğunu atlardı.
+
+### İstek, sheet tamamen kapandıktan sonra gönderilir
+
+Ekleme sheet'i kendi penceresinde çizilir ve kapanırken bir animasyonu vardır.
+İstek o sırada gönderilirse sistem diyaloğu kapanmakta olan sheet'in üstüne
+biner ve ikisi de kırpılır.
+
+Sıralama, sheet'i ağaçta tutan koşulun tersiyle kurulur:
+
+```kotlin
+val isAddSheetGone = !uiState.isAddSheetOpen && !sheetState.isVisible
+```
+
+`isAddSheetOpen` durumun kapandığını, `sheetState.isVisible` gizlenme
+animasyonunun bittiğini söyler. İstek yalnızca ikisi de sağlandığında gönderilir.
+Emülatörde ölçüldü: diyalog ağaçtayken sheet ne erişilebilirlik ağacında ne de
+pencere listesinde var.
+
+Tetik, gönderildiği anda `NotificationRequestHandled` olayıyla temizlenir.
+ViewModel döndürmede yaşadığı için temizlenmeseydi ekran yeniden kurulduğunda
+istek ikinci kez gönderilirdi. Ölçüldü: diyalog açıkken döndürmek ikinci bir
+diyalog üretmiyor, kapatıldıktan sonra geri döndürmek de üretmiyor.
+
+**İlk soruda araya açıklama diyaloğu girmez** — Ayarlar akışındaki kuralın
+aynısı. Bu zaten tanım gereği ilk sorudur.
+
 ### Sistem ayarlarından dönüşte durum tazelenir
 
 Ekran `ON_RESUME`'da durumu yeniden okur. Olmasaydı kullanıcı sistem

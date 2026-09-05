@@ -86,6 +86,13 @@ etmeden bildirin; sonraki maddeler zaten bozuk bir durumun üstüne binebilir.
 | 39 | Sistem ayarlarından **yalnızca kanalı** kapat, geri dön | Satır **kapalı** diyor (uygulama izni hâlâ verili olsa bile) | 10c-1 |
 | 40 | (API < 33) Satıra dokun | Sistem bildirim ayarları açılıyor, izin diyaloğu **hiç** çıkmıyor | 10c-1 |
 
+| 41 | Temiz kurulumda **tarihli** ilk aboneliği kaydet | Sheet kapandıktan **sonra** sistem izin diyaloğu çıkıyor; ikisi üst üste binmiyor | 10c-2 |
+| 42 | Temiz kurulumda **tarihsiz** abonelik kaydet | Diyalog **çıkmıyor** | 10c-2 |
+| 43 | Reddettikten sonra ikinci tarihli aboneliği kaydet | Diyalog **çıkmıyor** (tek sefer kuralı) | 10c-2 |
+| 44 | İzin verilmişken tarihli abonelik kaydet | Diyalog **çıkmıyor** | 10c-2 |
+| 45 | Diyalog açıkken ekranı döndür | Diyalog **tek** kalıyor, kapatılınca yeniden çıkmıyor | 10c-2 |
+| 46 | (API < 33) Tarihli ilk aboneliği kaydet | İzin diyaloğu **hiç** çıkmıyor, uygulama normal | 10c-2 |
+
 **Klavye açıkken buton erişilebilirliği — her fazda kontrol edilecek**
 
 Metin alanı olan **her** ekranda, klavye açıkken ekranın alt kısmındaki
