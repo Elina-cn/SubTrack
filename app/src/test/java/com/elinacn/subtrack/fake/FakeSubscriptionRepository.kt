@@ -4,7 +4,7 @@ import com.elinacn.subtrack.domain.model.Subscription
 import com.elinacn.subtrack.domain.repository.SubscriptionRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
 
 /**
  * In-memory stand-in for the real repository.
@@ -24,7 +24,15 @@ class FakeSubscriptionRepository : SubscriptionRepository {
     val inserted = mutableListOf<Subscription>()
     val deletedIds = mutableListOf<Long>()
 
-    override fun observeAll(): Flow<List<Subscription>> = stored.asStateFlow()
+    /**
+     * Newest first, like the DAO's ORDER BY createdAt DESC.
+     *
+     * The sort is part of what observeAll promises, and undo depends on it: a restored row carries
+     * its original createdAt and has to land back where it was rather than at the end. Without
+     * this the fake let an ordering bug through that the real database would never have.
+     */
+    override fun observeAll(): Flow<List<Subscription>> =
+        stored.map { subscriptions -> subscriptions.sortedByDescending { it.createdAt } }
 
     override suspend fun getById(id: Long): Subscription? = stored.value.firstOrNull { it.id == id }
 
