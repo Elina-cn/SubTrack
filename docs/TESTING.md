@@ -177,6 +177,42 @@ Klavyenin üst kenarı, uygulama penceresi `adjustResize` ile küçüldüğü i�
 en dıştaki kaydırma düğümünün (`android.widget.ScrollView`) alt sınırından
 okunabilir; ayrı bir piksel taramasına gerek yok.
 
+### Kaydırma testleri ekranın kenarından başlatılmaz — API 34 tuzağı
+
+Jest tabanlı gezinmede ekranın sol ve sağ kenarındaki dar şerit **sistem geri
+jestine** ayrılmıştır. Oradan başlayan bir `adb shell input swipe` uygulamanın
+kaydırma bileşenine hiç ulaşmaz; uygulama geri gider ve ölçüm **sessizce
+yanlış** çıkar — hata verilmez, sadece test ettiğin şey test edilmez.
+
+Faz 10b doğrulamasında tam olarak bu oldu: geniş emülatörde (1080 px)
+`input swipe 1040 ...` uygulamadan çıktı ve `topResumedActivity` launcher'a
+döndü. Aynı kaydırma `input swipe 950 ...` ile beklendiği gibi çalıştı, satır
+silindi.
+
+| Başlangıç x (1080 px ekran) | Kenardan uzaklık | Sonuç |
+|---|---|---|
+| 1040 | 40 px | **Sistem geri jesti**, uygulamadan çıkış |
+| 950 | 130 px | Uygulamaya ulaştı, satır silindi |
+
+**Eşik ikili aramayla daraltılmadı**; yalnızca bu iki nokta ölçüldü. Android'in
+varsayılan geri jesti şeridi kenar başına **20dp**, 420 dpi'da ≈ 52 px — yani
+1040 şeridin içinde, 950 dışında kalıyor. Kural: kaydırmayı kenardan
+**100 px'den fazla** içeriden başlat.
+
+**İki AVD neden farklı davranıyor, ölçüldü:**
+
+```bash
+adb shell cmd overlay list android | grep navbar
+```
+
+| AVD | Etkin overlay | Sonuç |
+|---|---|---|
+| `subtrack_narrow_api29` | hiçbiri (üç tuşlu gezinme) | Geri jesti şeridi **yok**; x=690 (kenardan 30 px) sorunsuz çalıştı |
+| `subtrack_wide_api34` | `[x] com.android.internal.systemui.navbar.gestural` | Şerit **var**; kenardan başlayan kaydırma uygulamadan çıkarıyor |
+
+Yani bu, API sürümünün değil **gezinme modunun** sonucudur. Bir AVD'nin modu
+değişirse davranış da değişir; şüphede kalınca yukarıdaki komutla bakılır.
+
 ### Yazı tipi ölçeği
 
 ```bash
@@ -259,11 +295,11 @@ API 33+ cihazda önce izin verilmeli, yoksa bildirim hiç gönderilmez:
 adb shell pm grant com.elinacn.subtrack android.permission.POST_NOTIFICATIONS
 ```
 
-**`pm clear` şart.** Worker günde en fazla bir bildirim gönderir ve gönderdiği
-günü kaydeder; aynı gün ikinci koşu tasarım gereği hiçbir şey yapmaz. Aynı
-sebeple test metodlarının sırası `@FixMethodOrder(NAME_ASCENDING)` ile
-sabitlenmiştir — "bildirimler kapalı" durumu da günü işaretliyor, bu yüzden
-ikinci sırada olmak zorunda.
+**`pm clear` şart.** Worker günde en fazla bir bildirim gönderir ve
+**gönderebildiği** günü kaydeder; aynı gün ikinci koşu tasarım gereği hiçbir
+şey yapmaz. Metodların sırası önemsizdir ve sabitlenmemiştir: gün yalnızca
+bildirim gerçekten gösterildiğinde işaretlendiği için "bildirimler kapalı"
+durumu kaydı kirletmez (ARCHITECTURE §18).
 
 ### Periyodik WorkManager işi — gövdesi gecikmesiz bir `OneTimeWorkRequest` ile koşturulur
 

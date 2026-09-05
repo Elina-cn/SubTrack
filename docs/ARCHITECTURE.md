@@ -724,6 +724,27 @@ kullanılıyor (Faz 10b Görev 0'da birleşik manifestte ölçüldü). Kaldırı
 `Configuration.Provider` üyesi **property**'dir (`workManagerConfiguration`);
 androidx.work 2.9'da fonksiyondan property'ye döndü.
 
+### Gün yalnızca bildirim gerçekten gösterildiğinde işaretlenir
+
+`PaymentReminderNotifier.notify(...)` **`Boolean` döner**: bildirimin ekrana
+ulaşıp ulaşmadığı. Worker günü yalnızca `true` dönerse yazar.
+
+**Gerekçe:** bildirimler kapalıyken hiçbir şey gösterilmiyor. Günü yine de
+işaretlemek, o günün hatırlatmasını kalıcı olarak yutardı — kullanıcı bir saat
+sonra bildirimleri açsa bile ertesi güne kadar hiçbir şey görmezdi. Kayıt,
+"iş koştu"nun değil "kullanıcıya söylendi"nin kaydıdır.
+
+Her iki durumda da `Result.success()` dönülür. Bildirimlerin kapalı olması bir
+hata değil, kullanıcının tercihi olabilir; `retry` yalnızca bu işin
+değiştiremeyeceği bir ayarı beklerken pil harcardı.
+
+**Bilinen sınır:** `areNotificationsEnabled()` **uygulama düzeyindedir.**
+Kullanıcı yalnızca `payment_reminders` **kanalını** kapatmışsa bu fonksiyon
+hâlâ `true` döner, `notify()` çağrılır, sistem bildirimi sessizce düşürür ve
+gün yine de işaretlenir. Yani kanal bazlı kapatma bu koruma tarafından
+yakalanmıyor. Kanal durumu `NotificationManagerCompat.getNotificationChannel`
+ile okunabilir; bunun eklenip eklenmeyeceği ayrı bir karar.
+
 ### Bildirim durumu neden ayrı repository
 
 Son bildirim günü **kullanıcı tercihi değil**, işin kendisi hakkında tuttuğu

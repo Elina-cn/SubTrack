@@ -27,6 +27,113 @@ Her faz sonunda **en üste** yeni kayıt eklenir. Eski kayıtlar silinmez.
 
 ---
 
+## [Faz 10b hotfix] Gösterilmeyen bildirim gün olarak yazılmasın — 2026-09-04
+
+**Durum:** Tamamlandı.
+
+**Sorun**
+10b doğrulama turunda bulundu (kayıt yukarıda, "Bulunan ve düzeltilmeyen"
+başlığı altında). Worker, seçim boş değilse `notifier.notify(...)` çağırdıktan
+sonra günü **koşulsuz** işaretliyordu. Notifier ise bildirimler kapalıyken
+hiçbir şey göndermeden çıkıyordu. Sonuç: hiç gösterilmemiş bir bildirim
+"gönderildi" olarak kaydediliyor, kullanıcı o gün bildirimleri açsa bile
+ertesi güne kadar hiçbir şey görmüyordu.
+
+Bu bir izin akışı sorunu değildi: `areNotificationsEnabled()` kullanıcı
+bildirimleri sistem ayarlarından kapattığında **her API sürümünde** `false`
+döner, yalnızca API 33+ izin reddinde değil.
+
+**Düzeltme**
+- `PaymentReminderNotifier.notify(...)` artık `Boolean` dönüyor: bildirimin
+  gerçekten gönderilip gönderilmediği. Kanal kurulumu, metin üretimi,
+  `BigTextStyle` ve `PendingIntent` değişmedi.
+- Worker günü **yalnızca `true` dönerse** yazıyor. İki durumda da
+  `Result.success()` — bildirimlerin kapalı olması bir hata değil, `retry`
+  bu işin değiştiremeyeceği bir ayarı beklerken pil harcardı.
+- `try/catch` eklenmedi (§9).
+
+**`@FixMethodOrder` kaldırıldı**
+10b'de eklenmişti, gerekçesi "bildirimler kapalı" metodunun günü
+işaretlemesiydi. Düzeltmeden sonra o metot kaydı hiç kirletmiyor, yani sıra
+bağımlılığı **yapısal olarak** kalktı. Ölçüldü: aşağıdaki turda kapalı-izin
+koşusu **önce**, asıl koşu **sonra** çalıştı ve asıl koşu bildirimi gönderdi.
+Anotasyon kaldırıldı; sınıf KDoc'u ve TESTING.md buna göre yeniden yazıldı.
+`pm clear` ön koşulu **duruyor** — sebebi sıra değil, "günde bir bildirim"
+kuralının kendisi.
+
+**Test yöntemi seçimi**
+Yeni test metodu **yazılmadı**, adb ile ayrılmış tur seçildi. Sebep: izin
+durumunu test süreci içinden değiştirmek `UiAutomation.revokeRuntimePermission`
+gerektiriyor ve çalışma zamanı izni geri almak süreci öldürebiliyor — testi de
+öldürürdü. `kspAndroidTest` eklenmedi, enstrümantasyonun Hilt grafına erişimi
+yok; kanıt davranışsal.
+
+**Doğrulama turu — API 34, tek tur, veri arada SİLİNMEDİ**
+
+`pm clear` → `pm revoke POST_NOTIFICATIONS` → üç koşu:
+
+| # | İzin | Nasıl koşturuldu | Sonuç |
+|---|---|---|---|
+| 1 | `granted=false` | `notificationsDisabled` metodu | `areNotificationsEnabled=false`, worker **SUCCEEDED**, aktif bildirim **0** |
+| 2 | `granted=true` (`pm grant`, veri silinmedi) | `datedSubscriptions` metodu, ilk koşu | **Bildirim GELDİ**, `postTime=1788550455107` |
+| 3 | `granted=true` | aynı metodun ikinci koşusu | Yeni bildirim yok, `postTime` **değişmedi** (1788550455107) |
+
+**Düzeltmenin kanıtı 2. satırdır.** Eski kodda 1. koşu günü işaretlerdi ve
+2. koşu hiçbir şey göndermezdi — 10b turunda tam olarak bu yüzden paket
+kırmızı olmuştu.
+
+Gelen bildirimin ham metni, 10b'dekiyle birebir aynı:
+
+```
+EXTRA_TITLE = [Payment reminder: 4 subscriptions]
+EXTRA_TEXT  = [DueToday — today, Tomorrow — tomorrow, OneDayLate — 1 day overdue,
+               ThreeDaysLate — 3 days overdue]
+channelId   = [payment_reminders]
+contentIntent is null = false      FLAG_AUTO_CANCEL set = true
+```
+
+**Diğer doğrulamalar**
+- `assembleDebug`, `lintDebug` (**0 hata**, uyarı kümesi değişmedi: 15),
+  `testDebugUnitTest` (**112**, 0 hata).
+- Tüm enstrümantasyon paketi `am instrument` ile iki emülatörde: **OK (11 tests)**.
+- Regresyon listesinden yalnızca **#1** ve **#12** koşuldu, iki emülatörde de
+  geçti. Bu bilinçli bir istisna: değişiklik UI'a, Room'a, DataStore anahtar
+  isimlerine ve DI grafına dokunmuyor; iki dosyada toplam 25 satır.
+
+**Bilinen sınır (ARCHITECTURE §18'e yazıldı)**
+`areNotificationsEnabled()` **uygulama düzeyindedir.** Kullanıcı yalnızca
+`payment_reminders` kanalını kapatmışsa fonksiyon hâlâ `true` döner, sistem
+bildirimi sessizce düşürür ve gün yine işaretlenir. Kanal bazlı kapatma bu
+korumanın dışında; eklenip eklenmeyeceği ayrı karar.
+
+**Belgelere taşınan ölçüm tuzağı**
+API 34'te ekranın kenarından başlayan `input swipe`'ın sistem geri jestini
+tetiklediği bilgisi PROGRESS'ten `TESTING.md`'nin "Emülatör Testleri"
+bölümüne taşındı. Sebep de ölçüldü: `cmd overlay list android` çıktısında dar
+AVD'de hiçbir gestural overlay etkin değil (üç tuşlu gezinme), geniş AVD'de
+`[x] com.android.internal.systemui.navbar.gestural`. Yani fark API
+sürümünün değil **gezinme modunun** sonucu. Ölçülen iki nokta: x=1040
+(kenardan 40 px) uygulamadan çıkardı, x=950 (130 px) çalıştı; eşik ikili
+aramayla daraltılmadı.
+
+**Değişen dosyalar**
+- `reminder/PaymentReminderNotifier.kt` — `notify` artık `Boolean`
+- `reminder/PaymentReminderWorker.kt` — gün koşullu yazılıyor
+- `androidTest/.../PaymentReminderWorkerTest.kt` — `@FixMethodOrder` kaldırıldı,
+  KDoc yeniden yazıldı
+- `docs/ARCHITECTURE.md` §18, `docs/TESTING.md`
+
+**Commit'ler**
+- `9d143a1` fix: only record the day when a reminder was actually shown
+
+**Sonraki faz için not**
+- 10c izni runtime'da isteyecek. İzin **yeni verildiğinde** o günkü
+  hatırlatmanın hâlâ gönderilebilir olması bu düzeltmeyle sağlandı; 10c'de
+  ayrıca izin verilir verilmez bir koşu tetiklenmeli mi, karara bağlanmalı.
+- Kanal bazlı kapatmanın tespiti de 10c'nin konusu olabilir.
+
+---
+
 ## [Faz 10b] WorkManager + Yerel Bildirim — 2026-09-04
 
 **Durum:** Tamamlandı. İzin isteme akışı (runtime `POST_NOTIFICATIONS`) **yok** — 10c.
