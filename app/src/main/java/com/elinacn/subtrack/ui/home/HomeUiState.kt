@@ -42,14 +42,6 @@ data class HomeUiState(
     val isLoading: Boolean = true,
     /** Owned here rather than by the composable: whether it may close depends on validation. */
     val isAddSheetOpen: Boolean = false,
-    /**
-     * The category the add form has selected.
-     *
-     * Optional for the user: leaving it alone stores [SubscriptionCategory.OTHER], because
-     * PROJECT_SPEC section 3 puts a fifteen second ceiling on adding a subscription and a
-     * required field on a bucket nobody has to care about would spend part of it.
-     */
-    val selectedCategory: SubscriptionCategory = SubscriptionCategory.OTHER,
     val nameError: UiText? = null,
     val priceError: UiText? = null,
     val dateError: UiText? = null,
@@ -79,16 +71,18 @@ sealed interface HomeEvent {
      *
      * [nextPaymentDate] is null when the user left the date empty, which is allowed - the card
      * simply shows no countdown then.
+     *
+     * [category] arrives the same way as the name and the price: the form owns it until the user
+     * commits. Leaving it alone means [SubscriptionCategory.OTHER], which is not a real answer
+     * and is why the card does not print it.
      */
     data class Save(
         val name: String,
         val rawPrice: String,
         val currency: Currency,
-        val nextPaymentDate: LocalDate? = null
+        val nextPaymentDate: LocalDate? = null,
+        val category: SubscriptionCategory = SubscriptionCategory.OTHER
     ) : HomeEvent
-
-    /** The user picked a category in the add form. */
-    data class SelectCategory(val category: SubscriptionCategory) : HomeEvent
 
     /** Sent as the user edits, so a stale error stops contradicting what is on screen. */
     data object ClearNameError : HomeEvent

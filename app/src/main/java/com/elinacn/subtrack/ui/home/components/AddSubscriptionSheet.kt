@@ -73,13 +73,12 @@ fun AddSubscriptionSheet(
     nameError: UiText?,
     priceError: UiText?,
     dateError: UiText?,
-    selectedCategory: SubscriptionCategory,
-    onSelectCategory: (SubscriptionCategory) -> Unit,
     onSave: (
         name: String,
         rawPrice: String,
         currency: Currency,
-        nextPaymentDate: LocalDate?
+        nextPaymentDate: LocalDate?,
+        category: SubscriptionCategory
     ) -> Unit,
     onNameEdited: () -> Unit,
     onPriceEdited: () -> Unit,
@@ -92,6 +91,9 @@ fun AddSubscriptionSheet(
     var currency by rememberSaveable(stateSaver = CurrencySaver) { mutableStateOf(Currency.Base) }
     var nextPaymentDate by rememberSaveable(stateSaver = LocalDateSaver) {
         mutableStateOf<LocalDate?>(null)
+    }
+    var category by rememberSaveable(stateSaver = CategorySaver) {
+        mutableStateOf(SubscriptionCategory.OTHER)
     }
     var isDatePickerOpen by rememberSaveable { mutableStateOf(false) }
 
@@ -183,7 +185,7 @@ fun AddSubscriptionSheet(
                 color = MaterialTheme.colorScheme.onSurface
             )
             Spacer(modifier = Modifier.height(Dimens.SpacerSmall))
-            CategorySelector(selected = selectedCategory, onSelect = onSelectCategory)
+            CategorySelector(selected = category, onSelect = { category = it })
 
             Spacer(modifier = Modifier.height(Dimens.SpacerMedium))
 
@@ -242,7 +244,7 @@ fun AddSubscriptionSheet(
         // far the form is scrolled. The gap above it was a Spacer inside the form before; as
         // padding here it stays a constant separation instead of scrolling away.
         Button(
-            onClick = { onSave(name, rawPrice, currency, nextPaymentDate) },
+            onClick = { onSave(name, rawPrice, currency, nextPaymentDate, category) },
             colors = ButtonDefaults.buttonColors(
                 containerColor = MaterialTheme.colorScheme.primaryContainer,
                 contentColor = MaterialTheme.colorScheme.onPrimaryContainer
@@ -328,6 +330,19 @@ private val CurrencySaver = Saver<Currency, String>(
     restore = { Currency.fromCode(it) }
 )
 
+/**
+ * Same shape as [CurrencySaver]: the name survives a rotation, not the constant itself.
+ *
+ * An unknown name falls back to OTHER rather than throwing, for the reason the mapper does the
+ * same - a saved bundle can outlive the build that wrote it. See ARCHITECTURE section 12.
+ */
+private val CategorySaver = Saver<SubscriptionCategory, String>(
+    save = { it.name },
+    restore = { name ->
+        SubscriptionCategory.entries.firstOrNull { it.name == name } ?: SubscriptionCategory.OTHER
+    }
+)
+
 /** Field errors as they appear after a rejected save. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Preview(showBackground = true)
@@ -339,9 +354,7 @@ private fun AddSubscriptionSheetErrorPreview() {
             nameError = UiText.Resource(R.string.error_name_empty),
             priceError = UiText.Resource(R.string.error_price_invalid),
             dateError = null,
-            selectedCategory = SubscriptionCategory.OTHER,
-            onSelectCategory = {},
-            onSave = { _, _, _, _ -> },
+            onSave = { _, _, _, _, _ -> },
             onNameEdited = {},
             onPriceEdited = {},
             onDateEdited = {},

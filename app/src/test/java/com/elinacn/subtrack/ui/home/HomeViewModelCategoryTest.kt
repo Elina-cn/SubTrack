@@ -25,9 +25,14 @@ import java.time.Instant
 import java.time.ZoneOffset
 
 /**
- * The category the add form carries, from the tap to the stored row and back to the default.
+ * The category as it reaches storage.
  *
- * The enum's own conversion is not retested here - SubscriptionMapperTest already covers both
+ * The form owns the pick until the user commits - the same place the name, the price, the currency
+ * and the date live - so what the ViewModel can be asked about is what a save carries. Whether the
+ * chip survives a rotation and resets afterwards is the sheet's rememberSaveable doing the same
+ * thing it does for the other four fields, and is measured on a device.
+ *
+ * The enum's own conversion is not retested here: SubscriptionMapperTest already covers both
  * directions and the fallback for a name it does not recognise.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -59,84 +64,56 @@ class HomeViewModelCategoryTest {
     }
 
     @Test
-    fun uiState_nothingPicked_startsOnOther() = runTest {
+    fun save_withACategory_storesIt() = runTest {
         collectState()
 
-        assertEquals(SubscriptionCategory.OTHER, viewModel.uiState.value.selectedCategory)
-    }
-
-    @Test
-    fun selectCategory_reachesTheScreen() = runTest {
-        collectState()
-
-        viewModel.onEvent(HomeEvent.SelectCategory(SubscriptionCategory.HEALTH))
-        advanceUntilIdle()
-
-        assertEquals(SubscriptionCategory.HEALTH, viewModel.uiState.value.selectedCategory)
-    }
-
-    @Test
-    fun save_afterPickingACategory_storesThatCategory() = runTest {
-        collectState()
-        viewModel.onEvent(HomeEvent.SelectCategory(SubscriptionCategory.ENTERTAINMENT))
-        advanceUntilIdle()
-
-        save()
+        save(category = SubscriptionCategory.ENTERTAINMENT)
 
         assertEquals(SubscriptionCategory.ENTERTAINMENT, repository.inserted.single().category)
     }
 
     @Test
-    fun save_withoutPickingACategory_storesOther() = runTest {
+    fun save_categoryOmitted_storesOther() = runTest {
         collectState()
 
-        save()
+        // The event's default. The field is optional, and leaving it out still writes a row.
+        viewModel.onEvent(HomeEvent.Save("Netflix", "159.99", Currency.TRY))
+        advanceUntilIdle()
 
-        // The field is optional; leaving it alone still writes a row.
         assertEquals(SubscriptionCategory.OTHER, repository.inserted.single().category)
     }
 
     @Test
-    fun save_afterStoring_leavesTheFormOnOther() = runTest {
+    fun save_twoSubscriptions_keepsEachCategoryWithItsOwnRow() = runTest {
         collectState()
-        viewModel.onEvent(HomeEvent.SelectCategory(SubscriptionCategory.PRODUCTIVITY))
-        advanceUntilIdle()
 
-        save()
+        save(name = "Netflix", category = SubscriptionCategory.ENTERTAINMENT)
+        save(name = "Gym", category = SubscriptionCategory.HEALTH)
 
-        // Same rule as the name and the price: the next form starts empty.
-        assertEquals(SubscriptionCategory.OTHER, viewModel.uiState.value.selectedCategory)
+        assertEquals(
+            listOf(SubscriptionCategory.ENTERTAINMENT, SubscriptionCategory.HEALTH),
+            repository.inserted.map { it.category }
+        )
     }
 
     @Test
-    fun dismissAddSheet_afterPicking_leavesTheFormOnOther() = runTest {
+    fun save_rejectedEntry_storesNothingWhateverTheCategory() = runTest {
         collectState()
-        viewModel.onEvent(HomeEvent.SelectCategory(SubscriptionCategory.HEALTH))
+
+        // Empty name: validation stops the write before the category matters.
+        viewModel.onEvent(
+            HomeEvent.Save("", "159.99", Currency.TRY, null, SubscriptionCategory.HEALTH)
+        )
         advanceUntilIdle()
 
-        viewModel.onEvent(HomeEvent.DismissAddSheet)
-        advanceUntilIdle()
-
-        // A pick that was abandoned must not come back next to a blank name and price.
-        assertEquals(SubscriptionCategory.OTHER, viewModel.uiState.value.selectedCategory)
-    }
-
-    @Test
-    fun save_rejectedEntry_keepsTheCategoryPicked() = runTest {
-        collectState()
-        viewModel.onEvent(HomeEvent.SelectCategory(SubscriptionCategory.HEALTH))
-        advanceUntilIdle()
-
-        // Empty name: nothing is stored and the sheet stays open with what was entered.
-        viewModel.onEvent(HomeEvent.Save("", "159.99", Currency.TRY))
-        advanceUntilIdle()
-
-        assertEquals(SubscriptionCategory.HEALTH, viewModel.uiState.value.selectedCategory)
         assertEquals(0, repository.inserted.size)
     }
 
-    private fun TestScope.save() {
-        viewModel.onEvent(HomeEvent.Save("Netflix", "159.99", Currency.TRY))
+    private fun TestScope.save(
+        name: String = "Netflix",
+        category: SubscriptionCategory
+    ) {
+        viewModel.onEvent(HomeEvent.Save(name, "159.99", Currency.TRY, null, category))
         advanceUntilIdle()
     }
 

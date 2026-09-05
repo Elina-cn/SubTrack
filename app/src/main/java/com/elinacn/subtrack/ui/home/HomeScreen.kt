@@ -261,13 +261,11 @@ fun HomeScreen(
             nameError = uiState.nameError,
             priceError = uiState.priceError,
             dateError = uiState.dateError,
-            onSave = { name, rawPrice, currency, nextPaymentDate ->
-                onEvent(HomeEvent.Save(name, rawPrice, currency, nextPaymentDate))
+            onSave = { name, rawPrice, currency, nextPaymentDate, category ->
+                onEvent(HomeEvent.Save(name, rawPrice, currency, nextPaymentDate, category))
             },
             onNameEdited = { onEvent(HomeEvent.ClearNameError) },
             onPriceEdited = { onEvent(HomeEvent.ClearPriceError) },
-            selectedCategory = uiState.selectedCategory,
-            onSelectCategory = { onEvent(HomeEvent.SelectCategory(it)) },
             onDateEdited = { onEvent(HomeEvent.ClearDateError) },
             onDismiss = { onEvent(HomeEvent.DismissAddSheet) }
         )
