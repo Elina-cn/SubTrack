@@ -109,4 +109,14 @@
     <string name="notification_entry_separator">", "</string>
     <string name="notification_due_today">today</string>
     <string name="notification_due_tomorrow">tomorrow</string>
+    <!-- Payment reminder settings row -->
+    <string name="reminder_notifications_title">Payment reminders</string>
+    <string name="reminder_notifications_on">On</string>
+    <string name="reminder_notifications_can_request">Off — tap to turn on</string>
+    <string name="reminder_notifications_settings_only">Off — turn on in system settings</string>
+    <!-- Title and status read as a single focus stop. -->
+    <string name="settings_row_description">%1$s, %2$s</string>
+    <string name="reminder_rationale_title">Allow reminders</string>
+    <string name="reminder_rationale_message">You get at most one notification a day, about subscriptions whose payment date is close. Nothing else is notified.</string>
+    <string name="reminder_rationale_confirm">Ask for permission</string>
 </resources>

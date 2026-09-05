@@ -1,39 +1,45 @@
 package com.elinacn.subtrack.ui.settings
 
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
+import android.Manifest
+import androidx.activity.compose.LocalActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.elinacn.subtrack.R
 import com.elinacn.subtrack.domain.model.Currency
 import com.elinacn.subtrack.ui.common.CurrencySelector
+import com.elinacn.subtrack.ui.common.SettingsRow
 import com.elinacn.subtrack.ui.theme.Dimens
 import com.elinacn.subtrack.ui.theme.SubTrackTheme
 
@@ -42,6 +48,10 @@ import com.elinacn.subtrack.ui.theme.SubTrackTheme
  *
  * Navigation arrives as lambdas rather than a NavController, so the screen has no opinion about
  * where it sits in the graph and previews without one.
+ *
+ * The reminder row is the one place the screen touches the platform, because asking for a
+ * permission and opening the system settings both need an Activity. It still decides nothing:
+ * it hands the ViewModel the one fact only an Activity knows and carries out what comes back.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -54,11 +64,48 @@ fun SettingsScreen(
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     val errorText = uiState.errorMessage?.asString()
+    val activity = LocalActivity.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    // Registered unconditionally. A launcher created inside an if would already be gone by the
+    // time the system handed the answer back.
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { _ ->
+        onEvent(SettingsEvent.RefreshReminderPermission(activity.canShowNotificationRationale()))
+    }
 
     LaunchedEffect(errorText) {
         if (errorText == null) return@LaunchedEffect
         snackbarHostState.showSnackbar(message = errorText, duration = SnackbarDuration.Short)
         onEvent(SettingsEvent.DismissError)
+    }
+
+    DisposableEffect(lifecycleOwner, activity) {
+        val observer = LifecycleEventObserver { _, event ->
+            // Coming back from the system settings is the case that matters: without this the row
+            // would still read "off" right after the user switched reminders on.
+            if (event == Lifecycle.Event.ON_RESUME) {
+                onEvent(
+                    SettingsEvent.RefreshReminderPermission(activity.canShowNotificationRationale())
+                )
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    LaunchedEffect(uiState.pendingReminderAction) {
+        when (uiState.pendingReminderAction) {
+            ReminderPermissionAction.REQUEST_PERMISSION ->
+                permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+
+            ReminderPermissionAction.OPEN_SYSTEM_SETTINGS ->
+                activity?.openNotificationSettings()
+
+            null -> return@LaunchedEffect
+        }
+        onEvent(SettingsEvent.ReminderActionHandled)
     }
 
     Scaffold(
@@ -115,28 +162,38 @@ fun SettingsScreen(
 
             HorizontalDivider()
 
-            // A whole row is the target rather than the text alone, and defaultMinSize keeps it at
-            // the accessibility floor even when the label happens to be shorter than that.
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable(onClick = onNavigateToExchangeRates)
-                    .defaultMinSize(minHeight = Dimens.MinTouchTarget)
-                    .padding(vertical = Dimens.SpacerMedium),
-                verticalArrangement = Arrangement.Center
-            ) {
-                Text(
-                    text = stringResource(id = R.string.exchange_rates_title),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
-                Text(
-                    text = stringResource(id = R.string.exchange_rates_row_description),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+            SettingsRow(
+                title = stringResource(id = R.string.exchange_rates_title),
+                description = stringResource(id = R.string.exchange_rates_row_description),
+                onClick = onNavigateToExchangeRates
+            )
+
+            HorizontalDivider()
+
+            SettingsRow(
+                title = stringResource(id = R.string.reminder_notifications_title),
+                description = stringResource(id = uiState.reminderPermission.statusTextId()),
+                onClick = { onEvent(SettingsEvent.ReminderRowTapped) }
+            )
         }
+    }
+
+    if (uiState.isReminderRationaleVisible) {
+        AlertDialog(
+            onDismissRequest = { onEvent(SettingsEvent.ReminderRationaleDismissed) },
+            title = { Text(stringResource(id = R.string.reminder_rationale_title)) },
+            text = { Text(stringResource(id = R.string.reminder_rationale_message)) },
+            confirmButton = {
+                TextButton(onClick = { onEvent(SettingsEvent.ReminderRationaleConfirmed) }) {
+                    Text(stringResource(id = R.string.reminder_rationale_confirm))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { onEvent(SettingsEvent.ReminderRationaleDismissed) }) {
+                    Text(stringResource(id = R.string.cancel))
+                }
+            }
+        )
     }
 }
 
@@ -145,7 +202,10 @@ fun SettingsScreen(
 private fun SettingsScreenPreview() {
     SubTrackTheme {
         SettingsScreen(
-            uiState = SettingsUiState(mainCurrency = Currency.USD),
+            uiState = SettingsUiState(
+                mainCurrency = Currency.USD,
+                reminderPermission = ReminderPermissionState.CAN_REQUEST
+            ),
             onEvent = {},
             onNavigateBack = {},
             onNavigateToExchangeRates = {}

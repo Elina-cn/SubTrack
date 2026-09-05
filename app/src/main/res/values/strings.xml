@@ -108,4 +108,14 @@
     <string name="notification_entry_separator">", "</string>
     <string name="notification_due_today">bugün</string>
     <string name="notification_due_tomorrow">yarın</string>
+    <!-- Payment reminder settings row -->
+    <string name="reminder_notifications_title">Ödeme hatırlatmaları</string>
+    <string name="reminder_notifications_on">Açık</string>
+    <string name="reminder_notifications_can_request">Kapalı — açmak için dokunun</string>
+    <string name="reminder_notifications_settings_only">Kapalı — sistem ayarlarından açılmalı</string>
+    <!-- Başlık ve durum tek bir odak durağı olarak okunur. -->
+    <string name="settings_row_description">%1$s, %2$s</string>
+    <string name="reminder_rationale_title">Hatırlatmalara izin verin</string>
+    <string name="reminder_rationale_message">Ödeme günü yaklaşan abonelikleriniz için günde en fazla bir bildirim gönderilir. Başka hiçbir şey için bildirim almazsınız.</string>
+    <string name="reminder_rationale_confirm">İzin iste</string>
 </resources>
