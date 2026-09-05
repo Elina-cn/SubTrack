@@ -8,6 +8,8 @@ import com.elinacn.subtrack.domain.model.Money
 import com.elinacn.subtrack.domain.model.Subscription
 import com.elinacn.subtrack.domain.model.SubscriptionCategory
 import com.elinacn.subtrack.domain.usecase.PaymentCountdown
+import com.elinacn.subtrack.fake.FakeReminderNotificationStatus
+import com.elinacn.subtrack.fake.FakeReminderStateRepository
 import com.elinacn.subtrack.fake.FakeSettingsRepository
 import com.elinacn.subtrack.fake.FakeSubscriptionRepository
 import com.elinacn.subtrack.ui.common.UiText
@@ -52,7 +54,14 @@ class HomeViewModelTest {
         Dispatchers.setMain(dispatcher)
         repository = FakeSubscriptionRepository()
         settingsRepository = FakeSettingsRepository()
-        viewModel = HomeViewModel(repository, settingsRepository, clock)
+        // Reminders already visible, so the permission trigger stays out of these cases.
+        viewModel = HomeViewModel(
+            repository,
+            settingsRepository,
+            FakeReminderStateRepository(),
+            FakeReminderNotificationStatus(remindersVisible = true),
+            clock
+        )
     }
 
     @After
