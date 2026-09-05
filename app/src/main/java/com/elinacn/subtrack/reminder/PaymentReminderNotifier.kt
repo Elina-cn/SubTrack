@@ -5,7 +5,6 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.os.Build
 import androidx.core.app.NotificationChannelCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
@@ -26,33 +25,39 @@ import javax.inject.Inject
 class PaymentReminderNotifier @Inject constructor(
     // @param: because Dagger reads the constructor parameter; without it Kotlin 2.2 warns that a
     // future release would also put the qualifier on the backing field.
-    @param:ApplicationContext private val context: Context
+    @param:ApplicationContext private val context: Context,
+    private val status: ReminderNotificationStatus
 ) {
 
     /**
      * Shows [reminders] as one notification, replacing yesterday's if it is still on screen.
      *
-     * Returns whether one actually went out. It does nothing when the user has notifications
-     * switched off - on API 33+ that is also what a denied POST_NOTIFICATIONS permission looks
-     * like, the expected state until the runtime request arrives in phase 10c. The caller needs
-     * to tell the two apart, because a day on which nothing was shown must not be recorded as a
-     * day on which the user was reminded. See ARCHITECTURE section 18.
+     * Returns whether one actually went out. It does nothing when reminders cannot be seen - the
+     * app switch off, the permission denied, or this channel silenced. The caller needs to tell
+     * the two apart, because a day on which nothing was shown must not be recorded as a day on
+     * which the user was reminded. See ARCHITECTURE section 18.
      */
     fun notify(reminders: List<PaymentReminder>): Boolean {
         if (reminders.isEmpty()) return false
 
-        val manager = NotificationManagerCompat.from(context)
-        if (!manager.areNotificationsEnabled()) return false
-        // areNotificationsEnabled already covers a denied POST_NOTIFICATIONS, but lint wants the
-        // permission itself checked before notify(). The version guard matters: the permission
-        // does not exist below API 33, where checkSelfPermission would answer "denied" for it and
-        // silence the reminder on every older device.
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+        // The single source of truth, shared with the settings screen: app switch and channel
+        // together. A denied POST_NOTIFICATIONS shows up here too, since it turns the app switch
+        // off. Nothing is decided twice.
+        if (!status.areRemindersVisible()) return false
+
+        // Lint cannot see through [status] and insists the permission is checked in the same
+        // function as the notify() call below. This restates what areRemindersVisible() already
+        // decided - a tool requirement, not a second opinion. The version guard is load-bearing:
+        // the permission does not exist below API 33, where checkSelfPermission answers "denied"
+        // for it and would silence the reminder on every older device.
+        if (status.isRuntimePermissionRequired() &&
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
             PackageManager.PERMISSION_GRANTED
         ) {
             return false
         }
+
+        val manager = NotificationManagerCompat.from(context)
 
         // Rebuilt every time on purpose. Creating a channel that exists is a no-op, and it is what
         // updates the channel's name and description after the user changes the device language.
@@ -123,7 +128,8 @@ class PaymentReminderNotifier @Inject constructor(
     }
 
     private companion object {
-        const val CHANNEL_ID = "payment_reminders"
+        /** Read from the status holder so the channel is named in exactly one place. */
+        const val CHANNEL_ID = ReminderNotificationStatus.CHANNEL_ID
 
         /** Fixed, so today's summary replaces yesterday's instead of stacking up. */
         const val NOTIFICATION_ID = 1
