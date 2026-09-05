@@ -738,7 +738,9 @@ Her iki durumda da `Result.success()` dönülür. Bildirimlerin kapalı olması 
 hata değil, kullanıcının tercihi olabilir; `retry` yalnızca bu işin
 değiştiremeyeceği bir ayarı beklerken pil harcardı.
 
-**Bilinen sınır:** `areNotificationsEnabled()` **uygulama düzeyindedir.**
+**Bilinen sınır — Faz 10c-1'de KAPANDI, aşağıdaki "Kanal düzeyi tespit"
+başlığına bakın. Kayıt olarak bırakılıyor:** `areNotificationsEnabled()`
+**uygulama düzeyindedir.**
 Kullanıcı yalnızca `payment_reminders` **kanalını** kapatmışsa bu fonksiyon
 hâlâ `true` döner, `notify()` çağrılır, sistem bildirimi sessizce düşürür ve
 gün yine de işaretlenir. Yani kanal bazlı kapatma bu koruma tarafından
@@ -756,6 +758,104 @@ kullanılıyor. Aynı dosya için ikinci bir instance çalışma zamanı hatası
 (§14), ve tek bir `Long` için ikinci bir dosya ileride taşınacak fazladan bir
 dosya olurdu. Gün **epoch day** olarak saklanır, epoch millis değil: "bugün
 gönderildi mi" bir takvim sorusudur.
+
+### Bildirim durumu üç haldir
+
+Kullanıcının bildirimleri açması gereken durum ikiye ayrılır ve iki farklı
+düğme ister. Bu yüzden durum `Boolean` değil, üç halli bir tiptir
+(`ReminderPermissionState`):
+
+| Hal | Anlamı | Satıra dokununca |
+|---|---|---|
+| `ENABLED` | Bildirimler görünüyor | Sistem bildirim ayarları açılır (kapatmak için) |
+| `CAN_REQUEST` | Kapalı, uygulama izni kendisi isteyebilir | İzin istenir |
+| `SETTINGS_ONLY` | Kapalı, yalnızca sistem ayarları açabilir | Sistem bildirim ayarları açılır |
+
+Karar tablosu, sırayla:
+
+1. Bildirimler görünüyorsa → `ENABLED`. (Bu dal her API sürümünü kapsar;
+   eski sürümlerde tutulacak izin yok, yalnızca anahtar var.)
+2. Bu derlemede runtime izin gerekmiyorsa (API < 33) → `SETTINGS_ONLY`.
+   İstenecek bir şey yok.
+3. İzin var ama bildirim görünmüyorsa → `SETTINGS_ONLY`. Uygulama anahtarı
+   veya kanal kapalı; ikisi de kullanıcının kendi tercihi.
+4. İzin yok ve **hiç sorulmamışsa** → `CAN_REQUEST`.
+5. İzin yok, sorulmuş ve sistem hâlâ gerekçe göstermemize izin veriyorsa →
+   `CAN_REQUEST`.
+6. Kalan durum → `SETTINGS_ONLY`. Sorulmuş, gerekçe hakkı yok: kalıcı ret.
+
+### "Hiç sorulmadı" ile "kalıcı reddedildi" neden bizim bayrağımızla ayrılır
+
+`shouldShowRequestPermissionRationale` **iki durumda da `false` döner**: izin
+hiç istenmemişse ve kullanıcı "bir daha sorma" ile reddetmişse. Sistem bu ikisini
+ayırt edecek bir API vermiyor.
+
+Ayrımı DataStore'daki kalıcı bir bayrak tutar
+(`ReminderStateRepository.wasPermissionRequested`). Bayrak **istek gönderildiği
+anda** yazılır, cevabından bağımsız — kullanıcının bir kez sorulmuş olması,
+"evet" demesine bağlı değil.
+
+Bu bayrak da bir kullanıcı tercihi değil, işin kendi kaydı; bu yüzden yeni bir
+repository açılmadı, mevcut `ReminderStateRepository`'ye eklendi ve aynı
+DataStore dosyasını kullanıyor (§14, ikinci instance yasak).
+
+### İlk soruda araya diyalog konmaz
+
+`CAN_REQUEST` + hiç sorulmamış → **doğrudan** sistem izin diyaloğu.
+`CAN_REQUEST` + sorulmuş → önce bir cümlelik açıklama, sonra sistem diyaloğu.
+
+Gerekçe: ilk seferde sistem diyaloğunun önüne konan fazladan bir ekran, izni
+kazandırmaktan çok reddi artırır. İkinci soruda kullanıcı zaten bir kez hayır
+demiştir; orada bir cümle açıklama borcumuzdur.
+
+### Kanal düzeyi tespit — 10b'deki "bilinen sınır" kapandı
+
+10b'de şu sınır kaydedilmişti: `areNotificationsEnabled()` uygulama
+düzeyindedir, kullanıcı yalnızca `payment_reminders` kanalını kapatmışsa bu
+yakalanmaz ve gün yine işaretlenir.
+
+**Bu sınır kapandı.** Kontrol artık iki aşamalı ve tek bir yerde
+(`ReminderNotificationStatus`):
+
+1. `NotificationManagerCompat.areNotificationsEnabled()`
+2. `getNotificationChannelCompat(CHANNEL_ID)?.importance != IMPORTANCE_NONE`
+
+Kanal henüz oluşmamışsa engel sayılmaz — bildirim gönderilene kadar kanal
+yoktur ve var olmayan bir kanal kullanıcının susturduğu bir kanal değildir.
+API 26 altında da kanal kavramı yok, Compat orada da `null` döndürüyor; bu
+yüzden elle `Build.VERSION` dallanması yazılmadı.
+
+Emülatörde ölçüldü: kanal kapatıldığında `mImportance=0` oluyor, uygulama izni
+`granted=true` kalıyor ve satır doğru şekilde `SETTINGS_ONLY`'ye düşüyor.
+
+**Tek elle yazılan sürüm kontrolü**, "bu derlemede runtime izin gerekiyor mu"
+sorusudur. Hiçbir Compat sınıfı bunu cevaplamıyor ve ayarlar ekranının iki
+yolundan hangisinin mümkün olduğunu bilmesi gerekiyor.
+
+### Notifier'daki ikinci izin kontrolü lint içindir
+
+`PaymentReminderNotifier` kararı `ReminderNotificationStatus`'tan alır. Buna ek
+olarak, `notify()` çağrısıyla **aynı fonksiyonda** bir
+`ContextCompat.checkSelfPermission` satırı vardır.
+
+Bunun sebebi lint'tir: `MissingPermission` denetimi arayüzün arkasını göremiyor
+ve izni çağrı yerinde görmek istiyor. Kaldırıldığında derleme
+`Call requires permission which may be rejected by user` hatasıyla duruyor.
+Karar tek yerdedir; bu satır aynı sorunun aracın görebileceği biçimde
+tekrarıdır, ikinci bir görüş değil. `@SuppressLint` yasak olduğu için
+(CLAUDE.md §4) alternatifi yok.
+
+### Sistem ayarlarından dönüşte durum tazelenir
+
+Ekran `ON_RESUME`'da durumu yeniden okur. Olmasaydı kullanıcı sistem
+ayarlarından bildirimleri açıp geri döndüğünde satır hâlâ "kapalı" derdi.
+Emülatörde ölçüldü: süreç kimliği değişmeden (aynı pid) satır "Açık"a
+dönüyor.
+
+`ACTION_APP_NOTIFICATION_SETTINGS` bulunamazsa
+`ACTION_APPLICATION_DETAILS_SETTINGS`'e düşülür. Bu **açık** bir fallback'tir,
+kodda `ActivityNotFoundException` yakalanıp gerekçesiyle yazılmıştır — §9'un
+yasakladığı sessiz `try/catch` değil.
 
 ### `POST_NOTIFICATIONS`
 

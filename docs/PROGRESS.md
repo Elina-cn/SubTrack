@@ -27,6 +27,152 @@ Her faz sonunda **en üste** yeni kayıt eklenir. Eski kayıtlar silinmez.
 
 ---
 
+## [Faz 10c-1] Bildirim Durumu ve İzin Akışı (Ayarlar) — 2026-09-05
+
+**Durum:** Tamamlandı. **Faz 10c KAPANMADI** — bağlamsal tetikleyici (tarihli
+abonelik kaydedilince sorma) 10c-2'nin işi, ROADMAP'teki 10c maddesi o bitene
+kadar işaretlenmiyor.
+
+**Yapılanlar**
+- `ReminderNotificationStatus` — bildirimin fiilen görünüp görünmediği için tek
+  kaynak. Kontrol iki aşamalı: uygulama anahtarı **ve** kanal importance'ı.
+  Arayüz + `AndroidReminderNotificationStatus` gerçeklemesi, `@Binds` ile
+  `di/ReminderModule`'de bağlandı. Arayüz olmasının sebebi test: durum
+  makinesinin yedi dalı gerçek bir `NotificationManager` üzerinden
+  koşturulamaz.
+- `PaymentReminderNotifier` artık kararı bu sınıftan alıyor; kendi içindeki
+  `areNotificationsEnabled` kontrolü kaldırıldı. Kanal id'si tek yerde
+  (`ReminderNotificationStatus.CHANNEL_ID`).
+- `ReminderStateRepository`'ye `wasPermissionRequested` / `setPermissionRequested`.
+  Mevcut `DataStore<Preferences>` örneği; yeni repository veya ikinci instance
+  yok (§14).
+- `SettingsUiState` üç halli `ReminderPermissionState` ve iki eylemli
+  `ReminderPermissionAction` kazandı. Karar tamamen ViewModel'da; composable
+  yalnızca Activity gerektiren işi yapıyor ve sonucu `onEvent` ile bildiriyor.
+  Yeni `Channel`/`SharedFlow` açılmadı.
+- Ayarlar ekranına "Ödeme hatırlatmaları" satırı. Kur satırıyla aynı desen;
+  ikisi de artık ortak `ui/common/SettingsRow` bileşeninden geliyor.
+- `LocalActivity` kullanıldı (activity-compose **1.12.4**, sınıfın varlığı
+  `unzip -l classes.jar` ile doğrulandı). `ContextWrapper` zinciri yürüyen
+  yardımcı yazılmadı.
+- `SettingsScreen.kt` bölünmeden 310 satır olmuştu (CLAUDE.md §4 sınırı 300);
+  satır bileşeni `ui/common/SettingsRow.kt`'ye, Activity yardımcıları
+  `ui/settings/ReminderPermissionActions.kt`'ye taşındı → 214 satır.
+
+**Karar tablosu** ARCHITECTURE §18'de. Özet sıra: görünüyorsa `ENABLED`;
+API < 33 ise `SETTINGS_ONLY`; izin var ama görünmüyorsa `SETTINGS_ONLY`;
+hiç sorulmamışsa `CAN_REQUEST`; sorulmuş + rationale varsa `CAN_REQUEST`;
+kalan `SETTINGS_ONLY`.
+
+**Testler**
+- 112 → **127 birim testi** (15 yeni), 0 hata. Yedi dalın tamamı ve dokunma
+  davranışları ViewModel'ın public yüzeyinden test edildi.
+- Yeni fake'ler: `FakeReminderStateRepository`, `FakeReminderNotificationStatus`.
+  Mock kütüphanesi yok (§11).
+- `lintDebug` **0 hata, 19 uyarı** (15 → 19). Dört yeni uyarının hepsi
+  `InlinedApi`: `POST_NOTIFICATIONS` (×2, API 33 sabiti),
+  `ACTION_APP_NOTIFICATION_SETTINGS` ve `EXTRA_APP_PACKAGE` (API 26 sabitleri).
+  Üçü de derleme anında satır içine alınan `String` sabitleri; eski cihazda
+  çalışma zamanı sorunu değil, zaten `ActivityNotFoundException` fallback'i ve
+  API < 33 dalı bu yüzden var.
+- Enstrümantasyon testi bu fazda yazılmadı (izin diyaloğu sistem UI'ı).
+
+**Lint yüzünden kalan ikinci kontrol — kabul edilen sapma**
+Prompt "notifier'da iki ayrı kontrol kalmasın" diyordu. Karar tek yerde
+(`status.areRemindersVisible()`), ama `notify()` ile **aynı fonksiyonda** bir
+`ContextCompat.checkSelfPermission` satırı bırakmak zorunda kaldım: lint'in
+`MissingPermission` denetimi arayüzün arkasını görmüyor ve kaldırıldığında
+derleme `Call requires permission which may be rejected by user` hatasıyla
+duruyor. `@SuppressLint` yasak (CLAUDE.md §4), `@RequiresPermission` ile
+yukarı taşımak worker'a yanlış bir söz yazmak olurdu. Satır, sebebi yazılarak
+bırakıldı.
+
+**Emülatör turu — API 34, tek tur, sırayla**
+
+| Adım | Kanıt |
+|---|---|
+| (a) `pm clear` sonrası | `granted=false` · satır: **"Payment reminders, Off — tap to turn on"** |
+| (b) satıra dokun | `com.android.permissioncontroller:id/grant_dialog` + `permission_allow_button` / `permission_deny_button`. Uygulamanın diyaloğu **yok** |
+| (c) Allow | `granted=true` · satır: **"Payment reminders, On"** |
+| (e) bir kez reddedip satıra dokun | **Uygulamanın diyaloğu**: "Allow reminders" / "You get at most one notification a day…" / Cancel · Ask for permission |
+| (e devam) sistem diyaloğu | İkinci soruda düğme `permission_deny_and_dont_ask_again_button` |
+| (f) kalıcı ret | `granted=false, flags=[USER_SET\|**USER_FIXED**\|…]` · satır: **"Off — turn on in system settings"** · dokununca `com.android.settings/.Settings$AppNotificationSettingsActivity` |
+| (d) sistem ayarlarından aç, geri dön | pid **6715 → 6715** (yeniden başlatma yok) · satır: **"Payment reminders, On"** |
+| (g) yalnızca kanalı kapat, geri dön | kanal `mImportance=0`, uygulama izni **`granted=true`**, pid **7175 → 7175** · satır: **"Off — turn on in system settings"** |
+| (h) fs 2.0 | satır `[42,1214][1038,1560]`, durum metni `[42,1332][1038,1528]` — iki satıra sarıyor, kırpılma yok, üstteki kur satırıyla çakışma yok (`…1211` / `1214…`) |
+
+**(d) hakkında bir düzeltme:** prompt `pm revoke` ile ON_RESUME tazelemesini
+göstermeyi istiyordu, ama **`pm revoke` uygulama sürecini öldürüyor** (pid
+6503 → yok). Bu yüzden tazeleme sistem ayarları üzerinden gösterildi; o yol
+süreci öldürmüyor ve zaten gerçek kullanım senaryosu bu. Ölçüm TESTING.md'ye
+yazıldı.
+
+**Emülatör turu — API 29**
+
+Prompt satırın `SETTINGS_ONLY` olmasını bekliyordu; **temiz kurulumda `ENABLED`
+çıkıyor** ve bu doğru: API 29'da bildirimler varsayılan açık, durum makinesinin
+ilk dalı kazanıyor. `SETTINGS_ONLY` yolu, bildirimler kapatılınca üretildi:
+
+- (i) satıra dokun → `com.android.settings/.Settings$AppNotificationSettingsActivity`,
+  ağaçta `permissioncontroller` düğümü sayısı **0** (izin diyaloğu hiç çıkmıyor).
+- Sistem ayarlarından bildirimleri kapat, geri dön → pid **7293 → 7293**,
+  satır: **"Payment reminders, Off — turn on in system settings"**.
+
+**(j) Erişilebilirlik — bulundu, çözülemedi**
+
+İki emülatörde de satır ağaçta **aynı sınırlarda iki düğüm** veriyor:
+
+```
+node class="android.view.View" content-desc=""                          clickable="true"  focusable="true"  bounds="[32,600][688,726]"
+node class="android.view.View" content-desc="Payment reminders, Off — turn on in system settings"  clickable="false" focusable="false" bounds="[32,600][688,726]"
+```
+
+(API 34'te aynı yapı, `bounds="[42,854][1038,1020]"`.)
+
+Denenenler: `semantics`'i `clickable`'dan **önce** koymak (değişmedi, hâlâ iki
+düğüm) ve `Role.Button` eklemek (**üç** düğüme çıkardı). Bırakılan biçim,
+adın odaklanabilir düğümün doğrudan altında olduğu iki-düğüm biçimi.
+
+TalkBack'in üst düğüme odaklanıp alttakinin adını okuyup okumadığı **bu
+imajlarda doğrulanamıyor** (Android Accessibility Suite yok, TESTING.md'de
+kayıtlı). ROADMAP Faz 16'daki TalkBack maddesine eklendi.
+
+**(k) Regresyon — 40 maddelik liste**
+
+Sabit listeye 10c-1'in sekiz maddesi eklendi (33-40), liste 32 → **40**.
+Tamamı iki emülatörde koşuldu ve geçti, iki bilinen istisnayla: **#15 (koyu
+tema)** API 29'da ölçülemiyor, **#16 (dil)** API 29'da ayarlar arayüzü
+gerektirdiği için koşulmadı; ikisi de API 34'te koşuldu ve geçti
+("Aylık Toplam", "Aboneliklerim", "Ödeme hatırlatmaları, Kapalı — açmak için
+dokunun", "4 gün gecikti", "6 gün kaldı").
+
+Cihaz tarihi 5 Eylül 2026 olduğu için tarih maddeleri buna göre koşuldu:
+11 Eylül → **"6 days left"**, 1 Eylül → **"4 days overdue"**, bugün →
+**"Due today"**, 31.12.2040 → alan hatası ve **kaydedilmedi**.
+
+Hiçbir metinde ham `%` görülmedi.
+
+**Değişen dosyalar**
+- `reminder/ReminderNotificationStatus.kt`, `reminder/AndroidReminderNotificationStatus.kt` — yeni
+- `di/ReminderModule.kt` — yeni
+- `reminder/PaymentReminderNotifier.kt` — kararı devretti
+- `domain/repository/ReminderStateRepository.kt`, `data/repository/ReminderStateRepositoryImpl.kt`
+- `ui/settings/SettingsUiState.kt`, `SettingsViewModel.kt`, `SettingsScreen.kt`
+- `ui/settings/ReminderPermissionActions.kt`, `ui/common/SettingsRow.kt` — yeni
+- `res/values/strings.xml`, `res/values-en/strings.xml`
+- `test/fake/FakeReminderStateRepository.kt`, `FakeReminderNotificationStatus.kt` — yeni
+- `test/ui/settings/SettingsViewModelReminderTest.kt` — yeni
+- `docs/ARCHITECTURE.md` §18, `docs/TESTING.md`, `docs/ROADMAP.md`
+
+**Sonraki faz için not**
+- 10c-2: tarihli abonelik kaydedilince bağlamsal olarak sorma. Bayrak ve durum
+  makinesi hazır; oradaki tek yeni soru, aynı gün içinde kaç kez sorulacağı.
+- İzin yeni verildiğinde o günkü hatırlatmanın gönderilmesi 10b hotfix'iyle
+  zaten mümkün; 10c-2'de izin verilir verilmez bir koşu tetiklenmeli mi,
+  karara bağlanmalı.
+
+---
+
 ## [Faz 10b hotfix] Gösterilmeyen bildirim gün olarak yazılmasın — 2026-09-04
 
 **Durum:** Tamamlandı.

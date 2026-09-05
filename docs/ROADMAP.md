@@ -368,7 +368,13 @@ Aylık toplamın zaman içindeki anlık görüntüleri. `PROJECT_SPEC.md` §1'de
       reddedildi — **nasıl çözüleceği ayrıca kararlaştırılacak.**
       Bekleyen maddeler: satır ve kart tek odak durağı mı okunuyor,
       "Sil" özel eylemi görünüp çalışıyor mu, para birimi chip'lerinin
-      seçili durumu duyuruluyor mu. **Ağaç tarafı Faz 9b-2'de kapandı:**
+      seçili durumu duyuruluyor mu. **Faz 10c-1'de bir tane daha eklendi:**
+      ayarlar satırları ağaçta aynı sınırlarda **iki düğüm** veriyor -
+      biri odaklanabilir ve tıklanabilir ama isimsiz, diğeri isimli ama
+      eylemsiz. `semantics`/`clickable` sırası değiştirilerek ve `Role.Button`
+      eklenerek denendi; ilki değiştirmedi, ikincisi düğüm sayısını üçe
+      çıkardı. TalkBack'in isimsiz üst düğüme odaklanıp alt düğümün adını
+      okuyup okumadığı **doğrulanamadı** - bu imajlarda TalkBack yok. **Ağaç tarafı Faz 9b-2'de kapandı:**
       ekleme sheet'i ve ayarlar ekranı, normal ve `--compressed` dump'ta
       birebir aynı yapıyı veriyor — tıklanabilir sarmalayıcı
       `checkable="true"`, seçili olan `checked="true"`. Hotfix'teki ters

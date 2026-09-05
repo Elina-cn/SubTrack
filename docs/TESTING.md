@@ -77,6 +77,15 @@ etmeden bildirin; sonraki maddeler zaten bozuk bir durumun üstüne binebilir.
 | 31 | Seçicinin metin girişinden 10 yıldan uzak bir tarih gir, kaydet | Alan altında hata, **kaydedilmiyor**, sheet açık kalıyor, çökme yok | 10a |
 | 32 | Tarih seçili haldeyken sheet açıkken döndür | Tarih **korunuyor** | 10a |
 
+| 33 | Ayarlarda "Ödeme hatırlatmaları" satırı | Üç halden birini söylüyor: **Açık** / **Kapalı — açmak için dokunun** / **Kapalı — sistem ayarlarından açılmalı** | 10c-1 |
+| 34 | (API 33+) Temiz kurulumda satıra dokun | **Doğrudan** sistem izin diyaloğu; araya uygulamanın diyaloğu **girmiyor** | 10c-1 |
+| 35 | İzni verip satıra bak | **Açık** | 10c-1 |
+| 36 | Bir kez reddettikten sonra satıra dokun | Önce **uygulamanın açıklama diyaloğu**, sonra sistem diyaloğu | 10c-1 |
+| 37 | Kalıcı reddedildikten sonra satıra dokun | **Sistem bildirim ayarları** açılıyor, izin diyaloğu çıkmıyor | 10c-1 |
+| 38 | Sistem ayarlarından bildirimleri aç, geri dön | Satır **uygulama yeniden başlatılmadan** güncelleniyor | 10c-1 |
+| 39 | Sistem ayarlarından **yalnızca kanalı** kapat, geri dön | Satır **kapalı** diyor (uygulama izni hâlâ verili olsa bile) | 10c-1 |
+| 40 | (API < 33) Satıra dokun | Sistem bildirim ayarları açılıyor, izin diyaloğu **hiç** çıkmıyor | 10c-1 |
+
 **Klavye açıkken buton erişilebilirliği — her fazda kontrol edilecek**
 
 Metin alanı olan **her** ekranda, klavye açıkken ekranın alt kısmındaki
@@ -212,6 +221,45 @@ adb shell cmd overlay list android | grep navbar
 
 Yani bu, API sürümünün değil **gezinme modunun** sonucudur. Bir AVD'nin modu
 değişirse davranış da değişir; şüphede kalınca yukarıdaki komutla bakılır.
+
+### Bildirim izni durumunu adb ile kurma ve okuma
+
+Ayarlar'daki "Ödeme hatırlatmaları" satırı üç hal gösterir ve üçü de elle
+kurulabilir. Okumak için:
+
+```bash
+adb shell dumpsys package com.elinacn.subtrack | grep POST_NOTIFICATIONS
+```
+
+`granted=false` + bayraklarda `USER_FIXED` yoksa "hiç sorulmamış veya bir kez
+reddedilmiş"; `USER_FIXED` varsa **kalıcı ret**.
+
+Kurmak için:
+
+```bash
+adb shell pm clear com.elinacn.subtrack        # hiç sorulmamış hale döner
+adb shell pm grant  com.elinacn.subtrack android.permission.POST_NOTIFICATIONS
+adb shell pm revoke com.elinacn.subtrack android.permission.POST_NOTIFICATIONS
+```
+
+**`pm revoke` uygulama sürecini öldürür.** Ölçüldü: pid `pm revoke`'tan sonra
+kayboluyor. Bu yüzden `ON_RESUME` tazelemesi bu komutla gösterilemez —
+gösterilecekse bildirimler **sistem ayarları arayüzünden** kapatılıp geri
+dönülür, o yol süreci öldürmüyor (aynı pid kalıyor).
+
+Kanal durumunu okumak için:
+
+```bash
+adb shell dumpsys notification --noredact | grep -A3 payment_reminders
+```
+
+`mImportance=0` kanalın susturulduğu anlamına gelir. **Kanal ancak ilk bildirim
+gönderildikten sonra vardır**; oluşturmak için hatırlatma testini bir kez
+koşturmak yeterli.
+
+Sistem izin diyaloğunun düğümleri `com.android.permissioncontroller` paketinde
+olur; ilk soruda `permission_allow_button` / `permission_deny_button`, ikinci
+soruda `permission_deny_and_dont_ask_again_button` çıkar.
 
 ### Yazı tipi ölçeği
 
