@@ -125,6 +125,7 @@ aramayla daraltılmadı.
 
 **Commit'ler**
 - `9d143a1` fix: only record the day when a reminder was actually shown
+- `3a81fc3` docs: record the reminder-day fix and the edge-swipe measuring trap
 
 **Sonraki faz için not**
 - 10c izni runtime'da isteyecek. İzin **yeni verildiğinde** o günkü
