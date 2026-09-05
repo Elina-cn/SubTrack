@@ -164,6 +164,84 @@ Hiçbir metinde ham `%` görülmedi.
 - `test/ui/settings/SettingsViewModelReminderTest.kt` — yeni
 - `docs/ARCHITECTURE.md` §18, `docs/TESTING.md`, `docs/ROADMAP.md`
 
+**Doğrulama tamamlaması — 2026-09-05**
+
+10c-1 kapanışında iki eksik vardı: notifier değiştiği hâlde enstrümantasyon
+paketi yeniden koşulmamıştı, ve satırın ağaçtaki şekli mevcut satırlarla
+karşılaştırılmamıştı. İkisi de kapatıldı, **üretim kodu değişmedi**.
+
+**Enstrümantasyon — iki emülatörde de `OK (11 tests)`**
+
+`am instrument` ile koşuldu (Gradle görevi uygulamayı kaldırıyor).
+
+| Emülatör | Sonuç |
+|---|---|
+| `subtrack_narrow_api29` | `OK (11 tests)` |
+| `subtrack_wide_api34` | `OK (11 tests)` |
+
+API 29'da bildirim **gerçekten gitti** — notifier'daki yeni
+`checkSelfPermission` satırının eski platformda hatırlatmayı susturmadığının
+kanıtı:
+
+```
+EXTRA_TITLE   = [Payment reminder: 4 subscriptions]
+EXTRA_TEXT    = [DueToday — today, Tomorrow — tomorrow, OneDayLate — 1 day overdue,
+                 ThreeDaysLate — 3 days overdue]
+channelId     = [payment_reminders]
+contentIntent is null = false      FLAG_AUTO_CANCEL set = true
+postTime      = 1788600100565  (ikinci koşuda değişmedi)
+```
+
+**API 29'da `POST_NOTIFICATIONS` nasıl görünüyor**
+
+```
+$ adb shell dumpsys package com.elinacn.subtrack | grep -A2 POST_NOTIFICATIONS
+      android.permission.POST_NOTIFICATIONS
+      android.permission.WAKE_LOCK
+      android.permission.ACCESS_NETWORK_STATE
+
+$ ... | grep -iE "POST_NOTIFICATIONS|install permissions|runtime permissions"
+      android.permission.POST_NOTIFICATIONS
+    install permissions:
+    runtime permissions:
+```
+
+İzin yalnızca **istenen izinler** listesinde görünüyor; `install permissions`
+ve `runtime permissions` bölümlerinin ikisi de onun için **boş** ve hiçbir
+`granted=` satırı yok. Yani API 29'da bu izin ne kurulum ne çalışma zamanı
+izni olarak veriliyor — `checkSelfPermission` ona "reddedildi" cevabı verirdi.
+Notifier'daki `isRuntimePermissionRequired()` koruması tam olarak bunun için
+var, ve yukarıdaki bildirim o korumanın çalıştığının kanıtı.
+
+**Teşhis — satırın ağaçtaki şekli proje geneli bir desen**
+
+API 34'te tek dump alındı:
+
+| Öğe | Düğüm | clickable / focusable | İsim |
+|---|---|---|---|
+| Ana para birimi chip'i (TRY) | 2 | üst: `true`/`true` (+`checkable`, `checked`) | üstte **yok**, altta "Turkish lira" |
+| Döviz Kurları satırı | 2 | üst: `true`/`true` | üstte **yok**, altta "Exchange Rates, Edit the rates…" |
+| Ödeme hatırlatmaları satırı | 2 | üst: `true`/`true` | üstte **yok**, altta "Payment reminders, Off — tap to turn on" |
+| Geri oku (stok `IconButton`) | 2 | üst: `true`/`true` | üstte **yok**, altta "Back" |
+| **Tarih alanı (10a)** | **1** | `true`/`true` | **"Next Payment (optional), Not set"** |
+
+Yani mevcut satırların hepsi yeni satırla **aynı iki-düğüm şeklinde** →
+promptun birinci dalı: **kod değiştirilmedi**, bulgu ROADMAP Faz 16'daki
+TalkBack maddesine yazıldı.
+
+Tek düğüm veren tek yapı 10a'daki tarih alanı ve sebebi ölçümden anlaşılıyor:
+orada `semantics` ve `clickable` **çocuğu olmayan** bir overlay `Box`'a
+konuyor, o yüzden tek semantics düğümünde birleşiyorlar. Metin çocukları olan
+bir satırda aynı sonuç alınamıyor.
+
+Dikkat çeken nokta: stok Material `IconButton` da (geri oku) aynı iki-düğüm
+şeklini veriyor. Bu, davranışın Compose erişilebilirlik köprüsünün normali
+olduğuna işaret ediyor — ama TalkBack bu imajlarda olmadığı için üst düğüme
+odaklanıp alt düğümün adını okuyup okumadığı **hâlâ doğrulanamadı**.
+
+Kod değişmediği için regresyon listesi yeniden koşulmadı.
+
+
 **Sonraki faz için not**
 - 10c-2: tarihli abonelik kaydedilince bağlamsal olarak sorma. Bayrak ve durum
   makinesi hazır; oradaki tek yeni soru, aynı gün içinde kaç kez sorulacağı.

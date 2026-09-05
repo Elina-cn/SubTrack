@@ -368,13 +368,35 @@ Aylık toplamın zaman içindeki anlık görüntüleri. `PROJECT_SPEC.md` §1'de
       reddedildi — **nasıl çözüleceği ayrıca kararlaştırılacak.**
       Bekleyen maddeler: satır ve kart tek odak durağı mı okunuyor,
       "Sil" özel eylemi görünüp çalışıyor mu, para birimi chip'lerinin
-      seçili durumu duyuruluyor mu. **Faz 10c-1'de bir tane daha eklendi:**
-      ayarlar satırları ağaçta aynı sınırlarda **iki düğüm** veriyor -
-      biri odaklanabilir ve tıklanabilir ama isimsiz, diğeri isimli ama
-      eylemsiz. `semantics`/`clickable` sırası değiştirilerek ve `Role.Button`
-      eklenerek denendi; ilki değiştirmedi, ikincisi düğüm sayısını üçe
-      çıkardı. TalkBack'in isimsiz üst düğüme odaklanıp alt düğümün adını
-      okuyup okumadığı **doğrulanamadı** - bu imajlarda TalkBack yok. **Ağaç tarafı Faz 9b-2'de kapandı:**
+      seçili durumu duyuruluyor mu. **Faz 10c-1'de bir tane daha
+      eklendi ve teşhis edildi: tıklanabilir satırlar tek odak durağı
+      vermiyor, bu tüm satırlar için ele alınacak.**
+
+      Ağaçta aynı sınırlarda **iki düğüm** çıkıyor: biri odaklanabilir ve
+      tıklanabilir ama isimsiz, diğeri isimli ama eylemsiz. API 34'te ölçüldü
+      ve **proje geneli bir desen** olduğu görüldü - yeni satırın getirdiği bir
+      gerileme değil:
+
+      | Öğe | Düğüm | Şekil |
+      |---|---|---|
+      | Para birimi chip'i (9a) | 2 | `clickable+checkable`, isimsiz → isimli çocuk |
+      | Döviz Kurları satırı | 2 | aynı |
+      | Ödeme hatırlatmaları satırı (10c-1) | 2 | aynı |
+      | Geri oku (stok `IconButton`) | 2 | aynı |
+      | **Tarih alanı (10a)** | **1** | `clickable` + `semantics` **çocuksuz** bir overlay `Box`'ta |
+
+      Yani tek düğüm veren tek yapı, 10a'daki **çocuksuz overlay** desenidir:
+      semantics ve clickable aynı, çocuğu olmayan öğeye konduğunda tek düğümde
+      birleşiyor. Metin çocukları olan bir satırda `semantics`/`clickable`
+      sırasını değiştirmek işe yaramadı, `Role.Button` eklemek düğüm sayısını
+      **üçe** çıkardı.
+
+      Karar bu maddede verilecek: ya tüm tıklanabilir satırlar overlay desenine
+      geçirilir, ya da TalkBack'in isimsiz üst düğüme odaklanıp alt düğümün
+      adını okuduğu doğrulanıp mevcut yapı kabul edilir. **İkincisi bu
+      imajlarda ölçülemiyor** - Accessibility Suite yok. Stok `IconButton`'ın
+      da aynı şekli vermesi, davranışın Compose erişilebilirlik köprüsünün
+      normali olduğuna işaret ediyor, ama bu bir gözlem, kanıt değil. **Ağaç tarafı Faz 9b-2'de kapandı:**
       ekleme sheet'i ve ayarlar ekranı, normal ve `--compressed` dump'ta
       birebir aynı yapıyı veriyor — tıklanabilir sarmalayıcı
       `checkable="true"`, seçili olan `checked="true"`. Hotfix'teki ters
