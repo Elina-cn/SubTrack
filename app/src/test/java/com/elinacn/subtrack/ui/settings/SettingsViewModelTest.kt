@@ -3,6 +3,8 @@ package com.elinacn.subtrack.ui.settings
 import app.cash.turbine.test
 import com.elinacn.subtrack.R
 import com.elinacn.subtrack.domain.model.Currency
+import com.elinacn.subtrack.fake.FakeReminderNotificationStatus
+import com.elinacn.subtrack.fake.FakeReminderStateRepository
 import com.elinacn.subtrack.fake.FakeSettingsRepository
 import com.elinacn.subtrack.ui.common.UiText
 import kotlinx.coroutines.Dispatchers
@@ -28,13 +30,17 @@ class SettingsViewModelTest {
 
     private val dispatcher = StandardTestDispatcher()
     private lateinit var repository: FakeSettingsRepository
+    private lateinit var reminderState: FakeReminderStateRepository
+    private lateinit var notificationStatus: FakeReminderNotificationStatus
     private lateinit var viewModel: SettingsViewModel
 
     @Before
     fun setUp() {
         Dispatchers.setMain(dispatcher)
         repository = FakeSettingsRepository()
-        viewModel = SettingsViewModel(repository)
+        reminderState = FakeReminderStateRepository()
+        notificationStatus = FakeReminderNotificationStatus()
+        viewModel = buildViewModel()
     }
 
     @After
@@ -54,7 +60,7 @@ class SettingsViewModelTest {
     @Test
     fun uiState_storedCurrency_isWhatTheScreenShows() = runTest {
         repository = FakeSettingsRepository(initial = Currency.GBP)
-        viewModel = SettingsViewModel(repository)
+        viewModel = buildViewModel()
         collectState()
 
         assertEquals(Currency.GBP, viewModel.uiState.value.mainCurrency)
@@ -113,6 +119,9 @@ class SettingsViewModelTest {
     }
 
     /** uiState is WhileSubscribed, so it stays cold until something collects it. */
+    private fun buildViewModel() =
+        SettingsViewModel(repository, reminderState, notificationStatus)
+
     private fun TestScope.collectState() {
         backgroundScope.launch { viewModel.uiState.collect() }
         advanceUntilIdle()
