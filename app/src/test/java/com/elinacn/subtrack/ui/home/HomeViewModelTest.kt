@@ -454,7 +454,9 @@ class HomeViewModelTest {
         val countdowns = viewModel.uiState.value.countdowns
         assertEquals(PaymentCountdown.Upcoming(days = 3), countdowns[1])
         assertEquals(PaymentCountdown.DueToday, countdowns[2])
-        assertEquals(PaymentCountdown.Overdue(days = 4), countdowns[3])
+        // Phase 12-2: the row anchored on 11 March is monthly, so by 15 March its next payment is
+        // 11 April, twenty-seven days off. Before advancement this said Overdue(4).
+        assertEquals(PaymentCountdown.Upcoming(days = 27), countdowns[3])
     }
 
     @Test

@@ -13,6 +13,7 @@ import com.elinacn.subtrack.domain.repository.ReminderStateRepository
 import com.elinacn.subtrack.domain.repository.SettingsRepository
 import com.elinacn.subtrack.domain.repository.SubscriptionRepository
 import com.elinacn.subtrack.domain.usecase.CurrencyConverter
+import com.elinacn.subtrack.domain.usecase.NextPaymentDate
 import com.elinacn.subtrack.domain.usecase.PaymentCountdown
 import com.elinacn.subtrack.reminder.ReminderNotificationStatus
 import com.elinacn.subtrack.ui.common.UiText
@@ -76,9 +77,14 @@ class HomeViewModel @Inject constructor(
             hasAnySubscriptions = subscriptions.isNotEmpty(),
             // Computed here rather than in the composable: it needs today, which is
             // state, and ARCHITECTURE section 3 keeps calculation out of composables.
+            //
+            // The stored date is an anchor and stays one - nothing is written back. What the card
+            // counts towards is where that anchor has reached by today, which for a date that has
+            // passed is a later day on the same cycle (ARCHITECTURE section 17).
             countdowns = visible.mapNotNull { subscription ->
-                subscription.nextPaymentDate?.let { date ->
-                    subscription.id to PaymentCountdown.between(today, date)
+                subscription.nextPaymentDate?.let { anchor ->
+                    val due = NextPaymentDate.onOrAfter(today, anchor, subscription.billingPeriod)
+                    subscription.id to PaymentCountdown.between(today, due)
                 }
             }.toMap(),
             // The total follows the filter: the number under the heading has to cover the rows
