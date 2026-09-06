@@ -93,8 +93,6 @@
         <item quantity="one">%1$d day overdue</item>
         <item quantity="other">%1$d days overdue</item>
     </plurals>
-    <!-- Spoken form of a row that has a date. Name, amount, countdown. -->
-    <string name="subscription_row_description_dated">%1$s, %2$s, %3$s</string>
 
     <!-- Payment reminder notification -->
     <string name="notification_channel_name">Payment reminders</string>
@@ -135,8 +133,8 @@
     <string name="category_productivity">Productivity</string>
     <string name="category_health">Health</string>
     <string name="category_other">Other</string>
-    <!-- Appends the category to the spoken row: (sentence so far), category. -->
-    <string name="subscription_row_description_with_category">%1$s, %2$s</string>
+    <!-- Appends one more fact to the spoken row: (sentence so far), the fact. -->
+    <string name="subscription_row_description_more">%1$s, %2$s</string>
     <!-- Category filter -->
     <string name="filter_all">All</string>
     <string name="empty_category_title">No subscriptions in this category</string>

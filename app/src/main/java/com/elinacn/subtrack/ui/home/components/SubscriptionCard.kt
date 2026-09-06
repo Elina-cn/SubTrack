@@ -25,6 +25,7 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import com.elinacn.subtrack.R
+import com.elinacn.subtrack.domain.model.BillingPeriod
 import com.elinacn.subtrack.domain.model.SubscriptionCategory
 import com.elinacn.subtrack.domain.usecase.PaymentCountdown
 import com.elinacn.subtrack.ui.common.labelRes
@@ -32,18 +33,24 @@ import com.elinacn.subtrack.ui.theme.Dimens
 import com.elinacn.subtrack.ui.theme.SubTrackTheme
 
 /**
- * One subscription: icon, name, the already formatted price and, when there is a date, how far
- * off the next payment is.
+ * One subscription: icon, name, how often it is billed, the already formatted price and, when
+ * there is a date, how far off the next payment is.
  *
  * The row measures 56dp - 24dp of content between 16dp of padding top and bottom - so it clears
- * the 48dp Android touch target minimum that the swipe gesture needs. A countdown adds a second
- * line and the row grows; rows without a date keep their old height rather than reserving space
- * for something that is not there.
+ * the 48dp Android touch target minimum that the swipe gesture needs. A countdown adds a line and
+ * the row grows; rows without a date keep their old height rather than reserving space for
+ * something that is not there.
+ *
+ * [billingPeriod] has no default and is drawn on every row, unlike the category. A price is a
+ * different amount of money depending on how often it is paid, so a row without the period is not
+ * a shorter answer, it is an ambiguous one - and the reader cannot tell an unmarked row from a
+ * monthly one. Nothing about money is left to an implied rule.
  */
 @Composable
 fun SubscriptionCard(
     name: String,
     price: String,
+    billingPeriod: BillingPeriod,
     modifier: Modifier = Modifier,
     countdown: PaymentCountdown? = null,
     category: SubscriptionCategory = SubscriptionCategory.OTHER
@@ -72,6 +79,19 @@ fun SubscriptionCard(
                     text = name,
                     color = MaterialTheme.colorScheme.onSurface,
                     style = MaterialTheme.typography.bodyLarge
+                )
+                // Its own line under the name rather than a suffix on the price. The price sits
+                // in the right-hand column and the name takes what is left, so lengthening the
+                // price would narrow the name - and a name too long for its column is a known
+                // problem at large font scales (phase 14). A line costs height, which the card
+                // has, instead of width, which it does not.
+                Text(
+                    text = stringResource(id = billingPeriod.labelRes()),
+                    // onSurface for the same reason as the category line below: onSurfaceVariant
+                    // is undefined in our scheme (ARCHITECTURE section 12). The smaller type is
+                    // what separates it from the name.
+                    color = MaterialTheme.colorScheme.onSurface,
+                    style = MaterialTheme.typography.bodySmall
                 )
                 if (countdown != null) {
                     Text(
@@ -135,7 +155,11 @@ private fun iconFor(name: String): ImageVector = when (name.lowercase()) {
 @Composable
 private fun SubscriptionCardPreview() {
     SubTrackTheme {
-        SubscriptionCard(name = "Netflix", price = "159.99 TL")
+        SubscriptionCard(
+            name = "Netflix",
+            price = "159.99 TL",
+            billingPeriod = BillingPeriod.MONTHLY
+        )
     }
 }
 
@@ -143,7 +167,11 @@ private fun SubscriptionCardPreview() {
 @Composable
 private fun SubscriptionCardUnknownServicePreview() {
     SubTrackTheme {
-        SubscriptionCard(name = "Bir Başka Servis", price = "1299.00 TL")
+        SubscriptionCard(
+            name = "Bir Başka Servis",
+            price = "1299.00 TL",
+            billingPeriod = BillingPeriod.YEARLY
+        )
     }
 }
 
@@ -154,6 +182,7 @@ private fun SubscriptionCardUpcomingPreview() {
         SubscriptionCard(
             name = "Netflix",
             price = "159.99 TL",
+            billingPeriod = BillingPeriod.MONTHLY,
             countdown = PaymentCountdown.Upcoming(days = 3)
         )
     }
@@ -166,6 +195,7 @@ private fun SubscriptionCardDueTodayPreview() {
         SubscriptionCard(
             name = "Spotify",
             price = "59.90 TL",
+            billingPeriod = BillingPeriod.WEEKLY,
             countdown = PaymentCountdown.DueToday
         )
     }
@@ -178,6 +208,7 @@ private fun SubscriptionCardOverduePreview() {
         SubscriptionCard(
             name = "Adobe",
             price = "249.00 TL",
+            billingPeriod = BillingPeriod.MONTHLY,
             countdown = PaymentCountdown.Overdue(days = 5)
         )
     }

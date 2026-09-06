@@ -225,38 +225,37 @@ fun HomeScreen(
                 val categoryText = subscription.category
                     .takeIf { it != SubscriptionCategory.OTHER }
                     ?.let { stringResource(id = it.labelRes()) }
-                // Built in two steps rather than as four separate resources: name/price and the
-                // optional countdown make the sentence, then the category is appended when there
-                // is one. Four combinations would otherwise need four strings to translate.
-                val rowSentence = if (countdownText == null) {
-                    stringResource(
-                        id = R.string.subscription_row_description,
-                        subscription.name,
-                        price
-                    )
-                } else {
-                    stringResource(
-                        id = R.string.subscription_row_description_dated,
-                        subscription.name,
-                        price,
-                        countdownText
-                    )
-                }
+                // Built by appending rather than as one resource per combination: the row can show
+                // a countdown or not and a category or not, and with the period that would be four
+                // strings to keep in step in every language. One "and one more thing" format does
+                // all of it, and the order below is the order the card draws them in.
+                val named = stringResource(
+                    id = R.string.subscription_row_description,
+                    subscription.name,
+                    price
+                )
+                val withPeriod = stringResource(
+                    id = R.string.subscription_row_description_more,
+                    named,
+                    stringResource(id = subscription.billingPeriod.labelRes())
+                )
+                val withCountdown = countdownText?.let {
+                    stringResource(id = R.string.subscription_row_description_more, withPeriod, it)
+                } ?: withPeriod
                 SwipeToDeleteRow(
                     onDelete = { onEvent(HomeEvent.Delete(subscription.id)) },
-                    contentDescription = if (categoryText == null) {
-                        rowSentence
-                    } else {
+                    contentDescription = categoryText?.let {
                         stringResource(
-                            id = R.string.subscription_row_description_with_category,
-                            rowSentence,
-                            categoryText
+                            id = R.string.subscription_row_description_more,
+                            withCountdown,
+                            it
                         )
-                    }
+                    } ?: withCountdown
                 ) {
                     SubscriptionCard(
                         name = subscription.name,
                         price = price,
+                        billingPeriod = subscription.billingPeriod,
                         countdown = countdown,
                         category = subscription.category
                     )

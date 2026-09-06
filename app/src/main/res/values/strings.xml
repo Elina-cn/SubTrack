@@ -93,8 +93,6 @@
     <plurals name="days_overdue">
         <item quantity="other">%1$d gün gecikti</item>
     </plurals>
-    <!-- Spoken form of a row that has a date. Ad, tutar, geri sayım. -->
-    <string name="subscription_row_description_dated">%1$s, %2$s, %3$s</string>
 
     <!-- Payment reminder notification -->
     <string name="notification_channel_name">Ödeme hatırlatmaları</string>
@@ -134,8 +132,8 @@
     <string name="category_productivity">Üretkenlik</string>
     <string name="category_health">Sağlık</string>
     <string name="category_other">Diğer</string>
-    <!-- Satırın okunan hâline kategoriyi ekler: (mevcut cümle), kategori. -->
-    <string name="subscription_row_description_with_category">%1$s, %2$s</string>
+    <!-- Satırın okunan hâline bir bilgi daha ekler: (mevcut cümle), yeni bilgi. -->
+    <string name="subscription_row_description_more">%1$s, %2$s</string>
     <!-- Category filter -->
     <string name="filter_all">Tümü</string>
     <string name="empty_category_title">Bu kategoride abonelik yok</string>
