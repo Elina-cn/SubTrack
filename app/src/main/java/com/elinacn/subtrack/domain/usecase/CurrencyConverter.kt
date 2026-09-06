@@ -6,6 +6,7 @@ import com.elinacn.subtrack.domain.model.Money
 import com.elinacn.subtrack.domain.model.Subscription
 import com.elinacn.subtrack.domain.model.TotalPeriod
 import com.elinacn.subtrack.domain.model.sum
+import java.math.BigInteger
 
 /**
  * Converts amounts between currencies and adds up a mixed list.
@@ -61,8 +62,8 @@ class CurrencyConverter(private val rates: ExchangeRateTable = ExchangeRateTable
      * same numbers give on paper.
      *
      * What makes one rounding possible is [BillingPeriod.paymentsPerYear]: multiplying by it is
-     * exact, so the yearly cost of a group is a plain Long sum with nothing lost yet. Everything
-     * after it - the rate, and the twelve that makes a month - is one division.
+     * exact, so the yearly cost of a group is a plain sum with nothing lost yet. Everything after
+     * it - the rate, and the twelve that makes a month - is one division.
      *
      * Multiply first, divide last, for the same reason.
      */
@@ -80,6 +81,17 @@ class CurrencyConverter(private val rates: ExchangeRateTable = ExchangeRateTable
      * [weight] scales a price before it is added - one for the prices as they are, the payments a
      * year for a cost. [parts] is what the sum is finally divided by, so the rate division and the
      * period division are the same division.
+     *
+     * **The intermediate is a BigInteger, the answer is still Long kuruş.** Weighing a weekly price
+     * multiplies it by 52 before the rate does, and that product is the widest value in the app: at
+     * the price and rate ceilings a Long ran out after 177 rows, where the same sum of unweighted
+     * prices lasted 9.223. Nothing about the ceilings changed - the room to work in did. What is
+     * left is the answer itself having to fit in [Money], which at those same ceilings takes over a
+     * million rows to reach.
+     *
+     * The arithmetic is otherwise identical: multiply first, divide once, HALF_UP, and BigInteger
+     * truncates toward zero exactly as Long does, so the half added before the division rounds the
+     * same way on both.
      */
     private fun total(
         subscriptions: List<Subscription>,
@@ -90,19 +102,22 @@ class CurrencyConverter(private val rates: ExchangeRateTable = ExchangeRateTable
         subscriptions
             .groupBy { it.currency }
             .map { (currency, group) ->
-                val weighted = group.sumOf { it.price.cents * weight(it) }
-                Money(
-                    if (currency == target) {
-                        // The rates would cancel; skipping them keeps an unconverted amount out of
-                        // a multiplication it does not need, and with parts = 1 out of any rounding.
-                        divideHalfUp(weighted, parts.toLong())
+                val weighted = group.fold(BigInteger.ZERO) { running, subscription ->
+                    running + subscription.price.cents.toBigInteger() * weight(subscription).toBigInteger()
+                }
+                val sameCurrency = currency == target
+                // The rates cancel when nothing is being converted; leaving them out keeps an
+                // unconverted amount out of a multiplication it does not need, and with parts = 1
+                // out of any rounding at all.
+                val numerator =
+                    if (sameCurrency) weighted else weighted * rates.rateOf(currency).toBigInteger()
+                val denominator =
+                    if (sameCurrency) {
+                        parts.toBigInteger()
                     } else {
-                        divideHalfUp(
-                            weighted * rates.rateOf(currency),
-                            rates.rateOf(target) * parts
-                        )
+                        rates.rateOf(target).toBigInteger() * parts.toBigInteger()
                     }
-                )
+                Money(divideHalfUp(numerator, denominator).toLong())
             }
             .sum()
 
@@ -113,6 +128,23 @@ class CurrencyConverter(private val rates: ExchangeRateTable = ExchangeRateTable
      *
      * HALF_EVEN exists to stop repeated rounding from drifting upward, but that needs many
      * roundings to show, and [totalIn] performs at most one per currency.
+     *
+     * There are two of these, one per width. BigInteger truncates toward zero exactly as Long does,
+     * so adding half the divisor first rounds identically on both - which is what lets the totals
+     * move to the wider type without any figure on screen changing.
+     */
+    private fun divideHalfUp(numerator: BigInteger, denominator: BigInteger): BigInteger {
+        val half = denominator / TWO
+        return if (numerator.signum() >= 0) {
+            (numerator + half) / denominator
+        } else {
+            (numerator - half) / denominator
+        }
+    }
+
+    /**
+     * The narrow one, for [convert]: a single amount times a rate has always fitted in a Long, and
+     * allocating BigIntegers to answer a question about one price would buy room it cannot use.
      */
     private fun divideHalfUp(numerator: Long, denominator: Long): Long {
         // Adding half the divisor before an integer division is what pushes a .5 away from zero;
@@ -123,5 +155,10 @@ class CurrencyConverter(private val rates: ExchangeRateTable = ExchangeRateTable
         } else {
             (numerator - half) / denominator
         }
+    }
+
+    private companion object {
+        /** BigInteger.TWO is API 31 and minSdk is 24, so the constant is our own. */
+        val TWO: BigInteger = BigInteger.valueOf(2)
     }
 }

@@ -11,6 +11,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.math.BigInteger
 
 /**
  * Turning prices billed on different clocks into one comparable figure.
@@ -203,6 +204,12 @@ class PeriodNormalisationTest {
      * are the absolute ceiling - every row at 1.000.000 whole units, weekly, in a currency the
      * user has edited up to 1.000,0000. At the rates the app ships with, the same list fits 3.290
      * rows.
+     *
+     * **These two numbers are history, not the converter's limit.** 177 is what a Long intermediate
+     * would leave, and it is why the intermediate is a BigInteger instead; the figures stay pinned
+     * because they are the reason for that choice, and because a ceiling moving without anyone
+     * meaning to should still break something. What actually bounds the totals now is
+     * [whatIsLeftIsTheAnswerHavingToFitInMoney].
      */
     @Test
     fun weeklyNormalisation_costsHeadroom_andWhatIsLeftIsPinned() {
@@ -213,6 +220,58 @@ class PeriodNormalisationTest {
         assertEquals(9_223L, unweighted)
         assertEquals(177L, weighted)
         assertTrue(weighted > PLAUSIBLE_LIST_BOUND)
+    }
+
+    /**
+     * Five hundred rows at both ceilings - well past the 177 a Long intermediate allowed.
+     *
+     * The product inside is 2,6 x 10^19, which does not fit in a Long at all; the test asserts that
+     * first, so it is measuring what it claims to. The answer still fits in [Money], and it is the
+     * exact figure, not a wrapped one.
+     */
+    @Test
+    fun farPastTheOldLongCeiling_theTotalIsStillExact() {
+        val converter = CurrencyConverter(
+            ExchangeRateTable.of(mapOf(Currency.USD to ExchangeRateTable.MAX_RATE))
+        )
+        val subscriptions = List(WIDE_LIST_BOUND) {
+            subscription(
+                cents = MAX_PRICE_CENTS,
+                period = BillingPeriod.WEEKLY,
+                currency = Currency.USD
+            )
+        }
+
+        val total = converter.totalIn(subscriptions, Currency.TRY, TotalPeriod.MONTHLY)
+
+        val widestProduct = BigInteger.valueOf(WIDE_LIST_BOUND * MAX_PRICE_CENTS * 52L) *
+            BigInteger.valueOf(ExchangeRateTable.MAX_RATE)
+        assertTrue(widestProduct > BigInteger.valueOf(Long.MAX_VALUE))
+        // 500 x 10^8 x 52 = 2,6 x 10^12 kuruş a year, at 1.000,0000 TRY per dollar, over twelve.
+        assertEquals(Money(216_666_666_666_667L), total)
+        assertTrue(total.cents > 0)
+    }
+
+    /**
+     * The bound that is left once the intermediate cannot overflow: the answer is a [Money], and a
+     * Money is a Long.
+     *
+     * At both ceilings, converting into the anchor, one weekly row costs 433.333.333.333 kuruş a
+     * month - so the monthly view runs out after twenty-one million rows and the yearly view after
+     * one and three quarter million. Room a list held in memory and drawn in a lazy column will
+     * not see; the number is here so that if it ever changes, it changes on purpose.
+     */
+    @Test
+    fun whatIsLeftIsTheAnswerHavingToFitInMoney() {
+        val perRowMonthly = MAX_PRICE_CENTS *
+            BillingPeriod.WEEKLY.paymentsPerYear * ExchangeRateTable.MAX_RATE /
+            (ANCHOR_RATE * TotalPeriod.MONTHLY.partsOfAYear)
+        val perRowYearly = MAX_PRICE_CENTS *
+            BillingPeriod.WEEKLY.paymentsPerYear * ExchangeRateTable.MAX_RATE / ANCHOR_RATE
+
+        assertEquals(433_333_333_333L, perRowMonthly)
+        assertEquals(21_284_704L, Long.MAX_VALUE / perRowMonthly)
+        assertEquals(1_773_725L, Long.MAX_VALUE / perRowYearly)
     }
 
     private fun mixedList() = listOf(
@@ -243,5 +302,11 @@ class PeriodNormalisationTest {
 
         /** Past any list a person keeps, and inside the room the weighted path leaves. */
         const val PLAUSIBLE_LIST_BOUND = 100
+
+        /** Past what a Long intermediate could have carried at the ceilings, which was 177. */
+        const val WIDE_LIST_BOUND = 500
+
+        /** TRY's own rate: the anchor is quoted against itself at 1,0000. */
+        const val ANCHOR_RATE = 10_000L
     }
 }

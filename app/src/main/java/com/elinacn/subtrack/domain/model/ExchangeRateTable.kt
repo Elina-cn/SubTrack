@@ -32,14 +32,19 @@ class ExchangeRateTable private constructor(private val ratesToAnchor: Map<Curre
          * The largest rate the arithmetic can carry: 1.000,0000 units of the anchor per foreign
          * unit.
          *
-         * The bound comes from [CurrencyConverter], where the widest value is
-         * `groupTotalCents * sourceRate + targetRate / 2` in a [Long]. At the per-subscription
-         * ceiling of 10^8 kuruş and this rate, the product reaches Long.MAX_VALUE only after
-         * **9.223 subscriptions in one currency** - about a hundred times more than the largest
-         * plausible list, and the check is pinned by a test rather than left to this comment.
+         * The bound was set from a [Long] product in [CurrencyConverter]:
+         * `groupTotalCents * sourceRate + targetRate / 2`, which at the per-subscription ceiling of
+         * 10^8 kuruş reached Long.MAX_VALUE after **9.223 subscriptions in one currency**.
          *
-         * Raising it costs headroom proportionally: ten times this rate leaves room for 922
-         * subscriptions, which is still safe but no longer obviously so.
+         * The totals no longer run in a Long - normalising a weekly price multiplies it by 52
+         * first, which left room for 177 rows, so the intermediate is a BigInteger and the product
+         * has no ceiling of its own. What bounds a total now is the answer fitting in [Money]:
+         * twenty-one million rows at these same ceilings. Both figures are pinned by tests rather
+         * than left to this comment.
+         *
+         * The rate is capped here anyway, because [CurrencyConverter.convert] still answers about a
+         * single amount in a Long, and because a rate above a thousand is a typo rather than a
+         * currency.
          */
         const val MAX_RATE = 10_000_000L
 
