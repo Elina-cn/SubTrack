@@ -232,13 +232,32 @@ Kural: **önce çarp, en sonda bir kez böl.** `CurrencyConverter`'ın periyot a
 `parça` aylık görünümde 12, yıllık görünümde 1. Yuvarlama HALF_UP, girilen
 fiyatın okunduğu yönle aynı.
 
-**Taşma payı azaldı, sınırlar değişmedi.** Pay artık 52'ye kadar bir çarpan
-taşıyor, dolayısıyla Long'da kalan yer o oranda azalıyor. Fiyat tavanı
-(1.000.000 birim) ve kur tavanı (1.000,0000) birlikte, satırların hepsi
-haftalıkken **177 satırdan** sonra taşar; normalizasyon öncesindeki sınır
-9.223'tü. Uygulamanın kendi kurlarıyla (en yükseği 53,90) aynı sınır 3.290.
-Hiçbir tavan bu yüzden değiştirilmedi; sayılar `PeriodNormalisationTest`'te
-sabitlendi, biri kıpırdarsa test kırılır.
+**Ara değer `BigInteger`, sonuç hâlâ `Long` kuruş.** Normalizasyon paya 52'ye
+kadar bir çarpan sokuyor: haftalık bir fiyat, kur ile çarpılmadan önce zaten
+52 ile çarpılmış oluyor ve bu çarpım uygulamadaki en geniş değer. Long'da
+ölçüldü — fiyat tavanı (1.000.000 birim) ve kur tavanı (1.000,0000) birlikte,
+satırların hepsi haftalıkken **177 satırdan** sonra taşıyordu; normalizasyondan
+önce aynı sınır 9.223'tü. Sayı bugünkü hiçbir listenin ulaşamayacağı yerde ama
+bu fazda daralan bir paydı, o yüzden kapatıldı: **ara değer `BigInteger`'a
+taşındı** (12-1 hotfix).
+
+Kapatma biçimi önemli:
+
+- **Hiçbir tavan değişmedi.** Fiyat tavanı ve kur tavanı aynı; kullanıcıya
+  dönük hiçbir sınır oynamadı.
+- **İmzalar aynı.** Fiyatlar `Long` kuruş girer, cevap `Long` kuruş çıkar;
+  `BigInteger` yalnızca zincirin içinde.
+- **Yuvarlama aynı.** `BigInteger` de sıfıra doğru kırpıyor, yani bölmeden önce
+  yarım eklemek iki tipte de aynı sonucu veriyor. 12-1'de ölçülen değerlerin
+  hepsi (243,33 · 2.920,00 · 14 kuruşluk fark) birebir korundu ve testleri
+  beklentileri değişmeden geçti.
+
+**Geriye kalan sınır cevabın `Money`'ye sığması.** Ara değerin tavanı yok ama
+`Money` bir `Long`. Aynı tavanlarda, çapaya çevirirken haftalık bir satır ayda
+433.333.333.333 kuruşa mal oluyor; yani aylık görünüm **21.284.704**, yıllık
+görünüm **1.773.725** satırdan sonra sığmaz. Bellekte tutulan ve `LazyColumn`
+ile çizilen bir listenin göremeyeceği bir yer. Bütün bu sayılar
+`PeriodNormalisationTest`'te sabitlendi; biri kıpırdarsa test kırılır.
 
 ---
 

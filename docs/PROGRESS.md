@@ -27,6 +27,93 @@ Her faz sonunda **en üste** yeni kayıt eklenir. Eski kayıtlar silinmez.
 
 ---
 
+## [Faz 12-1 hotfix] Normalizasyon ara değeri BigInteger'a taşındı — 2026-09-06
+
+**Durum:** Tamamlandı. Kullanıcıya dönük hiçbir şey değişmedi — ne bir sayı, ne
+bir sınır, ne bir imza.
+
+**Sorun (12-1 doğrulamasında ölçülmüştü)**
+Haftalık normalizasyon payı 52 ile çarpıyor: `fiyat × paymentsPerYear × kur`
+uygulamadaki en geniş değer. Long'da, fiyat tavanı (1.000.000 birim) ve kur
+tavanı (1.000,0000) birlikte, satırların hepsi haftalıkken **177 satırdan**
+sonra taşıyordu; normalizasyondan önceki sınır **9.223**'tü. Bugünkü hiçbir
+liste oraya yaklaşmıyor, ama pay bu fazda daraldığı için bu fazda kapatıldı.
+
+**Yapılan**
+`CurrencyConverter.total(...)` zincirinin ara değeri `BigInteger`:
+
+```
+Σ(fiyat × paymentsPerYear) × kaynakKuru / (hedefKuru × parça)
+```
+
+Ağırlıklı toplam `BigInteger.ZERO` üzerinden katlanıyor, kur çarpımı ve bölme
+de aynı tipte; sonuç tek noktada HALF_UP ile yuvarlanıp `toLong()` ile
+`Money`'ye dönüyor. `divideHalfUp`'ın `BigInteger` sürümü Long sürümünün
+yanına eklendi (`convert` tek bir tutara bakıyor, orada genişliğe ihtiyaç yok
+ve iki `BigInteger` ayırmak boşuna olurdu). `BigInteger.TWO` API 31, minSdk 24
+— sabit kendi companion'ımızda.
+
+**Neden davranış değişmiyor:** `BigInteger` de tam sayı bölmesini **sıfıra
+doğru kırpıyor**, tıpkı Long gibi. Bölmeden önce paydanın yarısını eklemek bu
+yüzden iki tipte de aynı yuvarlamayı veriyor. Tek yuvarlama noktası kuralı
+(ARCHITECTURE §6) aynen duruyor.
+
+**Değişmeyenler (bilerek)**
+- `MAX_PRICE` (1.000.000 birim) ve `ExchangeRateTable.MAX_RATE` (1.000,0000).
+- `CurrencyConverter`'ın public imzaları; `Money` hâlâ `Long` kuruş (§6).
+- UI'ın tamamı — bu bir hesap değişikliği.
+
+**Yeni sınır — ara değerin tavanı kalmadı, cevabın tavanı kaldı**
+`Money` bir `Long` olduğu için sınır artık **sonucun sığması**. Aynı tavanlarda,
+çapaya çevirirken haftalık bir satır ayda 433.333.333.333 kuruş:
+
+| | eski (Long ara değer) | yeni (BigInteger ara değer) |
+|---|---|---|
+| Aylık görünüm | **177 satır** | **21.284.704 satır** |
+| Yıllık görünüm | 177 satır | **1.773.725 satır** |
+| Normalizasyon öncesi referans | 9.223 satır | — |
+
+Yani pratikte kalan sınır, listenin bellekte tutulup `LazyColumn` ile çizildiği
+bir uygulamanın göremeyeceği yerde: 21 milyon satır. İki sayı da teste
+sabitlendi.
+
+**Testler**
+- 174 → **176 birim testi** (2 yeni), 0 hata. `lintDebug` **0 hata, 20 uyarı**.
+- **12-1'deki 14 normalizasyon testinin hiçbirinin beklentisi değişmedi.**
+  Tek dokunulan yer `weeklyNormalisation_costsHeadroom_andWhatIsLeftIsPinned`
+  testinin KDoc'u: 9.223 ve 177 assertion'ları aynen duruyor (ikisi de Long
+  hakkında doğru olgular ve bu tercihin gerekçesi), ama artık dönüştürücünün
+  sınırı olmadıkları yazıldı.
+- Yeni: `farPastTheOldLongCeiling_theTotalIsStillExact` — 500 satır, hepsi
+  tavan fiyatta, haftalık, kur tavanında. Önce çarpımın Long'a **sığmadığı**
+  gösteriliyor (2,6 × 10¹⁹ > 9,22 × 10¹⁸), sonra sonucun kuruşu kuruşuna
+  doğru olduğu: **216.666.666.666.667 kuruş**.
+- Yeni: `whatIsLeftIsTheAnswerHavingToFitInMoney` — 21.284.704 ve 1.773.725.
+
+**Emülatör (yalnızca (c) ve (d) ile 11. madde, iki AVD'de)**
+
+| | API 29 | API 34 |
+|---|---|---|
+| (c) 100 aylık + 1.200 yıllık + 10 haftalık | `Total Monthly, TRY 243.33` | `Total Monthly, TRY 243.33` |
+| (d) yıllık görünüm | `Total Yearly, TRY 2,920.00` | `Total Yearly, TRY 2,920.00` |
+| 11. 159,99 + 59,90 | `Total Monthly, TRY 219.89` | `Total Monthly, TRY 219.89` |
+
+Üç sayı da hotfix öncesiyle **birebir aynı**. Tam regresyon koşulmadı: UI
+değişmedi, hesap testlerle kapalı.
+
+**Değişen dosyalar**
+- `domain/usecase/CurrencyConverter.kt` — ara değer `BigInteger`, ikinci
+  `divideHalfUp`
+- `domain/model/ExchangeRateTable.kt` — `MAX_RATE`'in KDoc'u artık doğru sınırı
+  anlatıyor (eski 9.223 gerekçesi tarih olarak duruyor)
+- `test/.../PeriodNormalisationTest.kt` — iki yeni test, bir KDoc
+- `docs/ARCHITECTURE.md` §6
+
+**Commit**
+- `a5cc0a4` fix: give the totals room the ceilings cannot use up
+
+---
+
 ## [Faz 12-1] Ödeme Periyodu: seçim, normalizasyon, toplam görünümü — 2026-09-06
 
 **Durum:** Tamamlandı. **Faz 12 KAPANMADI** — tarih ilerletme ve hatırlatma
