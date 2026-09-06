@@ -44,8 +44,10 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
 import com.elinacn.subtrack.R
+import com.elinacn.subtrack.domain.model.BillingPeriod
 import com.elinacn.subtrack.domain.model.Currency
 import com.elinacn.subtrack.domain.model.SubscriptionCategory
+import com.elinacn.subtrack.ui.common.BillingPeriodSelector
 import com.elinacn.subtrack.ui.common.CategorySelector
 import com.elinacn.subtrack.ui.common.CurrencySelector
 import com.elinacn.subtrack.ui.common.UiText
@@ -78,7 +80,8 @@ fun AddSubscriptionSheet(
         rawPrice: String,
         currency: Currency,
         nextPaymentDate: LocalDate?,
-        category: SubscriptionCategory
+        category: SubscriptionCategory,
+        billingPeriod: BillingPeriod
     ) -> Unit,
     onNameEdited: () -> Unit,
     onPriceEdited: () -> Unit,
@@ -94,6 +97,9 @@ fun AddSubscriptionSheet(
     }
     var category by rememberSaveable(stateSaver = CategorySaver) {
         mutableStateOf(SubscriptionCategory.OTHER)
+    }
+    var billingPeriod by rememberSaveable(stateSaver = BillingPeriodSaver) {
+        mutableStateOf(BillingPeriod.MONTHLY)
     }
     var isDatePickerOpen by rememberSaveable { mutableStateOf(false) }
 
@@ -174,10 +180,23 @@ fun AddSubscriptionSheet(
 
             Spacer(modifier = Modifier.height(Dimens.SpacerMedium))
 
-            // Directly under the currency chips: the two chip rows are the only choices in the
-            // form and reading as one group beats scattering them. It sits after currency because
-            // currency changes what the price above it means, while the category changes nothing
-            // else on the form - and before the date, which opens a dialog and ends the sequence.
+            // Beside the currency, because the two of them are what the price above means: what
+            // it is in, and how often it is paid. A price with neither is half an answer, and a
+            // reader who has just typed one should settle both before moving on.
+            Text(
+                text = stringResource(id = R.string.billing_period_label),
+                modifier = Modifier.fillMaxWidth(),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Spacer(modifier = Modifier.height(Dimens.SpacerSmall))
+            BillingPeriodSelector(selected = billingPeriod, onSelect = { billingPeriod = it })
+
+            Spacer(modifier = Modifier.height(Dimens.SpacerMedium))
+
+            // After the two that qualify the price: the category files the subscription and
+            // changes nothing else on the form. Before the date, which opens a dialog and ends
+            // the sequence.
             Text(
                 text = stringResource(id = R.string.category_label),
                 modifier = Modifier.fillMaxWidth(),
@@ -244,7 +263,7 @@ fun AddSubscriptionSheet(
         // far the form is scrolled. The gap above it was a Spacer inside the form before; as
         // padding here it stays a constant separation instead of scrolling away.
         Button(
-            onClick = { onSave(name, rawPrice, currency, nextPaymentDate, category) },
+            onClick = { onSave(name, rawPrice, currency, nextPaymentDate, category, billingPeriod) },
             colors = ButtonDefaults.buttonColors(
                 containerColor = MaterialTheme.colorScheme.primaryContainer,
                 contentColor = MaterialTheme.colorScheme.onPrimaryContainer
@@ -343,6 +362,14 @@ private val CategorySaver = Saver<SubscriptionCategory, String>(
     }
 )
 
+/** Same again for the billing period, falling back to the one the form opens on. */
+private val BillingPeriodSaver = Saver<BillingPeriod, String>(
+    save = { it.name },
+    restore = { name ->
+        BillingPeriod.entries.firstOrNull { it.name == name } ?: BillingPeriod.MONTHLY
+    }
+)
+
 /** Field errors as they appear after a rejected save. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Preview(showBackground = true)
@@ -354,7 +381,7 @@ private fun AddSubscriptionSheetErrorPreview() {
             nameError = UiText.Resource(R.string.error_name_empty),
             priceError = UiText.Resource(R.string.error_price_invalid),
             dateError = null,
-            onSave = { _, _, _, _, _ -> },
+            onSave = { _, _, _, _, _, _ -> },
             onNameEdited = {},
             onPriceEdited = {},
             onDateEdited = {},

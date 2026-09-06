@@ -123,6 +123,11 @@
     <string name="empty_subscriptions_message">Eklemek için + düğmesine dokun</string>
     <!-- Başlık ve alt satır tek odak durağı olarak okunur. -->
     <string name="empty_state_description">%1$s, %2$s</string>
+    <!-- Billing period -->
+    <string name="billing_period_label">Ödeme Periyodu</string>
+    <string name="period_monthly">Aylık</string>
+    <string name="period_yearly">Yıllık</string>
+    <string name="period_weekly">Haftalık</string>
     <!-- Category -->
     <string name="category_label">Kategori</string>
     <string name="category_entertainment">Eğlence</string>

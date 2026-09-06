@@ -107,8 +107,14 @@ class HomeViewModel @Inject constructor(
 
             HomeEvent.DismissAddSheet -> screenState.update { it.clearedErrors(open = false) }
 
-            is HomeEvent.Save ->
-                save(event.name, event.rawPrice, event.currency, event.nextPaymentDate, event.category)
+            is HomeEvent.Save -> save(
+                event.name,
+                event.rawPrice,
+                event.currency,
+                event.nextPaymentDate,
+                event.category,
+                event.billingPeriod
+            )
 
             is HomeEvent.SelectCategoryFilter ->
                 screenState.update { it.copy(categoryFilter = event.category) }
@@ -141,7 +147,8 @@ class HomeViewModel @Inject constructor(
         rawPrice: String,
         currency: Currency,
         nextPaymentDate: LocalDate?,
-        category: SubscriptionCategory
+        category: SubscriptionCategory,
+        billingPeriod: BillingPeriod
     ) {
         val trimmedName = name.trim()
         val nameError = if (trimmedName.isEmpty()) UiText.Resource(R.string.error_name_empty) else null
@@ -168,7 +175,7 @@ class HomeViewModel @Inject constructor(
                         name = trimmedName,
                         price = price,
                         currency = currency,
-                        billingPeriod = BillingPeriod.MONTHLY,
+                        billingPeriod = billingPeriod,
                         nextPaymentDate = nextPaymentDate,
                         category = category,
                         iconKey = null,

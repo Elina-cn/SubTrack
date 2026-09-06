@@ -1,5 +1,6 @@
 package com.elinacn.subtrack.ui.home
 
+import com.elinacn.subtrack.domain.model.BillingPeriod
 import com.elinacn.subtrack.domain.model.Currency
 import com.elinacn.subtrack.domain.model.Money
 import com.elinacn.subtrack.domain.model.Subscription
@@ -92,13 +93,17 @@ sealed interface HomeEvent {
      * [category] arrives the same way as the name and the price: the form owns it until the user
      * commits. Leaving it alone means [SubscriptionCategory.OTHER], which is not a real answer
      * and is why the card does not print it.
+     *
+     * [billingPeriod] is not optional in the same sense: every subscription is billed on some
+     * clock, and the default here is the one the form opens on rather than a missing answer.
      */
     data class Save(
         val name: String,
         val rawPrice: String,
         val currency: Currency,
         val nextPaymentDate: LocalDate? = null,
-        val category: SubscriptionCategory = SubscriptionCategory.OTHER
+        val category: SubscriptionCategory = SubscriptionCategory.OTHER,
+        val billingPeriod: BillingPeriod = BillingPeriod.MONTHLY
     ) : HomeEvent
 
     /** Narrow the list to one category, or to all of them with null. */
