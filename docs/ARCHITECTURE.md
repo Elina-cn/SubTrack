@@ -196,6 +196,50 @@ value class Money(val cents: Long)
 Farklı para birimleri toplanırken sabit bir dönüşüm tablosu kullanılır
 (v1'de canlı kur yok). Dönüşüm mantığı Domain katmanındadır.
 
+### Periyot normalizasyonu — toplam maliyeti gösterir, fiyatları değil
+
+Abonelikler farklı saatlere göre ödenir. Toplam tek bir sayıysa hepsinin aynı
+birime indirgenmesi gerekir; yoksa yıllık bir fiyatla aylık bir fiyat toplanır
+ve çıkan sayının bir karşılığı olmaz (Faz 12-1'e kadar olan davranış buydu).
+
+- `BillingPeriod.paymentsPerYear` — aylık **12**, yıllık **1**, haftalık **52**.
+  Fiyatı bununla çarpmak **yıllık maliyeti** verir: çarpma tamdır, bu adımda
+  yuvarlama yoktur.
+- Aylık figür o yıllık toplamın 12'ye bölünmüşüdür. Yıllık görünüm ise
+  bölünmemiş hâlidir — **aylık figürün 12 katı değil.** İkisi de aynı ara
+  değerden çıkar; biri diğerinden türetilseydi bir yuvarlama iki kez yansırdı.
+
+**Haftalık 52 sayılır, 365,25 / 7 = 52,18 değil.** Kimse haftanın beşte biri
+kadar ödemiyor; o ondalıklar elle kontrol eden kullanıcıya açıklanamaz ve
+sonucu, hiçbir abonelik fiyatının zaten taşımadığı bir hassasiyet kadar
+oynatır. "Haftalık" ödeyen için yılda 52 ödeme vardır.
+
+### Tek yuvarlama noktası
+
+Bir tutar hem periyottan hem para biriminden geçtiğinde **iki kesir** vardır:
+yıllık/12 ve kaynak kuru/hedef kuru. Ayrı ayrı yuvarlanırlarsa yarımlar
+birbirini götürmez ve hata kalıcı olur — ölçüldü: haftalık **10,00 USD**'lik
+tek bir abonelikte fark **14 kuruş** (1.856,83 yerine 1.856,69), ve liste
+büyüdükçe büyür.
+
+Kural: **önce çarp, en sonda bir kez böl.** `CurrencyConverter`'ın periyot alan
+`totalIn` aşırı yüklemesi tek bölme yapıyor:
+
+```
+Σ(fiyat × paymentsPerYear) × kaynakKuru / (hedefKuru × parça)
+```
+
+`parça` aylık görünümde 12, yıllık görünümde 1. Yuvarlama HALF_UP, girilen
+fiyatın okunduğu yönle aynı.
+
+**Taşma payı azaldı, sınırlar değişmedi.** Pay artık 52'ye kadar bir çarpan
+taşıyor, dolayısıyla Long'da kalan yer o oranda azalıyor. Fiyat tavanı
+(1.000.000 birim) ve kur tavanı (1.000,0000) birlikte, satırların hepsi
+haftalıkken **177 satırdan** sonra taşar; normalizasyon öncesindeki sınır
+9.223'tü. Uygulamanın kendi kurlarıyla (en yükseği 53,90) aynı sınır 3.290.
+Hiçbir tavan bu yüzden değiştirilmedi; sayılar `PeriodNormalisationTest`'te
+sabitlendi, biri kıpırdarsa test kırılır.
+
 ---
 
 ## 7. Bağımlılık Yönetimi (DI)
@@ -676,9 +720,14 @@ penceresine uygulanır, o pencereye değil. İki mekanizma birbirine değmiyor.
 - `nextPaymentDate` NULLABLE. Tarih opsiyoneldir; boşsa arayüzde gösterge
   çıkmaz.
 - **Tarih geçtiğinde otomatik ilerletme yapılmaz**, "gecikmiş" gösterilir.
-  Ne kadar ilerleyeceği `billingPeriod`'a bağlıdır ve o alan Faz 12'ye
-  kadar kullanıcı tarafından seçilmiyor; aylık varsaymak yıllık
-  aboneliklerde veriyi sessizce bozar. İlerletme Faz 12'nin işidir.
+  Ne kadar ilerleyeceği `billingPeriod`'a bağlıdır. **Faz 12-1'den beri o
+  alanı kullanıcı seçiyor**, yani "aylık varsaymak veriyi bozar" gerekçesi
+  artık geçerli değil — ilerletmenin önündeki engel kalktı.
+  Buna rağmen 12-1'de yapılmadı, çünkü ilerletme ayrı bir karar kümesi:
+  saklanan veriye **yazma** gerektiriyor (ne zaman koşacak — açılışta mı, gün
+  dönümünde mi), geri alınamaz, ve §18'deki hatırlatma penceresiyle iç içe —
+  1-3 günlük gecikme penceresinin tek gerekçesi tarihin ilerlememesiydi.
+  İkisi birlikte ele alınmalı; **Faz 12-2'nin işi.**
 - Geçmiş tarih kabul edilir. Üst sınır bugünden 10 yıl ileridir — kayan
   tuş vuruşunu yakalayan bir ürün sınırı (`MAX_PRICE` ile aynı mantık).
 - `java.time` API 26'da geldi, `minSdk` 24. Core library desugaring açık

@@ -285,16 +285,28 @@ kategoriye göre daraltmak mümkün ve boş kalan kategori kendini söylüyor.
 
 ---
 
-## ⬜ Faz 12 — Ödeme Periyodu
+## 🟡 Faz 12 — Ödeme Periyodu
 
-- [ ] Aylık/yıllık/haftalık seçimi
-- [ ] Yıllık → aylık maliyet normalizasyonu
-- [ ] Aylık/yıllık toplam görünümü arasında geçiş
-- [ ] **Hatırlatmadaki gecikme penceresi gözden geçirilsin.** Faz 10b'deki 1-3
-      günlük pencerenin tek gerekçesi, tarihin otomatik ilerlememesi yüzünden
-      gecikmiş durumun kalıcı olmasıydı. İlerletme bu fazda gelince o gerekçe
-      ortadan kalkar. Eşikler `PaymentReminderSelection`'da adlandırılmış
-      sabit; gerekçe `ARCHITECTURE.md` §18'de.
+İki promptta yürütülüyor: **12-1** seçim, normalizasyon ve toplam görünümü
+**(bitti)**, **12-2** tarih ilerletme ve hatırlatma penceresi.
+
+- [x] **12-1:** Aylık/yıllık/haftalık seçimi — formda üçüncü chip sırası,
+      varsayılan `MONTHLY`, zorunlu (kartta her zaman görünür)
+- [x] **12-1:** Yıllık → aylık maliyet normalizasyonu —
+      `BillingPeriod.paymentsPerYear` ile çarpma, tek yuvarlama
+      (`ARCHITECTURE.md` §6)
+- [x] **12-1:** Aylık/yıllık toplam görünümü arasında geçiş — dashboard'ın
+      altında iki chip; yıllık figür aylık figürün 12 katı değil, aynı
+      bölünmemiş ara değer
+- [ ] **12-2:** **Tarih ilerletme.** 12-1'e kadar `billingPeriod` kullanıcı
+      tarafından seçilmiyordu ve engel buydu; engel kalktı, iş kalmadı sayılmaz:
+      saklanan veriye yazma, ne zaman koşacağı ve geri alınamazlığı ayrı
+      kararlar (`ARCHITECTURE.md` §17).
+- [ ] **12-2:** **Hatırlatmadaki gecikme penceresi gözden geçirilsin.** Faz
+      10b'deki 1-3 günlük pencerenin tek gerekçesi, tarihin otomatik
+      ilerlememesi yüzünden gecikmiş durumun kalıcı olmasıydı. İlerletme
+      gelince o gerekçe ortadan kalkar. Eşikler `PaymentReminderSelection`'da
+      adlandırılmış sabit; gerekçe `ARCHITECTURE.md` §18'de.
 
 ---
 

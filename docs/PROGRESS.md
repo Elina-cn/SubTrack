@@ -27,6 +27,256 @@ Her faz sonunda **en üste** yeni kayıt eklenir. Eski kayıtlar silinmez.
 
 ---
 
+## [Faz 12-1] Ödeme Periyodu: seçim, normalizasyon, toplam görünümü — 2026-09-06
+
+**Durum:** Tamamlandı. **Faz 12 KAPANMADI** — tarih ilerletme ve hatırlatma
+penceresi 12-2'nin işi, ROADMAP'teki o iki madde açık bırakıldı.
+
+### Görev 1 — mevcut durumun tespiti (kod yazmadan önce)
+
+**a) `BillingPeriod`** üç sabit taşıyordu, başka hiçbir şey yoktu:
+`MONTHLY`, `YEARLY`, `WEEKLY`. UI'a hiç bağlanmamıştı;
+`HomeViewModel.save()` her satıra koşulsuz `BillingPeriod.MONTHLY` yazıyordu.
+
+**b) Veritabanındaki değer — iki emülatörde de `MONTHLY`.** Üç kayıt
+oluşturulup `run-as` ile `subtrack.db` (+ `-wal`) çekildi ve okundu:
+
+```
+(1, 'Alpha',  10000, 'TRY', 'MONTHLY', 'OTHER')
+(2, 'Beta',  120000, 'TRY', 'MONTHLY', 'HEALTH')
+(3, 'Gamma',   1000, 'TRY', 'MONTHLY', 'OTHER')
+group by billingPeriod -> [('MONTHLY', 3)]
+```
+
+Yani mevcut toplamların anlamı değişmiyor: bugüne kadar yazılmış her satır
+zaten aylık. Durup sormayı gerektiren bir şey çıkmadı.
+
+> Tuzak: `subtrack.db` tek başına çekilirse **boş** görünür, kayıtlar WAL
+> dosyasındadır. `force-stop` checkpoint yapmıyor; `-wal` ve `-shm` de
+> çekilmeli (ve `exec-out` ile, `shell` ikiliyi bozuyor).
+
+**c) Taşma hesabı — taşmıyor, ama pay 52 kat daraldı.** Yeni paydaki en geniş
+değer `fiyat × paymentsPerYear × kur`:
+
+| | en geniş satır | Long'a sığan satır sayısı |
+|---|---|---|
+| Normalizasyon öncesi | 10^8 × 10^7 = 1,0 × 10^15 | **9.223** |
+| Haftalık normalizasyonla | 10^8 × 52 × 10^7 = 5,2 × 10^16 | **177** |
+| Aynısı, uygulamanın kendi kurlarıyla (≤ 53,90) | 2,8 × 10^15 | **3.290** |
+
+`Long.MAX_VALUE = 9,223 × 10^18`. Payda `hedefKuru × 12 ≤ 1,2 × 10^8`, eklenen
+yarım `6 × 10^7` — bu bandı değiştirmiyor. Yani **hiçbir tavan
+değiştirilmedi**; sınır `PeriodNormalisationTest`'te sabitlendi (9.223 ve 177
+birlikte).
+
+177 satırın hepsinin aynı anda tavan fiyatta (1.000.000 birim), haftalık ve
+kullanıcının 1.000,0000'e çektiği bir kurda olması gerekiyor. Gerçek bir
+listede ulaşılmaz; yine de eski payın yüzde ikisi olduğu için buraya yazıldı.
+Payı geri istemenin üç yolu var (fiyat tavanını indirmek, kur tavanını
+indirmek, ara değeri `BigInteger`'a taşımak) ve üçü de ürün/mimari kararı —
+kendi başıma almadım.
+
+### Normalizasyon
+
+- `BillingPeriod(paymentsPerYear)` — aylık 12, yıllık 1, haftalık 52.
+  Fiyatı bununla **çarpmak** yıllık maliyeti verir ve çarpma tamdır.
+- `TotalPeriod(partsOfAYear)` — görünüm için ayrı enum (MONTHLY 12, YEARLY 1).
+  `BillingPeriod` kullanılmadı: haftalık bir *görünüm* yok, olmayan bir cevabı
+  temsil eden sabit taşımak istemedim.
+- `CurrencyConverter.totalIn(subs, target, period)` — **yeni aşırı yükleme**,
+  mevcut iki parametreli imzaya dokunulmadı (prompt öyle istiyordu). İkisi de
+  aynı özel gövdeyi çağırıyor: satırları ağırlıklandır, para birimine göre
+  grupla, **tek bölmede** çevir ve böl.
+- **52 hafta** kararı ve **tek yuvarlama noktası** kuralı gerekçeleriyle
+  `ARCHITECTURE.md` §6'ya yazıldı.
+
+**İki parametreli `totalIn` neden duruyor:** artık üründe çağıran yok. Silmek
+imza değiştirmekten büyük bir adım olurdu ve `CurrencyConverterTest`'teki
+gruplama/yuvarlama sözleşmesini (aynı özel gövdeyi koruyan testler) götürürdü.
+KDoc'una "bu fiyatları toplar, maliyetleri değil; periyotlar karışıksa çıkan
+sayının karşılığı yoktur" diye açıkça yazıldı.
+
+### Form
+
+Periyot sırası **para biriminin altına**, kategorinin üstüne kondu: para birimi
+ve periyot ikisi de üstteki fiyatın ne demek olduğunu söylüyor (neyle, ne
+sıklıkta), kategori ise formda hiçbir şeyi değiştirmiyor ve tarih diyalog açıp
+sırayı bitiriyor.
+
+`FlowRow` seçildi (kategorideki gibi), kaydırma değil: form zaten kaydırılıyor,
+ikinci satırın kalıcı bir bedeli yok — filtre çubuğundaki gerekçe (liste üstünde
+sonsuza kadar duran şerit) burada geçerli değil. **Sığdı, sarma gerekmedi:**
+
+| | chip genişlikleri | toplam | kullanılabilir |
+|---|---|---|---|
+| API 29 (360dp) | 168 + 142 + 156 | 466 px + boşluklar | 624 px |
+| API 34 (411dp) | 217 + 186 + 202 | 605 px + boşluklar | 984 px |
+
+State sheet'in kendi `rememberSaveable`'ında (ARCHITECTURE §5, 11b'de
+netleşti); `BillingPeriodSaver`, `CategorySaver`'ın deseni.
+
+### Kartta gösterim
+
+**Adın altında ayrı bir satır, her kartta.** Fiyatın yanına sonek olarak
+yazılmadı: fiyat sağdaki sütunda, ad kalanı alıyor; fiyatı uzatmak adın
+sütununu daraltırdı ve **fs 2.0'da ad kırpılması zaten bilinen sorun**
+(Faz 14). Satır yükseklik harcıyor, kartın fazlası olan şey o.
+
+Kategoriden farklı olarak **koşulsuz**: `OTHER` "cevap yok" demekti, ama
+işaretsiz bir kart aylık mı yoksa işaretlenmemiş mi belli olmaz ve parada
+örtük kural olmaz.
+
+**Ölçüm — periyot satırı bir `bodySmall` satırı kadar yer alıyor, yatayda
+hiçbir şey almıyor:**
+
+| | 1 satır (12-1 öncesi) | 2 satır (ad + periyot) | 3 satır (+ kategori) |
+|---|---|---|---|
+| API 29 fs 1.0 | 144 px | **166 px** | **198 px** |
+| API 29 fs 2.0 | 162 px | **226 px** | **290 px** |
+| API 34 fs 1.0 | 189 px | **217 px** | **259 px** |
+| API 34 fs 2.0 | 212 px | **296 px** | **380 px** |
+
+fs 2.0'da her satır API 29'da 64 px, API 34'te 84 px ekliyor; ilk ek satır
+fs 1.0'da daha ucuz (28/22 px) çünkü ikonun asgari yüksekliği bir kısmını
+zaten içeriyordu. **Kırpılma yok, kart uzuyor ve liste kaydırılıyor.** Adın
+yatay alanı değişmedi: fiyat metni aynı, `weight(1f)` dağılımı aynı.
+
+Kart hâlâ **tek erişilebilirlik düğümü**; okunan cümle artık
+`"Delta, TRY 55.00, Monthly, Health"`.
+
+**Okunan cümle tek formata indi.** `subscription_row_description_dated`
+silindi, `..._with_category` → `..._more` diye yeniden adlandırıldı: cümle
+artık "bir bilgi daha ekle" formatıyla adım adım kuruluyor (ad+tutar → periyot
+→ geri sayım → kategori). Dört kombinasyon dört çeviri isteyecekti.
+
+### Dashboard
+
+Kartın **altında** iki chip (Aylık / Yıllık). İçine konamaz: kart
+`clearAndSetSemantics` ile tek odak durağı, çocukları ağaçtan düşüyor —
+içerideki bir chip erişilemez olurdu.
+
+Başlık görünümle değişiyor (`total_monthly` / `total_yearly`) ve tutarla
+birlikte tek cümle olarak okunuyor: `"Total Yearly, TRY 2,920.00"` — 8a'daki
+tek odak durağı bozulmadı.
+
+Görünüm state'i ViewModel'da (sayıyı değiştiriyor, §5), **kalıcı değil**;
+filtre kararıyla aynı çizgide.
+
+### Testler
+
+- 149 → **174 birim testi** (25 yeni), 0 hata. `lintDebug` **0 hata, 20 uyarı**
+  — sayı değişmedi.
+- `PeriodNormalisationTest` (14 test): yıllık ÷ 12 HALF_UP (1.199,00 → 99,92),
+  haftalık × 52 ÷ 12 (10,00 → 43,33), karışık liste (243,33), yıllık görünümün
+  tamlığı (292.000 kuruş), aylık × 12 ile yıllık arasındaki farkın sınırı
+  (≤ 6 kuruş), **tek yuvarlama kanıtı** ve tavanlar.
+- **Tek yuvarlama kanıtı:** haftalık 10,00 USD → TRY.
+  Birlikte `1.000 × 52 × 428.500 / (10.000 × 12)` = **185.683** kuruş;
+  ayrı ayrı `52.000/12 = 4.333` sonra `× 42,85` = **185.669**. Fark **14
+  kuruş**, test ikisini yan yana gösteriyor.
+- `HomeViewModelBillingPeriodTest` (4) ve `HomeViewModelTotalPeriodTest` (7):
+  kaydedilen periyot, varsayılan, görünüm değişimi, filtreyle birlikte çalışma.
+- Fake kullanıldı, mock yok (§11).
+
+### Emülatör doğrulaması
+
+**(b) Seçici** — yukarıdaki tabloda; iki AVD'de de **tek satır**.
+
+**(c) Toplam — elle hesapla birebir aynı.** 100,00 aylık + 1.200,00 yıllık +
+10,00 haftalık:
+
+```
+beklenen: 100,00 + 100,00 + 43,33 = 243,33
+ekranda : "Total Monthly, TRY 243.33"   (API 29 ve API 34)
+```
+
+**(d) Yıllık görünüm:** `"Total Yearly, TRY 2,920.00"` (iki AVD'de de).
+Aylık figürün 12 katı **2.919,96**; fark **4 kuruş**. Sebep tek yuvarlama:
+gerçek yıllık maliyet 292.000 kuruş, aylık figür onun yuvarlanmış on ikide
+biri (24.333). Ekranda gösterilen, yuvarlanmış sayının katı değil, bölünmemiş
+ara değerin kendisi — yani doğru olanı.
+
+**(e) Kartlar:** `"Alpha, TRY 100.00, Monthly"` · `"Beta, TRY 1,200.00, Yearly"`
+· `"Gamma, TRY 10.00, Weekly"`.
+
+**(f)** Yukarıdaki yükseklik tablosu.
+
+**(g) Filtre + görünüm birlikte:** Sağlık seçiliyken aylık **55,00**, yıllık
+**660,00** (= 55 × 12), "Tümü"ye dönünce aylık **298,33**. İki AVD'de de aynı.
+
+**(h)** Haftalık seçilip kaydedildikten sonra form yeniden açıldığında
+**Aylık** seçili geliyor; seçim yapılmışken döndürüldüğünde korunuyor
+(API 29 ve API 34).
+
+**(i) Erişilebilirlik:** dashboard tek düğüm
+(`[42,338][1038,633] "Total Monthly, TRY 243.33"`), kart tek düğüm, toggle
+chip'leri `checkable=true` ve seçili olan `checked=true`, her biri tek odak
+durağı.
+
+**(j) Sabit regresyon listesi — 61 → 68 madde, ikisinde de koşuldu.** 12-1'in
+yedi maddesi eklendi (62-68). 61 maddenin tamamı iki emülatörde koşuldu ve
+geçti; kayıtlı istisnalar 11b'dekilerle aynı (**API 29**: #15 koyu tema,
+#16 dil — API 33 öncesi `cmd locale` yok; #34-#37 ve #41-#45 API 33+ maddeleri,
+karşılıkları #40 ve #46 koşuldu. **API 34**: #40 ve #46 API < 33 maddeleri).
+#39 için kanal yine `am instrument` ile yaratıldı.
+
+**(k)** İki emülatör de silinip yeniden kuruldu, ayarlar geri alındı, ikisi de
+temiz boş durumla açılıyor.
+
+### Değişen dosyalar
+
+- `domain/model/BillingPeriod.kt` — `paymentsPerYear`
+- `domain/model/TotalPeriod.kt` — yeni
+- `domain/usecase/CurrencyConverter.kt` — periyot alan `totalIn` aşırı yüklemesi
+- `ui/common/BillingPeriodSelector.kt`, `ui/common/TotalPeriodToggle.kt` — yeni
+- `ui/home/components/SubscriptionRowDescription.kt` — yeni (HomeScreen 300
+  satırı geçmişti, okunan cümle oraya taşındı)
+- `ui/home/HomeUiState.kt` (`monthlyTotal` → `total`, `totalPeriod`),
+  `HomeViewModel.kt`, `HomeScreen.kt`, `HomeScreenPreviews.kt`
+- `ui/home/components/AddSubscriptionSheet.kt`, `SubscriptionCard.kt`,
+  `DashboardCard.kt`
+- `res/values/strings.xml`, `res/values-en/strings.xml`
+- `test/.../PeriodNormalisationTest.kt`, `HomeViewModelBillingPeriodTest.kt`,
+  `HomeViewModelTotalPeriodTest.kt` — yeni; `HomeViewModelTest`,
+  `HomeViewModelFilterTest` — alan adı güncellendi
+- `docs/ARCHITECTURE.md` §6 ve §17, `docs/ROADMAP.md`, `docs/TESTING.md`
+
+### Commit'ler
+
+- `2cf0459` feat: total what subscriptions cost, not what their prices say
+- `b1e1be7` feat: choose how often a subscription is billed
+- `1626d45` feat: say on every card how often it is billed
+- `94af319` feat: switch the total between a month and a year
+
+### Karşılaşılan sorunlar
+
+- **`HomeScreen.kt` 304 satıra çıktı** (sınır 300). Okunan satır cümlesi
+  `SubscriptionRowDescription.kt`'ye taşındı, 269'a indi.
+- **Tarih seçicinin onay düğmesi de "Save" diyor.** Diyalog kapanırken alınan
+  dump'ta iki "Save" düğümü görünüyor ve yanlış olana dokunuluyor; 29. madde
+  bu yüzden "kart yok" dedi. Üründe sorun yok, ölçümdeydi — TESTING.md'ye
+  tuzak olarak yazıldı.
+- **360dp'de form bir sıra uzadı**, kategori chip'leri ve tarih alanı açılışta
+  ekranın altında kalıyor. Ürün açısından sorun değil (form kaydırılabilir,
+  ikisi de opsiyonel) ama ölçümden önce kaydırmak gerekiyor; TESTING.md'ye
+  yazıldı.
+
+### Rapor edilen, düzeltilmedi
+
+- **Taşma payı 9.223 → 177.** Yukarıda hesabıyla duruyor. Tavan
+  değiştirilmedi, karar sohbetin.
+- İki parametreli `totalIn` artık üründe çağrılmıyor (yukarıda gerekçesi).
+
+### Sonraki faz için not
+
+- **12-2:** tarih ilerletme + hatırlatma penceresi. §17'deki "kullanıcı
+  seçmiyor" önkoşulu artık geçersiz; §18'deki 1-3 günlük pencerenin gerekçesi
+  ilerletme gelince ortadan kalkıyor. İkisi birlikte ele alınmalı.
+- Faz 14'te kart yeniden ele alınırken fs 2.0'da **üç satırlı** kart
+  (ad + periyot + kategori) 290/380 px; tabloyu oradan al.
+
+---
+
 ## [Faz 11b] Kategori Filtresi — 2026-09-06
 
 **Durum:** Tamamlandı. **Faz 11 KAPANDI** (ROADMAP'teki dört madde de işaretli).

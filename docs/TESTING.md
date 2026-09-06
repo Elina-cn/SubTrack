@@ -111,6 +111,14 @@ etmeden bildirin; sonraki maddeler zaten bozuk bir durumun üstüne binebilir.
 | 60 | Filtre seçiliyken döndür, sonra uygulamayı tamamen kapat ve aç | Döndürmede **korunuyor**, yeniden açılışta **Tümü**'ye dönüyor (filtre kalıcı değil) | 11b |
 | 61 | Filtre çubuğunu yatay kaydır | Ekrandan taşan chip'e ulaşılıyor; kaydırma ekranın **en sağ kenarından başlatılmaz** (aşağıdaki API 34 tuzağı) | 11b |
 
+| 62 | Ekleme formunda periyot seçici | Üç chip: Aylık / Yıllık / Haftalık. **Aylık** seçili gelir; 360dp'de **tek satıra sığar** | 12-1 |
+| 63 | Aylık 100,00 + yıllık 1.200,00 + haftalık 10,00 kaydet | Kartlarda periyot yazıyor; toplam **243,33** (100,00 + 100,00 + 43,33) | 12-1 |
+| 64 | Dashboard'ın altındaki **Yıllık** chip'ine bas | Başlık "Yıllık Toplam", değer **2.920,00** — aylık figürün 12 katı (2.919,96) **değil**; fark tek yuvarlamadan | 12-1 |
+| 65 | Bir kategori filtresi seçip iki görünüme de bak | Yıllık toplam yalnızca **görünen** satırları kapsıyor | 12-1 |
+| 66 | Periyot seçip kaydettikten sonra FAB'a tekrar bas | Periyot **Aylık**'a dönmüş | 12-1 |
+| 67 | Periyot seçili haldeyken sheet açıkken döndür | Seçim **korunuyor** | 12-1 |
+| 68 | Yıllık görünümdeyken uygulamayı tamamen kapat ve aç | **Aylık**'a dönüyor (görünüm kalıcı değil) | 12-1 |
+
 **Klavye açıkken buton erişilebilirliği — her fazda kontrol edilecek**
 
 Metin alanı olan **her** ekranda, klavye açıkken ekranın alt kısmındaki
@@ -259,6 +267,25 @@ sonra aynı komut üç kez üst üste hiçbir şey yapmadı.
 Kural: **silme** kaydırmalarında 700 ms kullan. 400 ms ve altı yalnızca
 "silmemeli" maddelerinde (liste #8, hızlı kısa fiske) anlamlıdır — orada zaten
 silmemesi beklenir, yani sessizce yanlış geçmez.
+
+### Tarih seçicinin onay düğmesi de "Save" diyor
+
+`DatePickerDialog`'un confirm düğmesi ile sheet'in Kaydet düğmesi **aynı
+metni** taşıyor. Diyalog kapanırken alınan bir dump'ta iki düğüm de "Save"
+diye görünür; ilkine dokunmak boşa gider ve test, kaydetmediğini fark etmeden
+devam eder. Faz 12-1 doğrulamasında bu oldu: 29. madde "kart yok" dedi, sebep
+üründe değil ölçümdeydi.
+
+Kural: diyalogda Kaydet'e bastıktan sonra **"Select date" başlığının
+kaybolmasını bekle**, sonra yeniden dump al.
+
+### 360dp'de form artık kaydırma istiyor
+
+Periyot sırası (Faz 12-1) formu bir sıra uzattı. 360dp'lik ekranda **kategori
+chip'leri ve tarih alanı açılışta ekranın altında kalıyor**; ikisine de
+ulaşmak için form kaydırılmalı. Ürün açısından sorun değil — form zaten
+kaydırılabilir ve iki alan da opsiyonel — ama otomatik testte "düğüm yok"
+hatası olarak çıkar. Ölçüm yaparken önce kaydır.
 
 ### Bildirim izni durumunu adb ile kurma ve okuma
 
