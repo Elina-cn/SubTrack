@@ -4,6 +4,7 @@ import com.elinacn.subtrack.domain.model.Currency
 import com.elinacn.subtrack.domain.model.ExchangeRateTable
 import com.elinacn.subtrack.domain.model.Money
 import com.elinacn.subtrack.domain.model.Subscription
+import com.elinacn.subtrack.domain.model.TotalPeriod
 import com.elinacn.subtrack.domain.model.sum
 
 /**
@@ -31,7 +32,7 @@ class CurrencyConverter(private val rates: ExchangeRateTable = ExchangeRateTable
     }
 
     /**
-     * Adds up [subscriptions] in [target].
+     * Adds up [subscriptions] in [target], taking every price exactly as it stands.
      *
      * Amounts are summed within each currency first and that one sum is converted, rather than
      * converting every subscription and adding the results. The two orders differ by a kuruş or
@@ -41,11 +42,68 @@ class CurrencyConverter(private val rates: ExchangeRateTable = ExchangeRateTable
      *
      * Nothing on screen is a per-row converted figure, so there is no parts-versus-total mismatch
      * for the user to notice: each card shows its own price in its own currency.
+     *
+     * **This adds prices, not costs.** A yearly price and a monthly one are added as they are, so
+     * the result only means something when every subscription shares a period. The screen uses the
+     * overload that takes a [TotalPeriod]; this one stays for the case where the caller genuinely
+     * wants the prices themselves.
      */
     fun totalIn(subscriptions: List<Subscription>, target: Currency): Money =
+        total(subscriptions, target, weight = { 1L }, parts = 1)
+
+    /**
+     * Adds up what [subscriptions] cost over one [period], in [target].
+     *
+     * Two conversions happen to every price on the way here - out of its billing period and out of
+     * its currency - and **both round once, together, at the end**. Each is a fraction: yearly over
+     * twelve, kuruş at one rate over another. Rounding them separately would round twice and the
+     * halves would not cancel; the error shows up as a total that is a kuruş or two off what the
+     * same numbers give on paper.
+     *
+     * What makes one rounding possible is [BillingPeriod.paymentsPerYear]: multiplying by it is
+     * exact, so the yearly cost of a group is a plain Long sum with nothing lost yet. Everything
+     * after it - the rate, and the twelve that makes a month - is one division.
+     *
+     * Multiply first, divide last, for the same reason.
+     */
+    fun totalIn(subscriptions: List<Subscription>, target: Currency, period: TotalPeriod): Money =
+        total(
+            subscriptions,
+            target,
+            weight = { it.billingPeriod.paymentsPerYear.toLong() },
+            parts = period.partsOfAYear
+        )
+
+    /**
+     * The shared body: weigh each price, sum per currency, then convert and divide in one step.
+     *
+     * [weight] scales a price before it is added - one for the prices as they are, the payments a
+     * year for a cost. [parts] is what the sum is finally divided by, so the rate division and the
+     * period division are the same division.
+     */
+    private fun total(
+        subscriptions: List<Subscription>,
+        target: Currency,
+        weight: (Subscription) -> Long,
+        parts: Int
+    ): Money =
         subscriptions
             .groupBy { it.currency }
-            .map { (currency, group) -> convert(group.map { it.price }.sum(), currency, target) }
+            .map { (currency, group) ->
+                val weighted = group.sumOf { it.price.cents * weight(it) }
+                Money(
+                    if (currency == target) {
+                        // The rates would cancel; skipping them keeps an unconverted amount out of
+                        // a multiplication it does not need, and with parts = 1 out of any rounding.
+                        divideHalfUp(weighted, parts.toLong())
+                    } else {
+                        divideHalfUp(
+                            weighted * rates.rateOf(currency),
+                            rates.rateOf(target) * parts
+                        )
+                    }
+                )
+            }
             .sum()
 
     /**
