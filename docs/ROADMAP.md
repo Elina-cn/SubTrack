@@ -259,20 +259,29 @@ Dört promptta yürütüldü: **10a** tarih seçici ve geri sayım, **10b** Work
 
 ---
 
-## 🟡 Faz 11 — Kategoriler
+## ✅ Faz 11 — Kategoriler
 
-İki promptta yürütülüyor: **11a** kategori seçimi ve gösterimi **(bitti)**,
-**11b** filtre ve kategori bazlı toplam.
+İki promptta yürütüldü: **11a** kategori seçimi ve gösterimi, **11b** filtre.
 
 - [x] **11a:** Kategori seçimi — ekleme formunda `FilterChip` sırası
       (para birimi seçicisinin deseni), varsayılan `OTHER`, zorunlu değil
 - [x] **11a:** Kartta gösterim — kategori yalnızca `OTHER` değilse çizilir,
       erişilebilirlik cümlesine de eklenir
-- [ ] **11b:** Kategoriye göre filtre, kategori bazlı toplam
-- [ ] **11b:** **Filtre hiçbir şeyle eşleşmediğinde boş durum** — Faz 8b'deki
-      `ui/common/EmptyState` bileşeninin varyantı olacak. Bileşen ikon, başlık
-      ve alt satırı parametre alacak şekilde yazıldı; yalnızca yeni metinler ve
-      (gerekiyorsa) yeni bir ikon gerekiyor, yeni bileşen değil.
+- [x] **11b:** Kategoriye göre filtre, kategori bazlı toplam —
+      `ui/common/CategoryFilterBar`, listenin üstünde yatay kayan beş chip
+      ("Tümü" + dört kategori). Filtre `HomeUiState.categoryFilter`'da yaşar,
+      kalıcı değildir, uygulama açılışında "Tümü"ye döner.
+- [x] **11b:** **Filtre hiçbir şeyle eşleşmediğinde boş durum** — Faz 8b'deki
+      `ui/common/EmptyState` bileşeninin varyantı (`EmptyCategory`). Bileşenin
+      imzası değişmedi; yalnızca iki yeni metin eklendi.
+
+**"Kategori bazlı toplam" böyle okundu:** filtre seçiliyken dashboard
+toplamı **görünen satırların** toplamıdır; ayrı bir "kategori toplamı"
+göstergesi eklenmedi. Ekranda iki toplam olsaydı hangisinin ne olduğu
+sorulurdu; tek toplamın filtreyi izlemesi aynı bilgiyi tek yerde veriyor.
+
+**Bitti:** Abonelikler kategoriyle kaydediliyor, kartta görünüyor, listeyi
+kategoriye göre daraltmak mümkün ve boş kalan kategori kendini söylüyor.
 
 ---
 

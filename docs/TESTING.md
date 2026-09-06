@@ -104,6 +104,13 @@ etmeden bildirin; sonraki maddeler zaten bozuk bir durumun üstüne binebilir.
 | 54 | Kaydettikten sonra FAB'a tekrar bas | Kategori **Diğer**'e dönmüş | 11a |
 | 55 | Kategori seçili haldeyken sheet açıkken döndür | Seçim **korunuyor** | 11a |
 
+| 56 | Liste üstündeki filtre çubuğu | "Tümü" + dört kategori, beş chip; açılışta **Tümü** seçili | 11b |
+| 57 | Bir kategori seç | Liste yalnızca o kategoriyi gösteriyor, **dashboard toplamı da** görünen satırların toplamı | 11b |
+| 58 | Hiçbir aboneliği olmayan bir kategoriyi seç | "Bu kategoride abonelik yok / Başka bir kategori seç" — 8b'deki ilk boş durumdan **farklı metin** | 11b |
+| 59 | Filtre açıkken bir satırı sil, sonra "Geri al" | Satır dönüyor, filtre **korunuyor**, "Tümü"de sıra da eski hâlinde | 11b |
+| 60 | Filtre seçiliyken döndür, sonra uygulamayı tamamen kapat ve aç | Döndürmede **korunuyor**, yeniden açılışta **Tümü**'ye dönüyor (filtre kalıcı değil) | 11b |
+| 61 | Filtre çubuğunu yatay kaydır | Ekrandan taşan chip'e ulaşılıyor; kaydırma ekranın **en sağ kenarından başlatılmaz** (aşağıdaki API 34 tuzağı) | 11b |
+
 **Klavye açıkken buton erişilebilirliği — her fazda kontrol edilecek**
 
 Metin alanı olan **her** ekranda, klavye açıkken ekranın alt kısmındaki
@@ -240,6 +247,18 @@ adb shell cmd overlay list android | grep navbar
 
 Yani bu, API sürümünün değil **gezinme modunun** sonucudur. Bir AVD'nin modu
 değişirse davranış da değişir; şüphede kalınca yukarıdaki komutla bakılır.
+
+### Kaydırarak silme: `input swipe` süresi 700 ms olmalı
+
+`adb shell input swipe x1 y cx2 y 400` bazı koşullarda satırı silmiyor: aynı
+mesafe, aynı başlangıç noktası, ama jest fiske (fling) sayılıp mesafe şartına
+takılıyor. 700 ms'lik aynı kaydırma her seferinde sildi. Faz 11b
+doğrulamasında bir kaydırma 400 ms ile çalıştı, emülatör yeniden başlatıldıktan
+sonra aynı komut üç kez üst üste hiçbir şey yapmadı.
+
+Kural: **silme** kaydırmalarında 700 ms kullan. 400 ms ve altı yalnızca
+"silmemeli" maddelerinde (liste #8, hızlı kısa fiske) anlamlıdır — orada zaten
+silmemesi beklenir, yani sessizce yanlış geçmez.
 
 ### Bildirim izni durumunu adb ile kurma ve okuma
 

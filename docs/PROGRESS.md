@@ -27,6 +27,163 @@ Her faz sonunda **en üste** yeni kayıt eklenir. Eski kayıtlar silinmez.
 
 ---
 
+## [Faz 11b] Kategori Filtresi — 2026-09-06
+
+**Durum:** Tamamlandı. **Faz 11 KAPANDI** (ROADMAP'teki dört madde de işaretli).
+
+**Görev 0 — 11a'daki form state tutarsızlığı kapatıldı**
+11a kategoriyi `HomeUiState.selectedCategory` + `HomeEvent.SelectCategory`
+olarak tutuyordu; formun diğer dört alanı (ad, fiyat, para birimi, tarih)
+sheet'in kendi `rememberSaveable`'ındaydı. Kategori sheet'e **indirildi**:
+
+- `AddSubscriptionSheet` artık `rememberSaveable(stateSaver = CategorySaver)`
+  ile kendi kategorisini tutuyor. `CategorySaver`, `CurrencySaver`'ın birebir
+  deseni — enum adı saklanıyor, tanınmayan ad `OTHER`'a düşüyor.
+- `onSave` beş parametreye çıktı; `HomeEvent.Save`'in `category` parametresi
+  varsayılanı `OTHER` olarak kaldı, yani eski çağrılar bozulmadı.
+- `HomeUiState.selectedCategory` ve `HomeEvent.SelectCategory` **kaldırıldı**.
+- Kural `ARCHITECTURE.md` §5'e yazıldı: form alanı composable'da, listeyi veya
+  toplamı değiştiren state ViewModel'da. Ayırt edici soru orada.
+
+11a'nın kategori testleri silinmedi, **yeni yüzeye göre yazıldı**: artık
+"seçim state'e yansıyor" değil, "kayıt doğru kategoriyle gidiyor" ölçülüyor
+(4 test). Chip'in döndürmede korunması ve kayıttan sonra sıfırlanması sheet'in
+`rememberSaveable`'ının işi ve cihazda ölçüldü (liste #54, #55).
+
+**Filtre**
+- `ui/common/CategoryFilterBar` — beş `FilterChip` ("Tümü" + dört kategori),
+  `horizontalScroll`. **`FlowRow` değil:** dört chip 360dp'de zaten tek satıra
+  sığmıyordu (11a: 788 px gerekiyor, 624 px var), beşincisi eklenince sarma her
+  ekranda kalıcı olarak ikinci bir satır yerdi. Kaydırmanın bedeli yalnızca
+  taşan chip'i isteyen kullanıcıya ait.
+- Filtre `HomeUiState.categoryFilter`'da; `null` "seçim yok" demek, beşinci bir
+  kategori değil. Kalıcı değil — DataStore'a yazılmıyor, süreç ölünce "Tümü".
+- ViewModel'da liste **bir kez** süzülüyor, geri sayım ve toplam süzülmüş
+  listeden türetiliyor. Yani filtre açıkken dashboard o kategoriyi gösteriyor;
+  ayrı bir "kategori toplamı" göstergesi **eklenmedi** (gerekçe ROADMAP'te).
+- `hasAnySubscriptions` eklendi: "hiç abonelik yok" ile "bu kategoride yok"
+  ayrımını ekran bu alandan yapıyor.
+
+**Boş durum varyantı**
+`EmptyState`'in **imzası değişmedi**; `EmptyCategory()` sarmalayıcısı eklendi ve
+`EmptySubscriptions()` ile aynı ikonu kullanıyor (`AutoMirrored.Filled.List`)
+— iki durum aynı şeyin farklı pencereden görünüşü, ayıran şey metin. Faz 16'nın
+daraltacağı ikon kümesi büyümedi.
+
+**Testler**
+- 143 → **149 birim testi** (yeni `HomeViewModelFilterTest` 9 test,
+  `HomeViewModelCategoryTest` 7 → 4 teste yeniden yazıldı), 0 hata.
+- `lintDebug` **0 hata, 20 uyarı** — sayı değişmedi.
+- Enstrümantasyon: `PaymentReminderWorkerTest` iki emülatörde de `OK (2 tests)`
+  (kanalı yaratmak için koşuldu, aşağıya bak).
+
+**Sahte repository'de bulunan hata — üründe değil, testte**
+Undo sıra testleri kırmızı geldi. Sebep: `FakeSubscriptionRepository.observeAll()`
+eklenme sırasını döndürüyordu, DAO ise `ORDER BY createdAt DESC` ile ters
+sırayı. Yani sahte, gerçek sözleşmeyi taklit etmiyordu. **Düzeltilen sahte
+oldu, ürün değil** — fake artık `sortedByDescending { it.createdAt }` veriyor.
+
+**Emülatör doğrulaması — iki AVD'de de tam**
+
+| | API 29 (360dp) | API 34 (411dp) |
+|---|---|---|
+| Chip'ler tek satıra | sığmıyor, kaydırma gerekiyor | sığmıyor, "Diğer" `[1043,821][1080,947]`'de kırpık |
+| Kaydırmadan sonra | beş chip de ulaşılabilir | "Diğer" tam görünür `[862,821][1038,947]` |
+| Süzme | her kategori kendi satırını gösterdi | Diğer 10,00 · Sağlık 20,00 · Üretkenlik 30,00 · Eğlence 50,00 (Tümü 110,00) |
+
+- **Boş kategori:** `"No subscriptions in this category, Try another category"`
+  — ilk boş durum `"No subscriptions yet, Tap + to add one"`. İkisi de tek
+  erişilebilirlik düğümü ve ikisi de `[84,1052][996,1417]` kutusunda.
+- **Depo boşken** bir kategori seçilirse yine **ilk** boş durum çıkıyor
+  ("...yet, Tap + to add one"), yani `hasAnySubscriptions` dalı cihazda da
+  doğru — `uiState_storeIsEmpty_saysSoRegardlessOfTheFilter` testiyle aynı
+  sonuç.
+- **Sil + geri al (filtre açık):** Üretkenlik seçiliyken tek satır silindi →
+  filtre boş durumu + Snackbar; "Geri al" satırı geri getirdi, filtre
+  Üretkenlik'te kaldı, toplam 30,00'a döndü. "Tümü"de sıra da eski hâlinde.
+- **Döndürme:** filtre korunuyor. Yazı tipi ölçeği değiştirilince (yapılandırma
+  değişikliği) hem filtre hem **çubuğun kaydırma konumu** korunuyor.
+- **Yeniden başlatma:** "Tümü"ye dönüyor (kalıcı değil, beklenen).
+- **fs 2.0:** chip'ler sarmıyor, metin kırpılmıyor ("Entertainment"
+  `[271,938][711,1036]`), çubuk sonuna kadar kayıyor ve "Diğer" seçilip
+  süzebiliyor. Chip yüksekliği 126 px.
+- **Koyu tema:** filtre çubuğu okunur, seçili chip `primaryContainer` zemininde,
+  seçilmeyenler çerçeveyle ayrışıyor; ekran görüntüsü alındı.
+- **Türkçe:** çubuk `Tümü / Eğlence / Üretkenlik / Sağlık / Diğer` diye geliyor
+  (API 34, `cmd locale set-app-locales`).
+
+**Erişilebilirlik — chip başına tek durak**
+Filtre chip'i ağaçta bir `View` (odaklanabilir, `checkable=true`, seçiliyse
+`checked=true`) ve içinde odaklanamayan iki çocuk: etiket `TextView` ve bir
+`CheckBox`. Yani çubuk **beş** durak ekliyor, chip başına bir tane; fazladan
+veya etiketsiz düğüm yok. Bu, formdaki kategori ve para birimi chip'lerinin
+yapısıyla aynı (stok `FilterChip`).
+
+**Sabit regresyon listesi — 55 → 61 madde, ikisinde de koşuldu**
+11b'nin altı maddesi eklendi (56-61). Liste **iki emülatörde de baştan sona**
+koşuldu ve geçti. Kayıtlı istisnalar:
+
+- **API 34:** #40 ve #46 yalnızca API < 33 maddeleri.
+- **API 29:** #15 ölçülemedi — `cmd uimode night yes` bu imajda "Night mode: no"
+  dönüyor, tema değişmiyor. #16 ölçülemedi — `cmd locale` servisi API 33
+  öncesinde **yok** ("Can't find service: locale"); cihaz dilini değiştirmek
+  çerçeve yeniden başlatması istiyor. Filtre çubuğunun Türkçesi bu yüzden API
+  34'te doğrulandı. #34-#37 ve #41-#45 API 33+ davranışları; karşılıkları #40
+  ve #46 koşuldu ve geçti.
+- #38 ve #39 **iki AVD'de de** koşuldu: sistem ayarından bildirim kapatılıp
+  açıldığında satır aynı süreçte (pid değişmeden) güncelleniyor. #39 için kanal
+  gerekiyor — kanal ilk bildirimle doğduğu için `PaymentReminderWorkerTest`
+  `am instrument` ile koşuldu; kanal kapatılınca satır "Kapalı — sistem
+  ayarlarından açılmalı" dedi, uygulama izni açık olsa bile.
+
+**Değişen dosyalar**
+- `ui/common/CategoryFilterBar.kt` — yeni
+- `ui/common/EmptyState.kt` — `EmptyCategory()` eklendi, `EmptyState` imzası aynı
+- `ui/home/HomeUiState.kt`, `HomeViewModel.kt`, `HomeScreen.kt`
+- `ui/home/components/AddSubscriptionSheet.kt` — kategori + `CategorySaver`
+- `res/values/strings.xml`, `res/values-en/strings.xml`
+- `test/fake/FakeSubscriptionRepository.kt` — DAO gibi sıralıyor
+- `test/ui/home/HomeViewModelFilterTest.kt` — yeni
+- `test/ui/home/HomeViewModelCategoryTest.kt` — yeni yüzeye göre yazıldı
+- `docs/ARCHITECTURE.md` §5, `docs/ROADMAP.md`, `docs/TESTING.md`
+
+**Commit'ler**
+- `133a373` refactor: let the add form own the category like its other fields
+- `768ce32` feat: narrow the list to one category
+- `5e7c173` feat: say when a category has nothing in it
+- `6d61411` test: cover the category filter and make the fake sort like the DAO
+
+**Karşılaşılan sorunlar**
+- **Sahte repository sıralamayı taklit etmiyordu** (yukarıda). Ders: bir fake
+  sözleşmeyi taklit ediyorsa, sözleşmenin sırası da sözleşmenin parçasıdır.
+- **`input swipe ... 400` bazen silmiyor.** Aynı komut emülatör yeniden
+  başlatıldıktan sonra üç kez üst üste hiçbir şey yapmadı, 700 ms ile her
+  seferinde sildi. TESTING.md'ye tuzak olarak yazıldı.
+- **`connectedDebugAndroidTest` uygulamayı siliyor.** Gradle koşum sonunda hem
+  test hem uygulama APK'sını kaldırıyor; kanalı yaratmak için koşulan test,
+  ölçülecek kurulumu da götürdü. Çözüm: APK'ları elle kurup `am instrument`
+  çağırmak.
+- **`pm revoke` kalıcı reddi taklit etmiyor.** Revoke sonrası satır yine
+  "Kapalı — açmak için dokunun" diyor; **kalıcı ret** ancak gerçek sistem
+  diyaloğunda iki kez reddedilerek üretilebiliyor. (10c-1'deki "pm revoke
+  süreci öldürüyor" notunun yanına.)
+
+**Rapor edilen, düzeltilmeyen**
+- Depoda hiç abonelik yokken filtre çubuğu **görünmeye devam ediyor**. Promptta
+  gizlenmesi istenmedi, kapsam dışı bırakıldı; davranış zararsız çünkü boş
+  depoda hangi chip seçilirse seçilsin ekran "Henüz abonelik yok" diyor.
+  Faz 14'te ekran yeniden ele alınırken karara bağlanabilir.
+
+**Sonraki faz için not**
+- Faz 12 ödeme periyodunu getirince toplam "aylık normalize" olacak; filtre
+  süzmeyi ondan **önce** yapıyor, yani sıra değişmemeli ama `totalIn`
+  değiştiğinde `HomeViewModelFilterTest`'teki toplam beklentileri gözden
+  geçirilmeli.
+- Filtre kalıcı yapılmak istenirse yeri `SettingsRepository` değil, ekranın
+  kendi `SavedStateHandle`'ı olur — bugünkü karar "kalıcı değil".
+
+---
+
 ## [Faz 11a] Kategori Seçimi ve Gösterimi — 2026-09-05
 
 **Durum:** Tamamlandı. **Faz 11 KAPANMADI** — filtre ve kategori bazlı toplam

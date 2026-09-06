@@ -147,6 +147,37 @@ fun onEvent(event: HomeEvent)
 `MutableStateFlow` **private** kalır. Composable'a 6 tane ayrı lambda
 geçirmiyoruz, tek `onEvent` yeterli.
 
+### Form alanları composable'da, listeyi etkileyen state ViewModel'da
+
+Kural iki cümle:
+
+- Yalnızca kendi formunu ilgilendiren **geçici alan** (ad, fiyat, para birimi,
+  tarih, kategori) onu çizen composable'ın `rememberSaveable`'ında yaşar ve
+  kayıt anında tek bir `Save` event'iyle ViewModel'a geçer.
+- Ekranda **ne görüneceğini belirleyen** state (liste, toplam, filtre, hata)
+  `UiState`'te yaşar.
+
+Ayırt edici soru: *bu değer değişince listenin veya toplamın gösterdiği şey
+değişiyor mu?* Evetse ViewModel'ın, hayırsa formun.
+
+Gerekçe: form alanı ViewModel'a konursa her tuş vuruşu `UiState`'i yeniden
+yayınlar ve tüm ekran recompose olur; ayrıca vazgeçme ve sıfırlama akışları
+iki ayrı yerden yönetilmek zorunda kalır. Filtre bunun tam tersi: liste ve
+toplam ondan **türetiliyor**, yani `UiState`'in dışında duramaz.
+
+Bu, §3'teki "composable `ViewModel` dışı state sahibi olmaz" kuralının
+istisnası değil, okunuşu: sheet'in `rememberSaveable`'ı ekranın state'i değil,
+henüz kaydedilmemiş bir formun taslağıdır.
+
+**11a'daki tutarsızlık ve 11b'de kapanışı.** 11a kategoriyi
+`HomeUiState.selectedCategory` + `HomeEvent.SelectCategory` olarak eklemişti;
+formun diğer dört alanı ise sheet'in kendi state'indeydi — beş alandan dördü
+bir yerde, biri başka yerde. 11b'nin ilk işi kategoriyi sheet'e indirmek oldu
+(`rememberSaveable(stateSaver = CategorySaver)`, `CurrencySaver`'ın deseni),
+`Save` event'i beş parametreye çıktı, `selectedCategory` ve `SelectCategory`
+kaldırıldı. Aynı fazda eklenen **filtre** ise ViewModel'da kaldı: yukarıdaki
+soruya "evet" cevabını veren tek alan o.
+
 ---
 
 ## 6. Para Birimi Kuralı
