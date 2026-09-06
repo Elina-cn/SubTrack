@@ -78,7 +78,7 @@ class HomeViewModelTest {
 
             assertTrue(initial.isLoading)
             assertTrue(initial.subscriptions.isEmpty())
-            assertEquals(Money.ZERO, initial.monthlyTotal)
+            assertEquals(Money.ZERO, initial.total)
 
             cancelAndIgnoreRemainingEvents()
         }
@@ -110,7 +110,7 @@ class HomeViewModelTest {
         collectState()
 
         // 219,89 exactly - the sum that a Double would not be trusted to produce.
-        assertEquals(Money(21989), viewModel.uiState.value.monthlyTotal)
+        assertEquals(Money(21989), viewModel.uiState.value.total)
     }
 
     @Test
@@ -124,7 +124,7 @@ class HomeViewModelTest {
         )
         collectState()
 
-        assertEquals(Money(178545), viewModel.uiState.value.monthlyTotal)
+        assertEquals(Money(178545), viewModel.uiState.value.total)
         assertEquals(Currency.TRY, viewModel.uiState.value.baseCurrency)
         assertTrue(viewModel.uiState.value.isTotalConverted)
     }
@@ -153,14 +153,14 @@ class HomeViewModelTest {
         collectState()
 
         // In TRY: 15999 + round(1099 * 428500 / 10000) = 15999 + 47092.
-        assertEquals(Money(63091), viewModel.uiState.value.monthlyTotal)
+        assertEquals(Money(63091), viewModel.uiState.value.total)
         assertEquals(Currency.TRY, viewModel.uiState.value.baseCurrency)
 
         settingsRepository.setMainCurrency(Currency.USD)
         advanceUntilIdle()
 
         // In USD: round(15999 * 10000 / 428500) + 1099 = 373 + 1099.
-        assertEquals(Money(1472), viewModel.uiState.value.monthlyTotal)
+        assertEquals(Money(1472), viewModel.uiState.value.total)
         assertEquals(Currency.USD, viewModel.uiState.value.baseCurrency)
         assertTrue(viewModel.uiState.value.isTotalConverted)
     }
@@ -177,7 +177,7 @@ class HomeViewModelTest {
         advanceUntilIdle()
 
         // Converted to itself, so the amount comes back untouched and the note goes away.
-        assertEquals(Money(1099), viewModel.uiState.value.monthlyTotal)
+        assertEquals(Money(1099), viewModel.uiState.value.total)
         assertEquals(false, viewModel.uiState.value.isTotalConverted)
     }
 
@@ -189,12 +189,12 @@ class HomeViewModelTest {
         collectState()
 
         // At the shipped 42,8500 that is 428,50 TRY.
-        assertEquals(Money(42_850), viewModel.uiState.value.monthlyTotal)
+        assertEquals(Money(42_850), viewModel.uiState.value.total)
 
         settingsRepository.setRate(Currency.USD, 500_000L) // 50,0000
         advanceUntilIdle()
 
-        assertEquals(Money(50_000), viewModel.uiState.value.monthlyTotal)
+        assertEquals(Money(50_000), viewModel.uiState.value.total)
     }
 
     @Test
@@ -209,7 +209,7 @@ class HomeViewModelTest {
         settingsRepository.resetRates()
         advanceUntilIdle()
 
-        assertEquals(Money(42_850), viewModel.uiState.value.monthlyTotal)
+        assertEquals(Money(42_850), viewModel.uiState.value.total)
     }
 
     // --- saving ---------------------------------------------------------------------------

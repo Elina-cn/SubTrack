@@ -8,6 +8,7 @@ import com.elinacn.subtrack.domain.model.Currency
 import com.elinacn.subtrack.domain.model.Money
 import com.elinacn.subtrack.domain.model.Subscription
 import com.elinacn.subtrack.domain.model.SubscriptionCategory
+import com.elinacn.subtrack.domain.model.TotalPeriod
 import com.elinacn.subtrack.domain.repository.ReminderStateRepository
 import com.elinacn.subtrack.domain.repository.SettingsRepository
 import com.elinacn.subtrack.domain.repository.SubscriptionRepository
@@ -80,9 +81,11 @@ class HomeViewModel @Inject constructor(
                     subscription.id to PaymentCountdown.between(today, date)
                 }
             }.toMap(),
-            // The total follows the filter: the number under the heading has to be the sum of
-            // the rows the user can see, or it is answering a question nobody asked.
-            monthlyTotal = converter.totalIn(visible, mainCurrency),
+            // The total follows the filter: the number under the heading has to cover the rows
+            // the user can see, or it is answering a question nobody asked. It follows the chosen
+            // span too - one figure, not a second indicator beside it.
+            total = converter.totalIn(visible, mainCurrency, screen.totalPeriod),
+            totalPeriod = screen.totalPeriod,
             baseCurrency = mainCurrency,
             isTotalConverted = visible.any { it.currency != mainCurrency },
             isLoading = false,
@@ -118,6 +121,9 @@ class HomeViewModel @Inject constructor(
 
             is HomeEvent.SelectCategoryFilter ->
                 screenState.update { it.copy(categoryFilter = event.category) }
+
+            is HomeEvent.SelectTotalPeriod ->
+                screenState.update { it.copy(totalPeriod = event.period) }
 
             HomeEvent.ClearNameError -> screenState.update { it.copy(nameError = null) }
 
@@ -322,7 +328,9 @@ class HomeViewModel @Inject constructor(
         val pendingUndo: Subscription? = null,
         val shouldRequestNotificationPermission: Boolean = false,
         /** Survives a rotation with the ViewModel, and dies with the process. */
-        val categoryFilter: SubscriptionCategory? = null
+        val categoryFilter: SubscriptionCategory? = null,
+        /** The same: a choice about the view, kept for as long as the screen is alive. */
+        val totalPeriod: TotalPeriod = TotalPeriod.MONTHLY
     )
 
     /** Opening, dismissing and a successful save all leave the form without complaints. */

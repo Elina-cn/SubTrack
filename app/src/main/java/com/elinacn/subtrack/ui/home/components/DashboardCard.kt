@@ -21,7 +21,12 @@ import com.elinacn.subtrack.ui.theme.Dimens
 import com.elinacn.subtrack.ui.theme.SubTrackTheme
 
 /**
- * The monthly total, already formatted by the caller.
+ * The total, already formatted by the caller, under the [label] that says what it covers.
+ *
+ * The label arrives rather than being read here because the card can show a month or a year and
+ * the choice is state, which belongs to the ViewModel (ARCHITECTURE section 5). The control that
+ * makes the choice sits outside the card: this one is a single focus stop, and a chip inside it
+ * would be dropped from the tree along with the rest of the children.
  *
  * [conversionNote] is shown only when there is something to explain - a list priced in more than
  * one currency. Left out of a single-currency list on purpose: a permanent line about exchange
@@ -29,11 +34,11 @@ import com.elinacn.subtrack.ui.theme.SubTrackTheme
  */
 @Composable
 fun DashboardCard(
+    label: String,
     totalAmount: String,
     modifier: Modifier = Modifier,
     conversionNote: String? = null
 ) {
-    val label = stringResource(id = R.string.total_monthly)
     // Written out here rather than left to merging. mergeDescendants keeps every child in the
     // accessibility tree - the delegate walks the unmerged tree - so the card still offered three
     // stops, and the amount was one of them: "219.89 TL" with nothing saying what it totals.
@@ -85,7 +90,7 @@ fun DashboardCard(
 @Composable
 private fun DashboardCardPreview() {
     SubTrackTheme {
-        DashboardCard(totalAmount = "₺219,89")
+        DashboardCard(label = "Aylık Toplam", totalAmount = "₺219,89")
     }
 }
 
@@ -93,7 +98,7 @@ private fun DashboardCardPreview() {
 @Composable
 private fun DashboardCardEmptyPreview() {
     SubTrackTheme {
-        DashboardCard(totalAmount = "₺0,00")
+        DashboardCard(label = "Yıllık Toplam", totalAmount = "₺0,00")
     }
 }
 
@@ -102,6 +107,7 @@ private fun DashboardCardEmptyPreview() {
 private fun DashboardCardConvertedPreview() {
     SubTrackTheme {
         DashboardCard(
+            label = "Aylık Toplam",
             totalAmount = "₺1.284,52",
             conversionNote = "Farklı para birimleri sabit kurla TRY cinsine çevrildi"
         )

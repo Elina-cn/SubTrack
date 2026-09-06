@@ -70,7 +70,7 @@ private fun HomeScreenPopulatedPreview() {
         HomeScreen(
             uiState = HomeUiState(
                 subscriptions = subscriptions,
-                monthlyTotal = Money(21989),
+                total = Money(21989),
                 isLoading = false
             ),
             onEvent = {},
@@ -92,7 +92,7 @@ private fun HomeScreenMixedCurrencyPreview() {
         HomeScreen(
             uiState = HomeUiState(
                 subscriptions = subscriptions,
-                monthlyTotal = Money(178545),
+                total = Money(178545),
                 isTotalConverted = true,
                 isLoading = false
             ),

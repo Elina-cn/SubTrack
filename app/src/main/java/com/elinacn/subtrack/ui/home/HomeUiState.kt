@@ -5,6 +5,7 @@ import com.elinacn.subtrack.domain.model.Currency
 import com.elinacn.subtrack.domain.model.Money
 import com.elinacn.subtrack.domain.model.Subscription
 import com.elinacn.subtrack.domain.model.SubscriptionCategory
+import com.elinacn.subtrack.domain.model.TotalPeriod
 import com.elinacn.subtrack.domain.usecase.PaymentCountdown
 import java.time.LocalDate
 import com.elinacn.subtrack.ui.common.UiText
@@ -46,9 +47,22 @@ data class HomeUiState(
      * keeps yesterday's numbers until something else changes.
      */
     val countdowns: Map<Long, PaymentCountdown> = emptyMap(),
-    /** Every subscription converted into [baseCurrency] and added up. */
-    val monthlyTotal: Money = Money.ZERO,
-    /** What [monthlyTotal] is denominated in. Read from the stored main-currency preference. */
+    /**
+     * What the visible subscriptions cost over one [totalPeriod], converted into [baseCurrency].
+     *
+     * Not a sum of prices: a yearly price counts for a twelfth of itself in the monthly figure.
+     */
+    val total: Money = Money.ZERO,
+    /**
+     * Which span [total] covers.
+     *
+     * Lives here rather than in the composable because it changes the number itself, not how the
+     * number looks (ARCHITECTURE section 5). Not persisted, like the category filter: a total that
+     * came back yearly after a restart would meet the user as a figure twelve times too large with
+     * nothing on screen saying why.
+     */
+    val totalPeriod: TotalPeriod = TotalPeriod.MONTHLY,
+    /** What [total] is denominated in. Read from the stored main-currency preference. */
     val baseCurrency: Currency = Currency.Base,
     /**
      * True when at least one subscription is priced in something other than [baseCurrency].
@@ -108,6 +122,9 @@ sealed interface HomeEvent {
 
     /** Narrow the list to one category, or to all of them with null. */
     data class SelectCategoryFilter(val category: SubscriptionCategory?) : HomeEvent
+
+    /** Show the total over a month or over a year. */
+    data class SelectTotalPeriod(val period: TotalPeriod) : HomeEvent
 
     /** Sent as the user edits, so a stale error stops contradicting what is on screen. */
     data object ClearNameError : HomeEvent

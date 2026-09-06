@@ -78,7 +78,7 @@ class HomeViewModelFilterTest {
         val state = viewModel.uiState.value
         assertNull(state.categoryFilter)
         assertEquals(4, state.subscriptions.size)
-        assertEquals(Money(15999 + 5990 + 1000 + 500), state.monthlyTotal)
+        assertEquals(Money(15999 + 5990 + 1000 + 500), state.total)
     }
 
     @Test
@@ -98,7 +98,7 @@ class HomeViewModelFilterTest {
         filter(SubscriptionCategory.ENTERTAINMENT)
 
         // The number under the heading has to be the sum of what is on screen.
-        assertEquals(Money(15999 + 5990), viewModel.uiState.value.monthlyTotal)
+        assertEquals(Money(15999 + 5990), viewModel.uiState.value.total)
     }
 
     @Test
@@ -111,7 +111,7 @@ class HomeViewModelFilterTest {
         val state = viewModel.uiState.value
         assertNull(state.categoryFilter)
         assertEquals(4, state.subscriptions.size)
-        assertEquals(Money(15999 + 5990 + 1000 + 500), state.monthlyTotal)
+        assertEquals(Money(15999 + 5990 + 1000 + 500), state.total)
     }
 
     @Test
@@ -122,7 +122,7 @@ class HomeViewModelFilterTest {
 
         val state = viewModel.uiState.value
         assertTrue(state.subscriptions.isEmpty())
-        assertEquals(Money.ZERO, state.monthlyTotal)
+        assertEquals(Money.ZERO, state.total)
         // What the screen uses to say "nothing in this category" rather than "nothing yet".
         assertTrue(state.hasAnySubscriptions)
     }

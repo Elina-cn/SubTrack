@@ -3,6 +3,7 @@
     <string name="app_name">SubTrack</string>
     <string name="my_subscriptions">My Subscriptions</string>
     <string name="total_monthly">Total Monthly</string>
+    <string name="total_yearly">Total Yearly</string>
     <string name="add_subscription">Add Subscription</string>
 
     <!-- Add sheet -->

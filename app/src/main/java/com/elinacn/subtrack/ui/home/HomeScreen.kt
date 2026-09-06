@@ -29,20 +29,19 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import com.elinacn.subtrack.R
-import com.elinacn.subtrack.domain.model.SubscriptionCategory
-import com.elinacn.subtrack.domain.usecase.PaymentCountdown
 import com.elinacn.subtrack.ui.common.DelayedLoadingIndicator
 import com.elinacn.subtrack.ui.common.CategoryFilterBar
 import com.elinacn.subtrack.ui.common.EmptyCategory
 import com.elinacn.subtrack.ui.common.EmptySubscriptions
-import com.elinacn.subtrack.ui.common.labelRes
+import com.elinacn.subtrack.ui.common.TotalPeriodToggle
 import com.elinacn.subtrack.ui.common.rememberMoneyFormatter
+import com.elinacn.subtrack.ui.common.totalLabelRes
 import com.elinacn.subtrack.ui.home.components.AddSubscriptionSheet
 import com.elinacn.subtrack.ui.home.components.DashboardCard
 import com.elinacn.subtrack.ui.home.components.SubscriptionCard
+import com.elinacn.subtrack.ui.home.components.subscriptionRowDescription
 import com.elinacn.subtrack.ui.home.components.SwipeToDeleteRow
 import com.elinacn.subtrack.ui.theme.Dimens
 
@@ -172,8 +171,16 @@ fun HomeScreen(
         ) {
             item {
                 DashboardCard(
-                    totalAmount = moneyFormatter.format(uiState.monthlyTotal, uiState.baseCurrency),
+                    label = stringResource(id = uiState.totalPeriod.totalLabelRes()),
+                    totalAmount = moneyFormatter.format(uiState.total, uiState.baseCurrency),
                     conversionNote = conversionNote
+                )
+
+                // Under the card, not inside it: the card is one focus stop and clears its own
+                // children out of the tree, so a chip in there would be unreachable.
+                TotalPeriodToggle(
+                    selected = uiState.totalPeriod,
+                    onSelect = { onEvent(HomeEvent.SelectTotalPeriod(it)) }
                 )
 
                 Text(
@@ -217,40 +224,11 @@ fun HomeScreen(
                 // is what the row has to keep saying.
                 val price = moneyFormatter.format(subscription.price, subscription.currency)
                 val countdown = uiState.countdowns[subscription.id]
-                // The countdown has to reach the spoken description too: the row is one focus stop
-                // with its own label, so anything left out of the label is simply not announced.
-                val countdownText = countdown?.asString()
-                // Left out when it is OTHER, exactly as the card leaves it out: a screen reader
-                // should hear the row the sighted user sees, not a default nobody chose.
-                val categoryText = subscription.category
-                    .takeIf { it != SubscriptionCategory.OTHER }
-                    ?.let { stringResource(id = it.labelRes()) }
-                // Built by appending rather than as one resource per combination: the row can show
-                // a countdown or not and a category or not, and with the period that would be four
-                // strings to keep in step in every language. One "and one more thing" format does
-                // all of it, and the order below is the order the card draws them in.
-                val named = stringResource(
-                    id = R.string.subscription_row_description,
-                    subscription.name,
-                    price
-                )
-                val withPeriod = stringResource(
-                    id = R.string.subscription_row_description_more,
-                    named,
-                    stringResource(id = subscription.billingPeriod.labelRes())
-                )
-                val withCountdown = countdownText?.let {
-                    stringResource(id = R.string.subscription_row_description_more, withPeriod, it)
-                } ?: withPeriod
                 SwipeToDeleteRow(
                     onDelete = { onEvent(HomeEvent.Delete(subscription.id)) },
-                    contentDescription = categoryText?.let {
-                        stringResource(
-                            id = R.string.subscription_row_description_more,
-                            withCountdown,
-                            it
-                        )
-                    } ?: withCountdown
+                    // The row is one focus stop with its own label, so everything the card draws
+                    // has to reach that sentence or it is not announced at all.
+                    contentDescription = subscriptionRowDescription(subscription, price, countdown)
                 ) {
                     SubscriptionCard(
                         name = subscription.name,
@@ -288,17 +266,4 @@ fun HomeScreen(
             onDismiss = { onEvent(HomeEvent.DismissAddSheet) }
         )
     }
-}
-
-/**
- * The countdown as one phrase for a screen reader, resolved here because the row's whole label is
- * built in one place.
- */
-@Composable
-private fun PaymentCountdown.asString(): String = when (this) {
-    is PaymentCountdown.Upcoming ->
-        pluralStringResource(R.plurals.days_until_payment, days.toInt(), days)
-    PaymentCountdown.DueToday -> stringResource(id = R.string.due_today)
-    is PaymentCountdown.Overdue ->
-        pluralStringResource(R.plurals.days_overdue, days.toInt(), days)
 }

@@ -3,6 +3,7 @@
     <string name="app_name">SubTrack</string>
     <string name="my_subscriptions">Aboneliklerim</string>
     <string name="total_monthly">Aylık Toplam</string>
+    <string name="total_yearly">Yıllık Toplam</string>
     <string name="add_subscription">Abonelik Ekle</string>
 
     <!-- Add sheet -->
