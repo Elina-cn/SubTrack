@@ -42,9 +42,6 @@ object PaymentReminderSelection {
             val qualifies = when (countdown) {
                 PaymentCountdown.DueToday -> true
                 is PaymentCountdown.Upcoming -> countdown.days <= UPCOMING_WITHIN_DAYS
-                // Unreachable: [due] is never before today. The branch is here for exhaustiveness
-                // and goes when PaymentCountdown.Overdue itself does.
-                is PaymentCountdown.Overdue -> false
             }
             if (qualifies) PaymentReminder(subscription, countdown) else null
         }

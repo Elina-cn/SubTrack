@@ -49,6 +49,4 @@ private fun PaymentCountdown.asString(): String = when (this) {
     is PaymentCountdown.Upcoming ->
         pluralStringResource(R.plurals.days_until_payment, days.toInt(), days)
     PaymentCountdown.DueToday -> stringResource(id = R.string.due_today)
-    is PaymentCountdown.Overdue ->
-        pluralStringResource(R.plurals.days_overdue, days.toInt(), days)
 }

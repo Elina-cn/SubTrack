@@ -14,7 +14,7 @@ import java.time.Clock
 import java.time.LocalDate
 
 /**
- * Runs once a day and notifies about payments that are due, nearly due, or recently overdue.
+ * Runs once a day and notifies about payments that are due today or due tomorrow.
  *
  * Deliberately without try/catch. There is no surface here to show an error on, an unhandled
  * failure is already reported by WorkManager, and the next day's run retries anyway - catching

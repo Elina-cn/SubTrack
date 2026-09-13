@@ -1,6 +1,7 @@
 package com.elinacn.subtrack.domain.usecase
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertThrows
 import org.junit.Test
 import java.time.LocalDate
 
@@ -24,12 +25,18 @@ class PaymentCountdownTest {
         assertEquals(PaymentCountdown.DueToday, PaymentCountdown.between(today, today))
     }
 
+    /**
+     * Changed by the 12-2 hotfix: this used to assert Overdue(1).
+     *
+     * There is no overdue case any more, and a date in the past is not something this type can
+     * describe - it is a caller that skipped [NextPaymentDate]. Rejecting it says so at the point
+     * of the mistake instead of putting an invented figure on a card.
+     */
     @Test
-    fun between_dateWasYesterday_isOneDayOverdue() {
-        val result = PaymentCountdown.between(today, LocalDate.of(2026, 3, 14))
-
-        // Overdue carries a positive count; the direction is in the type, not in the sign.
-        assertEquals(PaymentCountdown.Overdue(days = 1), result)
+    fun between_theDateIsBehindToday_isRejected() {
+        assertThrows(IllegalArgumentException::class.java) {
+            PaymentCountdown.between(today, LocalDate.of(2026, 3, 14))
+        }
     }
 
     @Test
@@ -40,12 +47,15 @@ class PaymentCountdownTest {
         assertEquals(PaymentCountdown.Upcoming(days = 31), result)
     }
 
+    /**
+     * Changed by the 12-2 hotfix: this used to assert Overdue(365). A year-old date reaches the
+     * countdown as whatever day its own cycle has got to, never as itself.
+     */
     @Test
-    fun between_dateIsLongPast_countsWholeDays() {
-        val result = PaymentCountdown.between(today, LocalDate.of(2025, 3, 15))
-
-        // 2026 is not a leap year and the span does not cross 29 February 2024.
-        assertEquals(PaymentCountdown.Overdue(days = 365), result)
+    fun between_theDateIsAYearBehind_isRejectedTheSameWay() {
+        assertThrows(IllegalArgumentException::class.java) {
+            PaymentCountdown.between(today, LocalDate.of(2025, 3, 15))
+        }
     }
 
     @Test

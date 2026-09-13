@@ -147,11 +147,22 @@ class HomeViewModelNextPaymentTest {
         )
         collectState()
 
-        // Overdue is what the screen used to say about any of these. It cannot happen now: the
-        // date the countdown is measured against is never in the past.
-        val countdowns = viewModel.uiState.value.countdowns.values
+        // Overdue is what the screen used to say about all three, and since the 12-2 hotfix the
+        // type has no such case: the date the countdown is measured against is never in the past.
+        // What is left to check is that each period found its own day from the same anchor - the
+        // 31st of March, the 31st of January 2027, and the 19th of March.
+        val countdowns = viewModel.uiState.value.countdowns
         assertEquals(3, countdowns.size)
-        assertTrue(countdowns.none { it is PaymentCountdown.Overdue })
+        assertEquals(PaymentCountdown.Upcoming(days = 16), countdowns[MONTHLY_ID])
+        assertEquals(PaymentCountdown.Upcoming(days = 322), countdowns[YEARLY_ID])
+        assertEquals(PaymentCountdown.Upcoming(days = 4), countdowns[WEEKLY_ID])
+    }
+
+    private companion object {
+        /** The ids [everyPeriod_countsTowardsSomethingThatIsNotBehind] hands out, in enum order. */
+        const val MONTHLY_ID = 1L
+        const val YEARLY_ID = 2L
+        const val WEEKLY_ID = 3L
     }
 
     private fun countdown(): PaymentCountdown? =

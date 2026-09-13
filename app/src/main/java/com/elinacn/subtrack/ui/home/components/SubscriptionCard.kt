@@ -96,15 +96,10 @@ fun SubscriptionCard(
                 if (countdown != null) {
                     Text(
                         text = countdown.asText(),
-                        // error is the only colorScheme role that carries "something is wrong"
-                        // without a new colour being invented. Our scheme does not define it, so
-                        // it falls back to the Material baseline red - noted for phase 14 along
-                        // with outline and onSurfaceVariant.
-                        color = if (countdown is PaymentCountdown.Overdue) {
-                            MaterialTheme.colorScheme.error
-                        } else {
-                            MaterialTheme.colorScheme.onSurface
-                        },
+                        // One colour, because there is one kind of news left to give: the payment
+                        // is coming. The error red was here for the overdue state, which the
+                        // advancement in phase 12-2 made unreachable.
+                        color = MaterialTheme.colorScheme.onSurface,
                         style = MaterialTheme.typography.bodySmall
                     )
                 }
@@ -138,8 +133,6 @@ private fun PaymentCountdown.asText(): String = when (this) {
     is PaymentCountdown.Upcoming ->
         pluralStringResource(R.plurals.days_until_payment, days.toInt(), days)
     PaymentCountdown.DueToday -> stringResource(id = R.string.due_today)
-    is PaymentCountdown.Overdue ->
-        pluralStringResource(R.plurals.days_overdue, days.toInt(), days)
 }
 
 /** Known services get their own icon; everything else falls back to a star. */
@@ -197,19 +190,6 @@ private fun SubscriptionCardDueTodayPreview() {
             price = "59.90 TL",
             billingPeriod = BillingPeriod.WEEKLY,
             countdown = PaymentCountdown.DueToday
-        )
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-private fun SubscriptionCardOverduePreview() {
-    SubTrackTheme {
-        SubscriptionCard(
-            name = "Adobe",
-            price = "249.00 TL",
-            billingPeriod = BillingPeriod.MONTHLY,
-            countdown = PaymentCountdown.Overdue(days = 5)
         )
     }
 }

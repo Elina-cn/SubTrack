@@ -91,14 +91,11 @@
     <plurals name="days_until_payment">
         <item quantity="other">%1$d gün kaldı</item>
     </plurals>
-    <plurals name="days_overdue">
-        <item quantity="other">%1$d gün gecikti</item>
-    </plurals>
 
     <!-- Payment reminder notification -->
     <string name="notification_channel_name">Ödeme hatırlatmaları</string>
-    <string name="notification_channel_description">Yaklaşan ve yeni gecikmiş ödemeler için günlük hatırlatma</string>
-    <!-- Neutral on purpose: one notification can cover both upcoming and overdue payments. -->
+    <string name="notification_channel_description">Bugün ve yarın ödenecek abonelikler için günlük hatırlatma</string>
+    <!-- Neutral on purpose: one notification can cover a payment due today and one due tomorrow. -->
     <plurals name="notification_title">
         <item quantity="other">Ödeme hatırlatması: %1$d abonelik</item>
     </plurals>

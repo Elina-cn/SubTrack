@@ -79,8 +79,8 @@ class PaymentReminderNotifier @Inject constructor(
     /**
      * Says how many subscriptions are covered and nothing more.
      *
-     * No verb: the same notification can hold a payment due today and one that is three days
-     * late, so any wording that commits to one of those would be wrong half the time.
+     * No verb: the same notification can hold a payment due today and one due tomorrow, so any
+     * wording that commits to one of those would be wrong half the time.
      */
     private fun title(count: Int): String =
         context.resources.getQuantityString(R.plurals.notification_title, count, count)
@@ -88,14 +88,13 @@ class PaymentReminderNotifier @Inject constructor(
     private fun describe(countdown: PaymentCountdown): String = when (countdown) {
         PaymentCountdown.DueToday -> context.getString(R.string.notification_due_today)
         is PaymentCountdown.Upcoming ->
-            // The selection window is one day today, so this is "tomorrow" in practice. The other
-            // branch is there so a wider window later cannot silently mislabel a payment.
+            // The window is one day, so this is "tomorrow" in practice. The other branch is there
+            // so a wider window later cannot silently mislabel a payment.
             if (countdown.days == 1L) {
                 context.getString(R.string.notification_due_tomorrow)
             } else {
                 quantity(R.plurals.days_until_payment, countdown.days)
             }
-        is PaymentCountdown.Overdue -> quantity(R.plurals.days_overdue, countdown.days)
     }
 
     /** The count is both the quantity that picks the wording and the number written into it. */

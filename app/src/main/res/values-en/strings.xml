@@ -90,15 +90,11 @@
         <item quantity="one">%1$d day left</item>
         <item quantity="other">%1$d days left</item>
     </plurals>
-    <plurals name="days_overdue">
-        <item quantity="one">%1$d day overdue</item>
-        <item quantity="other">%1$d days overdue</item>
-    </plurals>
 
     <!-- Payment reminder notification -->
     <string name="notification_channel_name">Payment reminders</string>
-    <string name="notification_channel_description">A daily reminder about upcoming and recently overdue payments</string>
-    <!-- Neutral on purpose: one notification can cover both upcoming and overdue payments. -->
+    <string name="notification_channel_description">A daily reminder about payments due today and tomorrow</string>
+    <!-- Neutral on purpose: one notification can cover a payment due today and one due tomorrow. -->
     <plurals name="notification_title">
         <item quantity="one">Payment reminder: %1$d subscription</item>
         <item quantity="other">Payment reminder: %1$d subscriptions</item>
