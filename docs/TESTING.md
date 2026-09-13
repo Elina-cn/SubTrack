@@ -119,6 +119,22 @@ etmeden bildirin; sonraki maddeler zaten bozuk bir durumun üstüne binebilir.
 | 67 | Periyot seçili haldeyken sheet açıkken döndür | Seçim **korunuyor** | 12-1 |
 | 68 | Yıllık görünümdeyken uygulamayı tamamen kapat ve aç | **Aylık**'a dönüyor (görünüm kalıcı değil) | 12-1 |
 
+| 69 | Geçmiş tarihli **aylık** abonelik ekle | Kart, çıpanın bir sonraki aya taşınmış hâline sayıyor: çıpa 5 gün önceyse "25 gün kaldı" gibi | 12-2 |
+| 70 | Geçmiş tarihli **haftalık** ve **yıllık** abonelik ekle | Aynısı kendi periyoduyla: haftalıkta en fazla 6 gün, yıllıkta bir yıl içinde | 12-2 |
+| 71 | **Çok eski** tarih (2+ yıl önce, haftalık) | Doğru gün sayısı, donma yok — hesap adım adım değil, tek aritmetik | 12-2 |
+| 72 | **31 Ocak** çıpalı aylık abonelik, Mart'ta bak | Mart **31**'ini gösteriyor, 28'ini değil (ilerletme çıpadan sayılıyor) | 12-2 |
+| 73 | Gelecek tarihli abonelik | İlerletme **yok**, tarih olduğu gibi | 12-2 |
+| 74 | Bugünün tarihi | "Bugün ödenecek" **korunuyor** | 12-2 |
+| 75 | Geçmiş tarihli bir aboneliği kaydettikten sonra veriyi oku | Saklanan tarih **değişmemiş** — ilerletme yalnızca ekranda (`run-as` ile `subtrack.db`) | 12-2 |
+
+> **#29 hakkında (Faz 12-2 ölçümü).** "Geçmiş bir tarih seç → kart *gecikmiş*
+> diyor, tarih ilerletilmiyor" maddesi 10a'da yazıldı ve **artık bu davranış
+> yok**: 12-2'den beri kart, çıpanın bir sonraki ödeme gününe taşınmış hâline
+> sayıyor (iki emülatörde de ölçüldü: 5 gün geçmiş aylık çıpa → "25 days left").
+> Madde **bilerek değiştirilmedi** — yerine ne yazılacağı, §18'deki gecikme
+> penceresi kararıyla birlikte sohbette verilecek. O karara kadar #29 koşulurken
+> bu not okunmalı, aksi hâlde gerçek olmayan bir kırılma raporlanır.
+
 **Klavye açıkken buton erişilebilirliği — her fazda kontrol edilecek**
 
 Metin alanı olan **her** ekranda, klavye açıkken ekranın alt kısmındaki

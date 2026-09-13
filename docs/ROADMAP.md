@@ -285,10 +285,10 @@ kategoriye göre daraltmak mümkün ve boş kalan kategori kendini söylüyor.
 
 ---
 
-## 🟡 Faz 12 — Ödeme Periyodu
+## ✅ Faz 12 — Ödeme Periyodu
 
-İki promptta yürütülüyor: **12-1** seçim, normalizasyon ve toplam görünümü
-**(bitti)**, **12-2** tarih ilerletme ve hatırlatma penceresi.
+İki promptta yürütüldü: **12-1** seçim, normalizasyon ve toplam görünümü,
+**12-2** tarih ilerletme.
 
 - [x] **12-1:** Aylık/yıllık/haftalık seçimi — formda üçüncü chip sırası,
       varsayılan `MONTHLY`, zorunlu (kartta her zaman görünür)
@@ -298,15 +298,19 @@ kategoriye göre daraltmak mümkün ve boş kalan kategori kendini söylüyor.
 - [x] **12-1:** Aylık/yıllık toplam görünümü arasında geçiş — dashboard'ın
       altında iki chip; yıllık figür aylık figürün 12 katı değil, aynı
       bölünmemiş ara değer
-- [ ] **12-2:** **Tarih ilerletme.** 12-1'e kadar `billingPeriod` kullanıcı
-      tarafından seçilmiyordu ve engel buydu; engel kalktı, iş kalmadı sayılmaz:
-      saklanan veriye yazma, ne zaman koşacağı ve geri alınamazlığı ayrı
-      kararlar (`ARCHITECTURE.md` §17).
-- [ ] **12-2:** **Hatırlatmadaki gecikme penceresi gözden geçirilsin.** Faz
-      10b'deki 1-3 günlük pencerenin tek gerekçesi, tarihin otomatik
-      ilerlememesi yüzünden gecikmiş durumun kalıcı olmasıydı. İlerletme
-      gelince o gerekçe ortadan kalkar. Eşikler `PaymentReminderSelection`'da
-      adlandırılmış sabit; gerekçe `ARCHITECTURE.md` §18'de.
+- [x] **12-2:** **Tarih ilerletme** — `NextPaymentDate.onOrAfter`, okuma
+      anında hesaplanır, veritabanına **yazılmaz**; saklanan tarih çıpa olarak
+      kalır. Çıpadan sayıldığı için ay sonu kaybolmuyor ve uzun geçmiş
+      tarihlerde döngü yok (`ARCHITECTURE.md` §17).
+- [x] **12-2:** **Hatırlatmadaki gecikme penceresi gözden geçirildi** — ölçüldü
+      ve olduğu gibi bırakıldı. Bildirim hâlâ **çıpayı** okuyor, yani pencere
+      tetiklenmeye devam ediyor ve artık ekranla aynı şeyi söylemiyor. Ölçüm ve
+      seçenekler `ARCHITECTURE.md` §18'de; **eşiklerin ne olacağı sohbette
+      karara bağlanacak** ve o karar kendi promptunu hak ediyor.
+
+**Bitti:** Abonelikler periyoduyla kaydediliyor, toplam gerçek maliyeti
+gösteriyor ve geçmiş bir ödeme tarihi kendi döngüsünde bir sonraki güne
+taşınıyor.
 
 ---
 
@@ -369,6 +373,9 @@ Aylık toplamın zaman içindeki anlık görüntüleri. `PROJECT_SPEC.md` §1'de
 - [ ] Karta tıklayınca düzenleme, Navigation ile ikinci ekran
 - [ ] Satır tıklanabilir olsun; şu an silme dışında eylem yok, TalkBack için
       tek yol custom action
+- [ ] **Tarih alanı ÇIPAYI göstermeli**, karttaki ilerletilmiş tarihi değil.
+      Kart "23 gün kaldı" derken düzenleme ekranı kullanıcının girdiği günü
+      açar; ikisi farklı sorulara cevap veriyor (`ARCHITECTURE.md` §17).
 
 ---
 

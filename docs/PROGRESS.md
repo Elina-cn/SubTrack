@@ -27,6 +27,178 @@ Her faz sonunda **en üste** yeni kayıt eklenir. Eski kayıtlar silinmez.
 
 ---
 
+## [Faz 12-2] Tarih İlerletme — 2026-09-13
+
+**Durum:** Tamamlandı. **Faz 12 KAPANDI.** Gecikme penceresine bilerek
+dokunulmadı — ölçüldü ve karar sohbete bırakıldı (aşağıda).
+
+### İlerletme — okuma anında, veritabanına yazmadan
+
+`domain/usecase/NextPaymentDate.onOrAfter(today, anchor, period)`: çıpayı,
+bugüne ulaşana kadar tam periyotlarla ilerletir. Saklanan tarih **çıpa** olarak
+kalıyor; hiçbir yere yazılmıyor. Gerekçe 10a'daki geri sayım kararının aynısı —
+ilerletilmiş tarih aboneliğin değil, *abonelik + bugün* ikilisinin özelliği.
+
+**Döngü yok, aritmetik var.** Üç periyot için de aynı şekil: kaç **tam** periyot
+geçtiğini `ChronoUnit.WEEKS/MONTHS/YEARS.between` ile sor, çıpaya bir kerede
+ekle, gerekirse bir periyot daha ekle. `between` tam birim saydığı için düzeltme
+en fazla bir adım. On yıllık haftalık bir çıpa 558 adım değil, bir çıkarma ve
+bir toplama.
+
+**Ay sonu tuzağı — çıpadan sayılıyor.** 31 Ocak'tan ayda bir ilerlenirse
+28 Şubat'a, oradan 28 Mart'a gidilir ve abonelik sessizce 28'ine taşınır. Kaç ay
+geçtiğini sorup çıpaya bir kerede eklemek Mart'ta 31'i geri veriyor. Testle
+sabitlendi (`monthly_theClampDoesNotStick_becauseCountingStartsAtTheAnchor`), ve
+dört ay boyunca 28 Şubat → 31 Mart → 30 Nisan → 31 Mayıs dizisi de ayrıca.
+
+`plusMonths`/`plusYears`'in takvim mantığı **bilerek** korundu: 31 Ocak + 1 ay =
+28 Şubat, 29 Şubat 2028 + 1 yıl = 28 Şubat 2029. Gün sayısına çevrilmedi.
+
+### Geri sayım ve kart
+
+`PaymentCountdown`'a **dokunulmadı**; `HomeViewModel` ona artık ilerletilmiş
+tarihi veriyor. Kartta ayrıca bir tarih metni yok — kartın gösterdiği şey geri
+sayım, o da ilerletilmiş tarihe göre.
+
+**"Gecikmiş" durumu ana ekranda artık oluşmuyor.** Sayılan tarih hiçbir zaman
+geçmişte olmadığı için `Overdue` üretilemez; bugünden geriye kalan tek durum
+"bugün ödenecek". Bu bir davranış **değişikliği değil, kararın sonucu** — 
+promptun öngördüğü durum — o yüzden durup sorulmadı; `PaymentCountdown.Overdue`
+kaldırılmadı, çünkü bildirim tarafı hâlâ çıpayı okuyor ve oradan gelebiliyor.
+
+Çıpa hiçbir yerde kaybolmuyor: Faz 15'in düzenleme ekranı onu gösterecek
+(ROADMAP'e madde olarak eklendi).
+
+### Görev 3 — bildirim tarafı: okundu, ölçüldü, değiştirilmedi
+
+**Kod:** `PaymentReminderSelection.on()` `subscription.nextPaymentDate`'i, yani
+**çıpayı** okuyor. İlerletme yalnızca `HomeViewModel`'in geri sayım hesabında.
+
+**Ölçüm (iki emülatörde de aynı):** enstrümantasyon paketi `am instrument` ile
+koşuldu; yedi abonelikten dördü bildirime girdi ve **ikisi gecikme
+penceresinden** geldi. Ham metin:
+
+```
+EXTRA_TITLE=[Payment reminder: 4 subscriptions]
+EXTRA_TEXT =[DueToday — today, Tomorrow — tomorrow,
+             OneDayLate — 1 day overdue, ThreeDaysLate — 3 days overdue]
+```
+
+Aynı satırlar için ekran başka bir şey diyor:
+
+| satır | çıpa | bildirim | kart |
+|---|---|---|---|
+| DueToday | bugün | "today" | Due today |
+| Tomorrow | +1 | "tomorrow" | 1 day left |
+| TwoDaysOut | +2 | (yok) | 2 days left |
+| **OneDayLate** | −1 | **"1 day overdue"** | **29 days left** |
+| **ThreeDaysLate** | −3 | **"3 days overdue"** | **27 days left** |
+| FourDaysLate | −4 | (yok) | 26 days left |
+| NoDate | — | (yok) | (gösterge yok) |
+
+**Sonuç: pencere ölü kod değil, hâlâ tetikleniyor** — ama gerekçesi düştü ve
+artık ekranla aynı şeyi söylemiyor. Eşiklere dokunulmadı; seçenekler
+`ARCHITECTURE.md` §18'e yazıldı, **karar sohbette**.
+
+### Testler
+
+- 176 → **197 birim testi** (21 yeni), 0 hata. `lintDebug` **0 hata, 20 uyarı**
+  (`java.time` kullanıldığı için şart koşuldu).
+- `NextPaymentDateTest` (13): gelecek/bugün dokunulmuyor · aylık ilerletme ·
+  kısa ay kırpması · **kırpmanın kalıcı olmadığı** · dört aylık dizi · bugüne
+  tam denk gelme · artık gün çıpası (2028-02-29) hem sıradan yılda kırpılıyor
+  hem **sonraki artık yılda 29'a dönüyor** · on yıl geçmiş yıllık · haftalık ·
+  **558 periyotluk** haftalık · ve hepsini kapsayan özellik testi (sonuç asla
+  geçmişte değil, bir önceki periyot her zaman geçmişte).
+- `HomeViewModelNextPaymentTest` (8): üç periyot, tarihsiz satır, gelecek,
+  bugün, **saklanan tarihin değişmediği**, ve `Overdue`'nun artık üretilmediği.
+- **Beklentisi değişen tek test:** `HomeViewModelTest.uiState_datedSubscriptions_carryTheirCountdown`
+  — 4 gün geçmiş aylık satır için `Overdue(4)` diyordu, artık `Upcoming(27)`
+  (11 Mart çıpası, 15 Mart'ta bakınca 11 Nisan). Fazın istediği davranış
+  değişikliği; testin yanına gerekçesi yazıldı.
+
+### Emülatör doğrulaması (cihaz tarihi 2026-09-13, iki AVD'de de aynı)
+
+| | periyot | çıpa | beklenen | kart |
+|---|---|---|---|---|
+| (a) | Monthly | 2026-08-09 (−35g) | 2026-10-09, 26 gün | `26 days left` |
+| (b) | Weekly | 2026-08-14 (−30g) | 2026-09-18, 5 gün | `5 days left` |
+| (b) | Yearly | 2025-08-09 (−400g) | 2027-08-09, 330 gün | `330 days left` |
+| (c) | Weekly | 2024-07-05 (−800g, **115 periyot**) | 2026-09-18, 5 gün | `5 days left` |
+| (d) | Monthly | 2026-09-18 (gelecek) | dokunulmaz | `5 days left` |
+| (e) | Monthly | bugün | dokunulmaz | `Due today` |
+
+Hepsi elle hesapla birebir. **(c) donma yok:** kaydetten kartın görünmesine
+kadar geçen süre 115 periyotluk satırda da 1 periyotluk satırdakiyle aynı
+(~4,4 s, ölçümün tamamı uyku + dump); hesap zaten sabit sayıda işlem.
+
+**Çıpa cihazda da yerinde duruyor.** 40 gün geçmiş bir çıpa kaydedildi, kart
+`Anchored, TRY 12.00, Monthly, 21 days left` dedi; `run-as` ile okunan satır:
+
+```
+Anchored | MONTHLY | 1785801600000 -> 2026-08-04
+```
+
+### (g) Sabit regresyon listesi — 68 → 75 madde, ikisinde de koşuldu
+
+12-2'nin yedi maddesi eklendi (69-75). 68 maddenin tamamı iki emülatörde
+koşuldu. Kayıtlı istisnalar önceki fazlarla aynı (**API 29**: #15 koyu tema,
+#16 dil; #34-#37 ve #41-#45 API 33+ maddeleri — karşılıkları #40 ve #46 koşuldu.
+**API 34**: #40 ve #46 API < 33 maddeleri).
+
+**#29 artık geçerli değil ve bilerek güncellenmedi.** "Geçmiş bir tarih seç →
+kart 'gecikmiş' diyor, tarih ilerletilmiyor" maddesi iki emülatörde de yeni
+davranışı gösterdi: 5 gün geçmiş aylık çıpa → **`Late, TRY 40.00, Monthly,
+25 days left`**. Maddenin yerine ne yazılacağı §18'deki pencere kararıyla
+birlikte verilmeli; TESTING.md'ye listenin altına bu ölçümü anlatan bir not
+eklendi, satırın kendisine dokunulmadı.
+
+### Değişen dosyalar
+
+- `domain/usecase/NextPaymentDate.kt` — yeni
+- `ui/home/HomeViewModel.kt` — geri sayım ilerletilmiş tarihe göre
+- `test/.../NextPaymentDateTest.kt`, `test/.../HomeViewModelNextPaymentTest.kt` — yeni
+- `test/.../HomeViewModelTest.kt` — bir beklenti (yukarıda)
+- `docs/ARCHITECTURE.md` §17 ve §18, `docs/ROADMAP.md`, `docs/TESTING.md`
+
+**Dokunulmayanlar:** `reminder/` (yalnızca okundu), `PaymentCountdown`,
+`PaymentReminderSelection`, Room şeması, `ui/settings/`.
+
+### Commit'ler
+
+- `974fb50` feat: work out where a payment date has got to by today
+- `e9a1135` feat: count towards the payment that is actually next
+
+### Karşılaşılan sorunlar
+
+- **Emülatör yavaşlığı ölçümü bozdu, ürün değil.** `am start` sonrası 6 saniye
+  yetmediği için birkaç koşu "düğüm yok" diye düştü; `restart_app` artık saate
+  değil, ekrandaki FAB'ın belirmesine bakıyor. Aynı sebepten #68 bir koşuda
+  "yıllık görünüm kalmış" gibi göründü — 9 saniye beklenince doğru sonuç
+  (`Total Monthly` ve `Monthly checked=true`, pid değişmiş) alındı.
+- **uiautomator bayat ağaç döndürebiliyor.** Temizlik sonrası dump "Ayarlar
+  ekranı" gösterdi; aynı anda alınan ekran görüntüsü ana ekranı gösteriyordu.
+  TESTING.md'de kayıtlı tuzak, tekrar doğrulandı.
+- **Tarih seçicideki "Save" ikilemi** (12-1'de yazılmıştı) yine çıktı; takvim
+  hücresi aramak yerine **metin girişi** kullanan bir yardımcıya geçildi, artık
+  tarihler cihazın kendi tarihinden hesaplanıyor (eski betikler sabit "10 Eylül"
+  gibi günlere bakıyordu ve tarih ilerleyince bozuluyordu).
+
+### Rapor edilen, karar bekleyen
+
+- **Gecikme penceresi** (yukarıdaki ölçüm). Bildirim çıpayı, ekran ilerletilmiş
+  tarihi okuyor; ikisi aynı satır için farklı şey söylüyor.
+- **#29** maddesinin yeni metni.
+
+### Sonraki faz için not
+
+- Faz 15 düzenleme ekranı **çıpayı** göstermeli (ROADMAP'te madde var).
+- `PaymentCountdown.Overdue` artık yalnızca bildirim yolundan gelebiliyor; §18
+  kararı onu tamamen kaldırırsa kartlardaki `error` rengi kullanımı da gözden
+  geçirilmeli (Faz 14 renk borcu).
+
+---
+
 ## [Faz 12-1 hotfix] Normalizasyon ara değeri BigInteger'a taşındı — 2026-09-06
 
 **Durum:** Tamamlandı. Kullanıcıya dönük hiçbir şey değişmedi — ne bir sayı, ne

@@ -738,15 +738,30 @@ penceresine uygulanır, o pencereye değil. İki mekanizma birbirine değmiyor.
 - `java.time` saf Java'dır, domain saflığını bozmaz (§1).
 - `nextPaymentDate` NULLABLE. Tarih opsiyoneldir; boşsa arayüzde gösterge
   çıkmaz.
-- **Tarih geçtiğinde otomatik ilerletme yapılmaz**, "gecikmiş" gösterilir.
-  Ne kadar ilerleyeceği `billingPeriod`'a bağlıdır. **Faz 12-1'den beri o
-  alanı kullanıcı seçiyor**, yani "aylık varsaymak veriyi bozar" gerekçesi
-  artık geçerli değil — ilerletmenin önündeki engel kalktı.
-  Buna rağmen 12-1'de yapılmadı, çünkü ilerletme ayrı bir karar kümesi:
-  saklanan veriye **yazma** gerektiriyor (ne zaman koşacak — açılışta mı, gün
-  dönümünde mi), geri alınamaz, ve §18'deki hatırlatma penceresiyle iç içe —
-  1-3 günlük gecikme penceresinin tek gerekçesi tarihin ilerlememesiydi.
-  İkisi birlikte ele alınmalı; **Faz 12-2'nin işi.**
+- **Tarih ilerletme: okuma anında hesaplanır, veritabanına yazılmaz**
+  (Faz 12-2). Saklanan tarih **çıpadır** — kullanıcının verdiği gün, olduğu
+  yerde kalır. Kartın saydığı şey `NextPaymentDate.onOrAfter(bugün, çıpa,
+  periyot)`: çıpanın, bugüne ulaşana kadar tam periyotlarla ilerletilmiş hâli.
+
+  **Neden yazılmıyor:** ilerletilmiş tarih aboneliğin değil, *abonelik + bugün*
+  ikilisinin özelliği — geri sayımın parametre olarak `today` almasıyla aynı
+  gerekçe (yukarıda). Yazmak, kullanıcının girdiği veriyi arka planda
+  değiştirmek olurdu ve tek yönlüdür: çıpa kaybolunca "aslında hangi gün
+  demiştim" sorusunun cevabı da kaybolur. Okuma anında hesaplamak ise saf bir
+  fonksiyon: girdisi belli, testi kolay, geri alınacak bir şey yok.
+
+  **Çıpadan sayılır, son adımdan değil.** 31 Ocak'tan ayda bir ilerlerken
+  28 Şubat'a, oradan 28 Mart'a gidilir ve abonelik sessizce 28'ine taşınır.
+  Kaç tam periyot geçtiği sorulup çıpaya bir kerede eklendiğinde Mart yine
+  31'ini alır. Aynı yaklaşım döngüyü de ortadan kaldırıyor: on yıl öncesine
+  ait haftalık bir çıpa 558 adım değil, bir çıkarma ve bir toplama.
+
+  **Sonucu:** "gecikmiş" durumu ana ekranda artık **oluşmuyor** — sayılan
+  tarih hiçbir zaman geçmişte değil. Bugünden geriye kalan tek durum, bugün
+  ödenmesi gereken ve henüz ödenmemiş olan. `PaymentCountdown.Overdue` yine de
+  duruyor: bildirim tarafı çıpayı okuyor (§18) ve oradan geliyor.
+
+  Düzenleme ekranı (Faz 15) **çıpayı** gösterecek, ilerletilmiş tarihi değil.
 - Geçmiş tarih kabul edilir. Üst sınır bugünden 10 yıl ileridir — kayan
   tuş vuruşunu yakalayan bir ürün sınırı (`MAX_PRICE` ile aynı mantık).
 - `java.time` API 26'da geldi, `minSdk` 24. Core library desugaring açık
@@ -774,18 +789,32 @@ hem bugün ödenecek hem üç gün gecikmiş bir aboneliği taşıyabildiği iç
 "yenileniyor" gibi tek duruma bağlanan bir başlık zamanın yarısında yanlış
 olurdu.
 
-### Gecikme penceresi neden var
+### Gecikme penceresi neden vardı, ve bugün nerede duruyor
 
-§17 gereği **tarih geçtiğinde otomatik ilerletme yapılmıyor**. Yani gecikmiş
-durum kalıcıdır; pencere olmasaydı bildirim de kalıcı olurdu ve kullanıcı her
+Pencere, §17'deki "tarih ilerletilmez" kuralı için konmuştu: gecikmiş durum
+kalıcı olduğu için, pencere olmasa bildirim de kalıcı olurdu ve kullanıcı her
 gün aynı satırı görürdü.
 
 İki eşik de `PaymentReminderSelection` içinde adlandırılmış sabittir
 (`UPCOMING_WITHIN_DAYS`, `OVERDUE_WITHIN_DAYS`), koda gömülü sayı değil.
 
-> **Faz 12 uyarısı:** ödeme periyodu gelip tarih ilerletilmeye başlandığında
-> gecikmiş durum artık kalıcı olmayacak. Pencerenin gerekçesi o gün ortadan
-> kalkar; eşikler yeniden değerlendirilmeli.
+**Faz 12-2 ölçümü — gerekçe düştü, kod düşmedi.** İlerletme ekrana geldi ama
+`PaymentReminderSelection` hâlâ `subscription.nextPaymentDate`'i, yani
+**çıpayı** okuyor; ilerletme yalnızca `HomeViewModel`'in geri sayım
+hesabındadır. Yani:
+
+- Gecikme penceresi **ölü kod değil**, hâlâ tetikleniyor. Enstrümantasyonla
+  ölçüldü (iki emülatörde de aynı): yedi abonelikten dördü bildirime girdi ve
+  ikisi pencereden geldi —
+  `"DueToday — today, Tomorrow — tomorrow, OneDayLate — 1 day overdue, ThreeDaysLate — 3 days overdue"`.
+- Aynı iki satır için ekran **başka bir şey** diyor: `OneDayLate` kartta
+  "29 days left", `ThreeDaysLate` "27 days left" (aylık abonelikler). Bildirim
+  "1 gün gecikti" derken kart "29 gün kaldı" diyor.
+
+> **Karar sohbette verilecek** (12-2'de pencereye bilerek dokunulmadı). Seçenekler
+> kabaca: bildirimi de ilerletilmiş tarihe bağlamak (pencere anlamsızlaşır,
+> gecikmiş kavramı bildirimden kalkar), pencereyi kısaltmak, ya da çıpayı
+> bilerek koruyup "ödemediysen hatırlatalım" olarak yeniden tanımlamak.
 
 ### Neden periyodik tarama, exact alarm değil
 
