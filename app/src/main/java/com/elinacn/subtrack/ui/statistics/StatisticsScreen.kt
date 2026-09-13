@@ -1,7 +1,9 @@
 package com.elinacn.subtrack.ui.statistics
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -24,6 +26,7 @@ import com.elinacn.subtrack.ui.common.EmptyStatistics
 import com.elinacn.subtrack.ui.common.labelRes
 import com.elinacn.subtrack.ui.common.rememberMoneyFormatter
 import com.elinacn.subtrack.ui.statistics.components.CategoryBarRow
+import com.elinacn.subtrack.ui.statistics.components.ExpensiveSubscriptionRow
 import com.elinacn.subtrack.ui.theme.Dimens
 import com.elinacn.subtrack.ui.theme.SubTrackTheme
 
@@ -80,6 +83,20 @@ fun StatisticsScreen(
                         percent = share.percent
                     )
                 }
+            }
+
+            if (uiState.mostExpensive.isNotEmpty()) {
+                SectionTitle(text = stringResource(id = R.string.statistics_most_expensive))
+                uiState.mostExpensive.forEach { cost ->
+                    ExpensiveSubscriptionRow(
+                        name = cost.subscription.name,
+                        billingPeriod = stringResource(
+                            id = cost.subscription.billingPeriod.labelRes()
+                        ),
+                        monthlyCost = moneyFormatter.format(cost.monthlyCost, uiState.currency)
+                    )
+                }
+                Spacer(modifier = Modifier.height(Dimens.SpacerXLarge))
             }
         }
     }

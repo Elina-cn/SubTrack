@@ -144,4 +144,9 @@
     <string name="statistics_percent">%1$d%%</string>
     <!-- Spoken form of one breakdown row: category, amount, share. -->
     <string name="statistics_category_description">%1$s, %2$s, %3$d percent</string>
+    <string name="statistics_most_expensive">Most expensive</string>
+    <!-- The cost spread over months, not the price on the card. -->
+    <string name="statistics_monthly_cost">%1$s a month</string>
+    <!-- Spoken form of one "most expensive" row: name, billing period, monthly cost. -->
+    <string name="statistics_cost_description">%1$s, %2$s, %3$s a month</string>
 </resources>

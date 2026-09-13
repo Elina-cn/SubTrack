@@ -145,4 +145,9 @@
     <string name="statistics_percent">%%%1$d</string>
     <!-- Bir dağılım satırının tek odak durağı olarak okunan hâli: kategori, tutar, oran. -->
     <string name="statistics_category_description">%1$s, %2$s, yüzde %3$d</string>
+    <string name="statistics_most_expensive">En Pahalı Abonelikler</string>
+    <!-- Aylara bölünmüş maliyet, kartın gösterdiği fiyat değil. -->
+    <string name="statistics_monthly_cost">ayda %1$s</string>
+    <!-- Bir "en pahalı" satırının tek odak durağı olarak okunan hâli: ad, periyot, aylik maliyet. -->
+    <string name="statistics_cost_description">%1$s, %2$s, ayda %3$s</string>
 </resources>
