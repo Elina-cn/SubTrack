@@ -57,7 +57,7 @@ class PaymentReminderWorkerTest {
         context.getSystemService(NotificationManager::class.java)
 
     @Test
-    fun reminderWorker_datedSubscriptions_notifiesOnlyTheOnesInsideTheWindows() {
+    fun reminderWorker_datedSubscriptions_notifiesOnlyTheOnesInsideTheWindow() {
         notificationManager.cancelAll()
         seedSubscriptions()
 
@@ -85,11 +85,17 @@ class PaymentReminderWorkerTest {
         )
 
         val shown = "$title\n$text\n$bigText"
-        INSIDE_THE_WINDOWS.forEach { name ->
+        INSIDE_THE_WINDOW.forEach { name ->
             assertTrue("$name should be in the notification, was: $shown", shown.contains(name))
         }
-        OUTSIDE_THE_WINDOWS.forEach { name ->
+        OUTSIDE_THE_WINDOW.forEach { name ->
             assertFalse("$name should not be in the notification, was: $shown", shown.contains(name))
+        }
+        LATENESS_WORDINGS.forEach { wording ->
+            assertFalse(
+                "the notification still talks about lateness ($wording): $shown",
+                shown.contains(wording, ignoreCase = true)
+            )
         }
 
         // A leftover % means a format argument was not supplied, which is how a raw "%1$d" has
@@ -142,10 +148,15 @@ class PaymentReminderWorkerTest {
     }
 
     /**
-     * Writes the seven rows through a second connection to the app's own database file.
+     * Writes the eight rows through a second connection to the app's own database file.
      *
      * A second Room instance over the same file is allowed - unlike DataStore, which forbids it -
      * and the worker opens its own instance later, so it sees whatever is on disk.
+     *
+     * **Every date here is an anchor, and the names say where the anchor lands, not where it
+     * sits.** A passed date is not a late payment: since the 12-2 hotfix the reminder measures the
+     * same advanced date the card counts towards, so a weekly row anchored six days back is due
+     * tomorrow and a monthly row anchored three days back is nearly a month off.
      */
     private fun seedSubscriptions() {
         val database = Room
@@ -159,29 +170,41 @@ class PaymentReminderWorkerTest {
                 // createdAt descends with the list, so observeAll's ORDER BY createdAt DESC hands
                 // them back in exactly this order and the notification body is predictable.
                 listOf(
-                    "DueToday" to today,
-                    "Tomorrow" to today.plusDays(1),
-                    "TwoDaysOut" to today.plusDays(2),
-                    "OneDayLate" to today.minusDays(1),
-                    "ThreeDaysLate" to today.minusDays(3),
-                    "FourDaysLate" to today.minusDays(4),
-                    "NoDate" to null
-                ).forEachIndexed { index, (name, date) ->
-                    dao.insert(subscription(name, date, createdAt = (100 - index).toLong()).toEntity())
+                    Triple("DueToday", today, BillingPeriod.MONTHLY),
+                    Triple("Tomorrow", today.plusDays(1), BillingPeriod.MONTHLY),
+                    Triple("TwoDaysOut", today.plusDays(2), BillingPeriod.MONTHLY),
+                    // Six days back on a weekly cycle: the next payment is tomorrow.
+                    Triple("PassedLandsTomorrow", today.minusDays(6), BillingPeriod.WEEKLY),
+                    // A whole week back: the next one falls today.
+                    Triple("PassedLandsToday", today.minusDays(7), BillingPeriod.WEEKLY),
+                    // Three days back on a monthly cycle: at least twenty-five days off.
+                    Triple("PassedLandsFarOff", today.minusDays(3), BillingPeriod.MONTHLY),
+                    // Over a year back on a yearly cycle: around eleven months off.
+                    Triple("LongPassedYearly", today.minusDays(400), BillingPeriod.YEARLY),
+                    Triple("NoDate", null, BillingPeriod.MONTHLY)
+                ).forEachIndexed { index, (name, date, period) ->
+                    dao.insert(
+                        subscription(name, date, period, createdAt = (100 - index).toLong()).toEntity()
+                    )
                 }
             }
         } finally {
             database.close()
         }
-        Log.i(TAG, "seeded seven subscriptions around today=$today")
+        Log.i(TAG, "seeded eight subscriptions around today=$today")
     }
 
-    private fun subscription(name: String, date: LocalDate?, createdAt: Long) = Subscription(
+    private fun subscription(
+        name: String,
+        date: LocalDate?,
+        period: BillingPeriod,
+        createdAt: Long
+    ) = Subscription(
         id = 0,
         name = name,
         price = Money(1000),
         currency = Currency.TRY,
-        billingPeriod = BillingPeriod.MONTHLY,
+        billingPeriod = period,
         nextPaymentDate = date,
         category = SubscriptionCategory.OTHER,
         iconKey = null,
@@ -213,8 +236,17 @@ class PaymentReminderWorkerTest {
 
         const val POLL_INTERVAL_MILLIS = 200L
 
-        val INSIDE_THE_WINDOWS = listOf("DueToday", "Tomorrow", "OneDayLate", "ThreeDaysLate")
+        val INSIDE_THE_WINDOW =
+            listOf("DueToday", "Tomorrow", "PassedLandsTomorrow", "PassedLandsToday")
 
-        val OUTSIDE_THE_WINDOWS = listOf("TwoDaysOut", "FourDaysLate", "NoDate")
+        val OUTSIDE_THE_WINDOW = listOf("TwoDaysOut", "PassedLandsFarOff", "LongPassedYearly", "NoDate")
+
+        /**
+         * Wordings that can no longer be produced, in both languages the app ships.
+         *
+         * The overdue branch went with the 12-2 hotfix; if either of these reaches the shade
+         * again, something is reading the anchor instead of the advanced date.
+         */
+        val LATENESS_WORDINGS = listOf("overdue", "gecik")
     }
 }

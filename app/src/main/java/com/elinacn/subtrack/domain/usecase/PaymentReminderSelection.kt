@@ -6,8 +6,8 @@ import java.time.LocalDate
 /**
  * A subscription worth reminding about, carrying the state that earned it a place.
  *
- * The countdown travels with the subscription because the reminder says three different things
- * and the caller would otherwise have to ask [PaymentCountdown] a second question it has already
+ * The countdown travels with the subscription because the reminder says two different things and
+ * the caller would otherwise have to ask [PaymentCountdown] a second question it has already
  * answered here.
  */
 data class PaymentReminder(
@@ -22,29 +22,29 @@ object PaymentReminderSelection {
     const val UPCOMING_WITHIN_DAYS = 1L
 
     /**
-     * How many days an overdue payment keeps being mentioned.
-     *
-     * A window rather than "forever" because the app deliberately never rolls a passed date
-     * forward (ARCHITECTURE §17), so the overdue state is permanent - without a window the
-     * reminder would be permanent too. See ARCHITECTURE §18.
-     */
-    const val OVERDUE_WITHIN_DAYS = 3L
-
-    /**
      * The subscriptions to mention on [today], each with the reason it qualified.
      *
      * [today] is a parameter rather than a LocalDate.now() call inside, so the result is a
      * function of its inputs. Subscriptions without a date are skipped: there is nothing to
      * count towards.
+     *
+     * **The stored date is an anchor, not a due date.** What is measured here is the same thing
+     * the card counts towards - the anchor caught up to today by whole billing periods
+     * ([NextPaymentDate]) - so the two can never say different things about the same row. Reading
+     * the anchor directly is what made a monthly subscription "1 day overdue" in the shade while
+     * its card said "29 days left" (ARCHITECTURE §18).
      */
     fun on(today: LocalDate, subscriptions: List<Subscription>): List<PaymentReminder> =
         subscriptions.mapNotNull { subscription ->
-            val nextPayment = subscription.nextPaymentDate ?: return@mapNotNull null
-            val countdown = PaymentCountdown.between(today, nextPayment)
+            val anchor = subscription.nextPaymentDate ?: return@mapNotNull null
+            val due = NextPaymentDate.onOrAfter(today, anchor, subscription.billingPeriod)
+            val countdown = PaymentCountdown.between(today, due)
             val qualifies = when (countdown) {
                 PaymentCountdown.DueToday -> true
                 is PaymentCountdown.Upcoming -> countdown.days <= UPCOMING_WITHIN_DAYS
-                is PaymentCountdown.Overdue -> countdown.days <= OVERDUE_WITHIN_DAYS
+                // Unreachable: [due] is never before today. The branch is here for exhaustiveness
+                // and goes when PaymentCountdown.Overdue itself does.
+                is PaymentCountdown.Overdue -> false
             }
             if (qualifies) PaymentReminder(subscription, countdown) else null
         }
