@@ -140,4 +140,8 @@
     <string name="statistics_title">Statistics</string>
     <string name="empty_statistics_title">Nothing to chart yet</string>
     <string name="empty_statistics_message">Add a subscription and the breakdown appears here</string>
+    <string name="statistics_by_category">Category breakdown</string>
+    <string name="statistics_percent">%1$d%%</string>
+    <!-- Spoken form of one breakdown row: category, amount, share. -->
+    <string name="statistics_category_description">%1$s, %2$s, %3$d percent</string>
 </resources>

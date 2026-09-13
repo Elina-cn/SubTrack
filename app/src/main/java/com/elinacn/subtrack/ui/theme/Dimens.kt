@@ -62,6 +62,20 @@ object Dimens {
     /** Breathing room around an empty-state message, which sits alone on the screen. */
     val EmptyStatePadding = 32.dp
 
+    /**
+     * Thickness of a breakdown bar.
+     *
+     * Thick enough to read as a quantity at a glance, thin enough that four of them plus their
+     * labels stay above the fold on a 360dp screen.
+     */
+    val BarHeight = 12.dp
+
+    /** Corner radius of a breakdown bar. Half its height, so the ends are round. */
+    val BarCorner = 6.dp
+
+    /** Gap between a breakdown bar and the label above it. */
+    val BarLabelSpacing = 6.dp
+
     /** Gap between an icon and the text that follows it. */
     val IconSpacing = 16.dp
 

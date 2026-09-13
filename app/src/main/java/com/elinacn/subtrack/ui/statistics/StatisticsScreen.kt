@@ -21,6 +21,10 @@ import androidx.compose.ui.tooling.preview.Preview
 import com.elinacn.subtrack.R
 import com.elinacn.subtrack.ui.common.DelayedLoadingIndicator
 import com.elinacn.subtrack.ui.common.EmptyStatistics
+import com.elinacn.subtrack.ui.common.labelRes
+import com.elinacn.subtrack.ui.common.rememberMoneyFormatter
+import com.elinacn.subtrack.ui.statistics.components.CategoryBarRow
+import com.elinacn.subtrack.ui.theme.Dimens
 import com.elinacn.subtrack.ui.theme.SubTrackTheme
 
 /**
@@ -37,6 +41,8 @@ fun StatisticsScreen(
     onNavigateBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val moneyFormatter = rememberMoneyFormatter()
+
     Scaffold(
         modifier = modifier,
         containerColor = MaterialTheme.colorScheme.background,
@@ -64,8 +70,34 @@ fun StatisticsScreen(
             if (!uiState.isLoading && !uiState.hasAnySubscriptions) {
                 EmptyStatistics()
             }
+
+            if (uiState.categoryShares.isNotEmpty()) {
+                SectionTitle(text = stringResource(id = R.string.statistics_by_category))
+                uiState.categoryShares.forEach { share ->
+                    CategoryBarRow(
+                        label = stringResource(id = share.category.labelRes()),
+                        amount = moneyFormatter.format(share.total, uiState.currency),
+                        percent = share.percent
+                    )
+                }
+            }
         }
     }
+}
+
+/** The heading over one section, indented and spaced like the home screen's own. */
+@Composable
+private fun SectionTitle(text: String, modifier: Modifier = Modifier) {
+    Text(
+        text = text,
+        modifier = modifier.padding(
+            start = Dimens.SectionTitleStart,
+            top = Dimens.SectionTitleTop,
+            bottom = Dimens.SectionTitleBottom
+        ),
+        style = MaterialTheme.typography.titleLarge,
+        color = MaterialTheme.colorScheme.onBackground
+    )
 }
 
 @Preview(showBackground = true)

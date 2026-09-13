@@ -140,4 +140,9 @@
     <string name="statistics_title">İstatistik</string>
     <string name="empty_statistics_title">Henüz istatistik yok</string>
     <string name="empty_statistics_message">Bir abonelik ekleyince dağılım burada çıkar</string>
+    <string name="statistics_by_category">Kategori Dağılımı</string>
+    <!-- Türkçede yüzde işareti sayıdan önce gelir: %45 -->
+    <string name="statistics_percent">%%%1$d</string>
+    <!-- Bir dağılım satırının tek odak durağı olarak okunan hâli: kategori, tutar, oran. -->
+    <string name="statistics_category_description">%1$s, %2$s, yüzde %3$d</string>
 </resources>
