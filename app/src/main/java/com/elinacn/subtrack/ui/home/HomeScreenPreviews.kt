@@ -31,7 +31,12 @@ private fun previewSubscription(
 @Composable
 private fun HomeScreenEmptyPreview() {
     SubTrackTheme {
-        HomeScreen(uiState = HomeUiState(isLoading = false), onEvent = {}, onNavigateToSettings = {})
+        HomeScreen(
+            uiState = HomeUiState(isLoading = false),
+            onEvent = {},
+            onNavigateToSettings = {},
+            onNavigateToStatistics = {}
+        )
     }
 }
 
@@ -39,7 +44,12 @@ private fun HomeScreenEmptyPreview() {
 @Composable
 private fun HomeScreenLoadingPreview() {
     SubTrackTheme {
-        HomeScreen(uiState = HomeUiState(isLoading = true), onEvent = {}, onNavigateToSettings = {})
+        HomeScreen(
+            uiState = HomeUiState(isLoading = true),
+            onEvent = {},
+            onNavigateToSettings = {},
+            onNavigateToStatistics = {}
+        )
     }
 }
 
@@ -54,7 +64,8 @@ private fun HomeScreenErrorPreview() {
                 errorMessage = UiText.Raw("Abonelik kaydedilemedi")
             ),
             onEvent = {},
-            onNavigateToSettings = {}
+            onNavigateToSettings = {},
+            onNavigateToStatistics = {}
         )
     }
 }
@@ -74,7 +85,8 @@ private fun HomeScreenPopulatedPreview() {
                 isLoading = false
             ),
             onEvent = {},
-            onNavigateToSettings = {}
+            onNavigateToSettings = {},
+            onNavigateToStatistics = {}
         )
     }
 }
@@ -97,7 +109,8 @@ private fun HomeScreenMixedCurrencyPreview() {
                 isLoading = false
             ),
             onEvent = {},
-            onNavigateToSettings = {}
+            onNavigateToSettings = {},
+            onNavigateToStatistics = {}
         )
     }
 }

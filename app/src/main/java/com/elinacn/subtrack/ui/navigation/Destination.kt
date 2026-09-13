@@ -11,6 +11,8 @@ object Destination {
 
     const val HOME = "home"
 
+    const val STATISTICS = "statistics"
+
     const val SETTINGS = "settings"
 
     const val EXCHANGE_RATES = "exchange_rates"

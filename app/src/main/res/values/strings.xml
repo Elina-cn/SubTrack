@@ -136,4 +136,8 @@
     <string name="filter_all">Tümü</string>
     <string name="empty_category_title">Bu kategoride abonelik yok</string>
     <string name="empty_category_message">Başka bir kategori seç</string>
+    <!-- Statistics -->
+    <string name="statistics_title">İstatistik</string>
+    <string name="empty_statistics_title">Henüz istatistik yok</string>
+    <string name="empty_statistics_message">Bir abonelik ekleyince dağılım burada çıkar</string>
 </resources>

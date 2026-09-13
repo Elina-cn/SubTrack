@@ -11,6 +11,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -49,8 +50,9 @@ import com.elinacn.subtrack.ui.theme.Dimens
  * The home screen. Stateless with respect to data: it renders [uiState] and reports back through
  * [onEvent], holding nothing but whether the add sheet is open.
  *
- * [onNavigateToSettings] arrives as a lambda rather than a NavController, so the screen knows only
- * that a settings screen exists somewhere, not how to reach it.
+ * [onNavigateToSettings] and [onNavigateToStatistics] arrive as lambdas rather than a
+ * NavController, so the screen knows only that those screens exist somewhere, not how to reach
+ * them.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -58,6 +60,7 @@ fun HomeScreen(
     uiState: HomeUiState,
     onEvent: (HomeEvent) -> Unit,
     onNavigateToSettings: () -> Unit,
+    onNavigateToStatistics: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val moneyFormatter = rememberMoneyFormatter()
@@ -139,6 +142,14 @@ fun HomeScreen(
             TopAppBar(
                 title = { Text(text = stringResource(id = R.string.app_name)) },
                 actions = {
+                    // Before settings, not after: settings has been the rightmost action since
+                    // phase 9 and moving it would move the target the user already knows.
+                    IconButton(onClick = onNavigateToStatistics) {
+                        Icon(
+                            imageVector = Icons.Default.BarChart,
+                            contentDescription = stringResource(id = R.string.statistics_title)
+                        )
+                    }
                     IconButton(onClick = onNavigateToSettings) {
                         Icon(
                             imageVector = Icons.Default.Settings,

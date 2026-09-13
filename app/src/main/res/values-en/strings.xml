@@ -136,4 +136,8 @@
     <string name="filter_all">All</string>
     <string name="empty_category_title">No subscriptions in this category</string>
     <string name="empty_category_message">Try another category</string>
+    <!-- Statistics -->
+    <string name="statistics_title">Statistics</string>
+    <string name="empty_statistics_title">Nothing to chart yet</string>
+    <string name="empty_statistics_message">Add a subscription and the breakdown appears here</string>
 </resources>

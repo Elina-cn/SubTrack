@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -120,6 +121,31 @@ fun EmptyCategory(modifier: Modifier = Modifier) {
         message = stringResource(id = R.string.empty_category_message),
         modifier = modifier
     )
+}
+
+/**
+ * The empty state for the statistics screen before there is anything to chart.
+ *
+ * The bar-chart glyph rather than the list one: it is the icon the screen was entered by, so the
+ * empty page still looks like the place the user asked for. It adds nothing to the icon set phase
+ * 16 has to narrow down - the top bar already carries this name.
+ */
+@Composable
+fun EmptyStatistics(modifier: Modifier = Modifier) {
+    EmptyState(
+        icon = Icons.Default.BarChart,
+        title = stringResource(id = R.string.empty_statistics_title),
+        message = stringResource(id = R.string.empty_statistics_message),
+        modifier = modifier
+    )
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun EmptyStatisticsPreview() {
+    SubTrackTheme {
+        EmptyStatistics()
+    }
 }
 
 @Preview(showBackground = true)

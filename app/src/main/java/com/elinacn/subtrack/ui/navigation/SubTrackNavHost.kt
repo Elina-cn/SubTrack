@@ -12,6 +12,8 @@ import androidx.navigation.compose.rememberNavController
 import com.elinacn.subtrack.ui.home.HomeScreen
 import com.elinacn.subtrack.ui.home.HomeViewModel
 import com.elinacn.subtrack.ui.settings.SettingsScreen
+import com.elinacn.subtrack.ui.statistics.StatisticsScreen
+import com.elinacn.subtrack.ui.statistics.StatisticsViewModel
 import com.elinacn.subtrack.ui.settings.SettingsViewModel
 import com.elinacn.subtrack.ui.settings.rates.ExchangeRatesScreen
 import com.elinacn.subtrack.ui.settings.rates.ExchangeRatesViewModel
@@ -45,7 +47,20 @@ fun SubTrackNavHost(
                     // launchSingleTop so a double tap on the icon cannot stack two copies of
                     // settings, which would then need two back presses to leave.
                     navController.navigate(Destination.SETTINGS) { launchSingleTop = true }
+                },
+                onNavigateToStatistics = {
+                    navController.navigate(Destination.STATISTICS) { launchSingleTop = true }
                 }
+            )
+        }
+
+        composable(Destination.STATISTICS) {
+            val viewModel: StatisticsViewModel = hiltViewModel()
+            val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
+            StatisticsScreen(
+                uiState = uiState,
+                onNavigateBack = { navController.popBackStack() }
             )
         }
 
