@@ -246,9 +246,10 @@ Dört promptta yürütüldü: **10a** tarih seçici ve geri sayım, **10b** Work
       kabul, üst sınır 10 yıl (ARCHITECTURE §17)
 - [x] **10a:** "X gün kaldı" göstergesi — gelecek, bugün ve gecikmiş; tarih
       yoksa gösterge çıkmaz. Tarih geçince **ilerletme yok**, o Faz 12'nin işi
+      (12-2'de geldi; "gecikmiş" hâli o fazda anlamsızlaşıp kaldırıldı)
 - [x] **10b:** WorkManager + yerel bildirim — günde bir kez, yerel 09:00 hedefi,
       tek özet bildirim. Bildirilenler: bugün, 1 gün kalan, 1-3 gün gecikmiş
-      (ARCHITECTURE §18)
+      (ARCHITECTURE §18; gecikme penceresi 12-2 hotfix'inde kaldırıldı)
 - [x] **10c-1:** `POST_NOTIFICATIONS` izin akışı, Ayarlar'dan — üç halli durum
       makinesi (açık / istenebilir / yalnızca sistem ayarları), kanal düzeyi
       tespit dahil (ARCHITECTURE §18)
@@ -303,10 +304,12 @@ kategoriye göre daraltmak mümkün ve boş kalan kategori kendini söylüyor.
       kalır. Çıpadan sayıldığı için ay sonu kaybolmuyor ve uzun geçmiş
       tarihlerde döngü yok (`ARCHITECTURE.md` §17).
 - [x] **12-2:** **Hatırlatmadaki gecikme penceresi gözden geçirildi** — ölçüldü
-      ve olduğu gibi bırakıldı. Bildirim hâlâ **çıpayı** okuyor, yani pencere
-      tetiklenmeye devam ediyor ve artık ekranla aynı şeyi söylemiyor. Ölçüm ve
-      seçenekler `ARCHITECTURE.md` §18'de; **eşiklerin ne olacağı sohbette
-      karara bağlanacak** ve o karar kendi promptunu hak ediyor.
+      ve raporlandı: bildirim çıpayı, ekran ilerletilmiş tarihi okuyordu.
+- [x] **12-2 hotfix:** **Bildirim de ilerletilmiş tarihi okuyor, gecikme
+      penceresi kalktı.** Kural artık "bugün ödenecek + 1 gün kalan".
+      `PaymentCountdown.Overdue` böylece ulaşılamaz hâle geldi ve kaldırıldı.
+      Kabul edilen bedel (worker bir günü kaçırırsa o döngünün bildirimi
+      kaybolur) `ARCHITECTURE.md` §18'de yazılı.
 
 **Bitti:** Abonelikler periyoduyla kaydediliyor, toplam gerçek maliyeti
 gösteriyor ve geçmiş bir ödeme tarihi kendi döngüsünde bir sonraki güne
@@ -355,10 +358,9 @@ Aylık toplamın zaman içindeki anlık görüntüleri. `PROJECT_SPEC.md` §1'de
       tanımsız, seçilmemiş chip etiketi ve ayarlar açıklama metni koyu temada
       **#CAC4D0**, açık temada **#49454F**. İkisi de mor-gri, kontrast AA geçiyor
       (koyu 9.66:1, açık 6.85:1) — sorun okunabilirlik değil, palet tutarlılığı.
-      Faz 10a'da üçüncüsü eklendi: `error` tanımsız, "gecikmiş" göstergesi
-      Material baseline kırmızısına düşüyor. Kartta metin olarak okunabilen tek
-      alternatif `onSurface`'ti ve o "bir şey ters" demiyor, o yüzden `error`
-      bilerek seçildi — ama tanımlanması gereken rollerden biri.
+      Faz 10a'da üçüncüsü eklendi: `error` tanımsız, Material baseline
+      kırmızısına düşüyor. Kartlardaki "gecikmiş" kullanımı 12-2 hotfix'inde
+      düştü ama rol hâlâ kullanılıyor (`SwipeToDeleteRow`), yani borç duruyor.
       Paletimiz mavi-camgöbeği ailesinde. Tüm `colorScheme`
       rolleri gözden geçirilip eksikler tanımlanmalı, sadece bunlar değil.
 - [ ] Para birimi gösterimi tutarlı hale getirilsin: `NumberFormat` locale'e göre

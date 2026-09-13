@@ -756,10 +756,12 @@ penceresine uygulanır, o pencereye değil. İki mekanizma birbirine değmiyor.
   31'ini alır. Aynı yaklaşım döngüyü de ortadan kaldırıyor: on yıl öncesine
   ait haftalık bir çıpa 558 adım değil, bir çıkarma ve bir toplama.
 
-  **Sonucu:** "gecikmiş" durumu ana ekranda artık **oluşmuyor** — sayılan
-  tarih hiçbir zaman geçmişte değil. Bugünden geriye kalan tek durum, bugün
-  ödenmesi gereken ve henüz ödenmemiş olan. `PaymentCountdown.Overdue` yine de
-  duruyor: bildirim tarafı çıpayı okuyor (§18) ve oradan geliyor.
+  **Sonucu:** "gecikmiş" durumu **hiçbir yerde oluşmuyor** — sayılan tarih
+  hiçbir zaman geçmişte değil. Bugünden geriye kalan tek durum, bugün ödenmesi
+  gereken ve henüz ödenmemiş olan. 12-2 hotfix'inde bildirim de aynı
+  ilerletilmiş tarihe bağlandığı için `PaymentCountdown.Overdue` ulaşılamaz hâle
+  geldi ve **kaldırıldı** (§18). `PaymentCountdown.between` artık geçmiş bir
+  tarihi reddediyor: çıpayı doğrudan veren bir çağıran bu adımı atlamıştır.
 
   Düzenleme ekranı (Faz 15) **çıpayı** gösterecek, ilerletilmiş tarihi değil.
 - Geçmiş tarih kabul edilir. Üst sınır bugünden 10 yıl ileridir — kayan
@@ -779,42 +781,74 @@ penceresine uygulanır, o pencereye değil. İki mekanizma birbirine değmiyor.
 
 ### Ürün kuralı
 
-Bildirilenler: **bugün ödenecek**, **1 gün kalan**, ve gecikmesi **1-3 gün**
-olanlar. Tarihi olmayan abonelik bildirilmez. Abonelik başına ayrı bildirim
-yok — tek özet bildirim, sabit id, günde en fazla bir tane. Bildirimde tutar
-yazmaz.
+Bildirilenler: **bugün ödenecek** ve **1 gün kalan**. Tarihi olmayan abonelik
+bildirilmez. Abonelik başına ayrı bildirim yok — tek özet bildirim, sabit id,
+günde en fazla bir tane. Bildirimde tutar yazmaz.
+
+Ölçülen şey **çıpa değil, çıpanın bugüne ulaşmış hâli**: seçim de kartla aynı
+`NextPaymentDate.onOrAfter(bugün, çıpa, periyot)` sonucuna bakar (§17). Aynı
+satır için ekranla bildirimin farklı şey söylemesi böylece yapısal olarak
+imkânsız.
 
 Başlık kapsanan abonelik **sayısını** söyler ve fiil kullanmaz. Aynı bildirim
-hem bugün ödenecek hem üç gün gecikmiş bir aboneliği taşıyabildiği için
+hem bugün ödenecek hem yarın ödenecek bir aboneliği taşıyabildiği için
 "yenileniyor" gibi tek duruma bağlanan bir başlık zamanın yarısında yanlış
 olurdu.
 
-### Gecikme penceresi neden vardı, ve bugün nerede duruyor
+### Gecikme penceresi neden vardı, neden kalktı
 
-Pencere, §17'deki "tarih ilerletilmez" kuralı için konmuştu: gecikmiş durum
-kalıcı olduğu için, pencere olmasa bildirim de kalıcı olurdu ve kullanıcı her
-gün aynı satırı görürdü.
+Pencere (1-3 gün) 10b'de, §17'deki "tarih ilerletilmez" kuralı için konmuştu:
+gecikmiş durum kalıcı olduğu için, pencere olmasa bildirim de kalıcı olurdu ve
+kullanıcı her gün aynı satırı görürdü.
 
-İki eşik de `PaymentReminderSelection` içinde adlandırılmış sabittir
-(`UPCOMING_WITHIN_DAYS`, `OVERDUE_WITHIN_DAYS`), koda gömülü sayı değil.
+**12-2 ilerletmeyi getirince gerekçe düştü.** Ölçüm şunu gösterdi: bildirim
+çıpayı, ekran ilerletilmiş tarihi okuyordu, ve aynı aylık abonelik için
+bildirim "1 gün gecikti" derken kart "29 gün kaldı" diyordu. İki doğru yoktu;
+biri yanlıştı ve yanlış olan çıpayı okuyan taraftı — kullanıcının ödemesi
+gereken bir sonraki gün, geçmiş bir tarih değil.
 
-**Faz 12-2 ölçümü — gerekçe düştü, kod düşmedi.** İlerletme ekrana geldi ama
-`PaymentReminderSelection` hâlâ `subscription.nextPaymentDate`'i, yani
-**çıpayı** okuyor; ilerletme yalnızca `HomeViewModel`'in geri sayım
-hesabındadır. Yani:
+`OVERDUE_WITHIN_DAYS` kaldırıldı, `UPCOMING_WITHIN_DAYS = 1` kaldı; tek eşik
+hâlâ `PaymentReminderSelection` içinde adlandırılmış sabit, koda gömülü sayı
+değil.
 
-- Gecikme penceresi **ölü kod değil**, hâlâ tetikleniyor. Enstrümantasyonla
-  ölçüldü (iki emülatörde de aynı): yedi abonelikten dördü bildirime girdi ve
-  ikisi pencereden geldi —
-  `"DueToday — today, Tomorrow — tomorrow, OneDayLate — 1 day overdue, ThreeDaysLate — 3 days overdue"`.
-- Aynı iki satır için ekran **başka bir şey** diyor: `OneDayLate` kartta
-  "29 days left", `ThreeDaysLate` "27 days left" (aylık abonelikler). Bildirim
-  "1 gün gecikti" derken kart "29 gün kaldı" diyor.
+**KABUL EDİLEN BEDEL — bir günü kaçıran döngü kaybolur.** Pencere, işi bir gün
+geç koşan bir worker için ikinci bir şans işlevi de görüyordu. Artık yok:
+ödeme günü geçtiği anda tarih bir sonraki periyoda atlar, dolayısıyla o
+döngünün bildirimi bir daha üretilemez. Doze altında kayan, cihazın kapalı
+olduğu ya da `KEEP` yüzünden atlanan bir gün, o ödeme için sessiz kalır.
+Bilerek kabul edildi: bugünkü kural iki günlük bir pencereye (bugün + yarın)
+bakıyor, yani bir günün kaçması ödemeyi tamamen kaçırmak değil — yarınki
+bildirim, bugün kaçırılan "yarın ödenecek" satırını "bugün ödenecek" olarak
+yakalar. Kaçan tek durum, o iki günün **ikisinin de** kaçırılması.
 
-> **Karar sohbette verilecek** (12-2'de pencereye bilerek dokunulmadı). Seçenekler
-> kabaca: bildirimi de ilerletilmiş tarihe bağlamak (pencere anlamsızlaşır,
-> gecikmiş kavramı bildirimden kalkar), pencereyi kısaltmak, ya da çıpayı
-> bilerek koruyup "ödemediysen hatırlatalım" olarak yeniden tanımlamak.
+İleride bu bedel ödenmek istenmezse doğru çözüm **"gecikmiş durumu" değil**:
+gecikmiş durumu ilerletmeyle birlikte anlamsız (tarih hiçbir zaman geçmişte
+değil). Doğru soru "son N günde bir ödeme günü geçti mi" — yani çıpanın bir
+**önceki** periyodunun bugüne uzaklığı. `NextPaymentDate` bunu zaten bir
+çıkarmayla verebilir (`sonuç - 1 periyot`), yeni alan veya yazma gerektirmez.
+
+### `PaymentCountdown.Overdue` kaldırıldı (12-2 hotfix, Görev 3)
+
+Kanıt: `PaymentCountdown.between`'in üretimde **iki** çağıranı var —
+`HomeViewModel` ve `PaymentReminderSelection` — ve hotfix'ten sonra ikisi de
+ona `NextPaymentDate.onOrAfter` sonucunu veriyor. O sonuç hiçbir zaman bugünden
+önce değil (`NextPaymentDateTest.theAnswer_isAlwaysTheFirstDueDateNotBeforeToday`
+ile sabitli), dolayısıyla `days < 0` dalı ulaşılamaz hâle geldi.
+
+Kaldırılanlar: `PaymentCountdown.Overdue` tipi ve `between`'in negatif dalı ·
+bildirimdeki `days_overdue` dalı · kartın `error` renkli geri sayım dalı ve
+`asText`/`asString` karşılıkları · `SubscriptionCardOverduePreview` ·
+`days_overdue` çoğulu (`values` ve `values-en`) · `OVERDUE_WITHIN_DAYS` ·
+"gecikmiş"ten söz eden kanal açıklaması (iki dilde de yenilendi).
+
+`between` artık geçmiş bir tarihi **reddediyor** (`require`), uydurma bir
+cevap üretmiyor: çıpayı doğrudan veren bir çağıran `NextPaymentDate`'i
+atlamıştır ve bu, para hakkında yanlış bir sayı göstermektense hatanın
+kendisinde patlaması gereken bir sözleşme ihlalidir.
+
+`MaterialTheme.colorScheme.error` uygulamada **hâlâ kullanılıyor**
+(`SwipeToDeleteRow`), yani Faz 14'teki renk borcu aynen duruyor — yalnızca
+kartlardaki kullanımı düştü.
 
 ### Neden periyodik tarama, exact alarm değil
 

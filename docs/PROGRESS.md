@@ -27,6 +27,166 @@ Her faz sonunda **en üste** yeni kayıt eklenir. Eski kayıtlar silinmez.
 
 ---
 
+## [Faz 12-2 hotfix] Bildirim ilerletilmiş tarihi okuyor, gecikme penceresi kalktı — 2026-09-13
+
+**Durum:** Tamamlandı. 12-2'de ölçülüp sohbete bırakılan iki soru da kapandı:
+pencere kaldırıldı, `TESTING.md` #29 yeniden yazıldı.
+
+### Sorun
+
+12-2 ölçümü: kart `NextPaymentDate.onOrAfter` sonucunu, `PaymentReminderSelection`
+ise **çıpayı** okuyordu. Aynı aylık abonelik için bildirim "1 day overdue",
+kart "29 days left" diyordu. İki doğru yoktu — yanlış olan çıpayı okuyan taraftı.
+
+### Görev 1 — seçim mantığı
+
+`PaymentReminderSelection.on()` artık aboneliğin **periyoduyla** ilerletilmiş
+tarihi ölçüyor. `OVERDUE_WITHIN_DAYS` ve gecikme dalı kalktı;
+`UPCOMING_WITHIN_DAYS = 1` aynen duruyor. Kural: **bugün ödenecek + 1 gün kalan.**
+
+### Görev 3 — Overdue ulaşılabilir mi: kanıt, sonra kaldırma
+
+`PaymentCountdown.between`'in üretimde **iki** çağıranı var ve Görev 1'den
+sonra **ikisi de** ona `NextPaymentDate.onOrAfter` sonucunu veriyor:
+
+| çağıran | verdiği tarih |
+|---|---|
+| `HomeViewModel` (kart) | `onOrAfter(today, anchor, period)` |
+| `PaymentReminderSelection` (bildirim) | `onOrAfter(today, anchor, period)` |
+
+O sonuç hiçbir zaman bugünden önce değil — `NextPaymentDateTest`'teki özellik
+testiyle sabitli. Yani **gecikmiş dalı çalışamıyor; çalışan dal her zaman
+`DueToday` ya da `Upcoming`.** Kaldırıldı:
+
+- `PaymentCountdown.Overdue` tipi ve `between`'in negatif dalı
+- `PaymentReminderNotifier`'daki `days_overdue` dalı
+- `SubscriptionCard`'daki `error` renkli geri sayım dalı, `asText` dalı ve
+  `SubscriptionCardOverduePreview`
+- `SubscriptionRowDescription`'daki `asString` dalı
+- `days_overdue` çoğulu — `values` ve `values-en`
+- `OVERDUE_WITHIN_DAYS`
+- "gecikmiş"ten söz eden kanal açıklaması (iki dilde de yenilendi; kullanıcıya
+  görünen ve artık doğru olmayan tek metindi)
+
+`between` geçmiş bir tarihi artık **reddediyor** (`require`), uydurma bir cevap
+üretmiyor: çıpayı doğrudan veren bir çağıran `NextPaymentDate`'i atlamıştır.
+
+**Kapsam notu:** promptun DOKUNMA listesinde `ui/home/` vardı ("kart davranışı
+değişmiyor"). `SubscriptionCard.kt` ve `SubscriptionRowDescription.kt`
+değiştirildi çünkü `when` dallarının kaldırılmasını Görev 3 istiyor ve derleyici
+zorunlu kılıyor. Davranış birebir aynı: kaldırılan dallar zaten üretilemeyen bir
+durumu çiziyordu.
+
+`MaterialTheme.colorScheme.error` uygulamada **hâlâ kullanılıyor**
+(`SwipeToDeleteRow`), yani Faz 14 renk borcu duruyor.
+
+### Görev 2 — testler
+
+176 → **202 birim testi** (5 yeni seçim testi, 2 sözleşme testi), 0 hata.
+`lintDebug` **0 hata, 23 uyarı** — 23'ün 15'i `libs.versions.toml`'daki sürüm
+tazeliği uyarısı (yeni sürümler yayınlandıkça artıyor); hiçbiri bu değişiklikten
+gelmiyor.
+
+Beklentisi değişen testler (hiçbiri silinmedi, her birinin yanında gerekçesi var):
+
+| test | eskiden | şimdi |
+|---|---|---|
+| `on_theAnchorWasYesterday_...` | `Overdue(1)`, seçilirdi | seçilmiyor — sonraki ödeme 14 Nisan |
+| `on_theAnchorWasThreeDaysAgo_...` | `Overdue(3)`, pencerenin kenarı | seçilmiyor — 12 Nisan |
+| `on_theAnchorWasFourDaysAgo_...` | seçilmiyordu (pencere dışı) | seçilmiyor (pencere yok) |
+| `on_mixedList_...` | OneLate + ThreeLate girerdi | girmiyor; yerine geçmiş çıpalı haftalık **giriyor** |
+| `on_theWindowCrossesAMonthBoundary_...` | `Overdue(3)` | yalnızca 1 Nisan |
+| `on_theWindowCrossesAYearBoundary_...` | `Overdue(3)` | 1 Ocak + Noel çıpalı haftalık |
+| `between_theDateIsBehindToday_...` | `Overdue(1)` | `IllegalArgumentException` |
+| `between_theDateIsAYearBehind_...` | `Overdue(365)` | `IllegalArgumentException` |
+| `everyPeriod_countsTowards...` | "hiçbiri Overdue değil" | üç periyodun üç ayrı günü (16 / 322 / 4) |
+
+Yeni: geçmiş çıpalı haftalık → yarın → **giriyor**; geçmiş çıpalı aylık → 20 gün
+sonra → **girmiyor**; bugüne denk gelen geçmiş çıpa → `DueToday`; aynı çıpa üç
+periyotla üç farklı sonuç; seçilen hatırlatma **çıpayı taşımaya devam ediyor**.
+
+Enstrümantasyon fikstürü yeniden yazıldı: `OneDayLate`/`ThreeDaysLate` isimleri
+yanıltıcıydı, artık satırlar **nereye vardıklarına** göre adlandırılıyor
+(`PassedLandsTomorrow`, `PassedLandsToday`, `PassedLandsFarOff`,
+`LongPassedYearly`) ve bildirim metninde "overdue"/"gecik" geçmediği ayrıca
+doğrulanıyor.
+
+### Doğrulama — iki emülatörde de birebir aynı
+
+**(a) Ham bildirim metni** (API 29 ve API 34):
+
+```
+EXTRA_TITLE=[Payment reminder: 4 subscriptions]
+EXTRA_TEXT =[DueToday — today, Tomorrow — tomorrow,
+             PassedLandsTomorrow — tomorrow, PassedLandsToday — today]
+```
+
+"overdue" **yok**, "gecik" **yok**.
+
+**(b)/(c) Kart ile bildirim, aynı veriden, yan yana:**
+
+| satır | çıpa · periyot | kart | bildirim |
+|---|---|---|---|
+| DueToday | bugün · aylık | Due today | today |
+| Tomorrow | +1 · aylık | 1 day left | tomorrow |
+| TwoDaysOut | +2 · aylık | 2 days left | (yok) |
+| **PassedLandsTomorrow** | **−6 · haftalık** | **1 day left** | **tomorrow** |
+| **PassedLandsToday** | **−7 · haftalık** | **Due today** | **today** |
+| **PassedLandsFarOff** | **−3 · aylık** | **27 days left** | **(yok)** |
+| LongPassedYearly | −400 · yıllık | 330 days left | (yok) |
+| NoDate | — | (gösterge yok) | (yok) |
+
+Çelişki kalmadı. Geçmiş çıpalı iki satır bildirime **girdi** (vardıkları gün
+yakın), uzağa varan iki satır **girmedi**.
+
+### (e) 75 maddelik sabit regresyon — ikisinde de
+
+Kayıtlı istisnalar önceki fazlarla aynı (**API 29**: #15 koyu tema ve #16 dil —
+`cmd uimode`/`cmd locale` servisleri bu imajda yok; #34-#37, #41-#45 API 33+
+maddeleri, karşılıkları #40 ve #46 koşuldu. **API 34**: #40 ve #46 API < 33
+maddeleri).
+
+**#29 yeni hâliyle koşuldu ve geçti**, üç iddiası da ölçüldü: çıpa 2026-09-08
+(5 gün geçmiş), kart `Late, TRY 40.00, Monthly, 25 days left`, "gecikmiş" yok,
+ve `run-as` ile okunan satırda tarih **değişmemiş** (`1788825600000 → 2026-09-08`).
+Listenin altındaki 12-2 geçici notu kaldırıldı.
+
+Üç madde ilk okumada "durum kalıcı olmuş" gibi göründü (#60 filtre, #68 yıllık
+görünüm, #14 yazılmış metin) — üçü de **bayat ağaç**tı. Ekran görüntüsü
+uygulamanın hâlâ açılış ekranında olduğunu gösterdi; uzun beklemeden sonra üçü
+de doğru davranışı verdi (#60 → All, #68 → Total Monthly 243,33 + Monthly
+seçili, #14 → "Half typed" korunuyor). TESTING.md'ye yazıldı.
+
+### Değişen dosyalar
+
+- `domain/usecase/PaymentReminderSelection.kt` — ilerletilmiş tarih, pencere yok
+- `domain/usecase/PaymentCountdown.kt` — `Overdue` kalktı, `require` geldi
+- `reminder/PaymentReminderNotifier.kt`, `reminder/PaymentReminderWorker.kt` — dal ve metin
+- `ui/home/components/SubscriptionCard.kt`, `SubscriptionRowDescription.kt` — ölü dallar
+- `res/values/strings.xml`, `res/values-en/strings.xml` — `days_overdue` silindi, kanal açıklaması
+- `test/.../PaymentReminderSelectionTest.kt`, `PaymentCountdownTest.kt`, `HomeViewModelNextPaymentTest.kt`
+- `androidTest/.../PaymentReminderWorkerTest.kt` — fikstür
+- `docs/ARCHITECTURE.md` §17 ve §18, `docs/ROADMAP.md`, `docs/TESTING.md`
+
+**Dokunulmayanlar:** `NextPaymentDate`, Room şeması, DataStore, Manifest,
+`Theme.kt`/`Color.kt`, `ui/settings/`.
+
+### Karşılaşılan sorunlar
+
+- **`pm clear` bildirim iznini de geri alıyor.** API 34'te ilk enstrümantasyon
+  koşusu "no notification was posted" dedi; `pm grant`, clear'dan **sonra**
+  gelmeli. TESTING.md'ye yazıldı.
+- **`am force-stop` uygulamanın bildirimini siliyor**, yani bildirim metni
+  uygulama açılmadan önce okunmalı. Yazıldı.
+- **API 34 emülatörü "System UI isn't responding" veriyordu**; sürücü artık
+  diyaloğu kendi kapatıyor, tekrarlarsa `adb reboot`. Ürünle ilgisi yok.
+
+### Açık kalan
+
+- Hiçbiri. Faz 12 kapalı; tag kullanıcıda.
+
+---
+
 ## [Faz 12-2] Tarih İlerletme — 2026-09-13
 
 **Durum:** Tamamlandı. **Faz 12 KAPANDI.** Gecikme penceresine bilerek
@@ -186,7 +346,9 @@ eklendi, satırın kendisine dokunulmadı.
 
 ### Rapor edilen, karar bekleyen
 
-- **Gecikme penceresi** (yukarıdaki ölçüm). Bildirim çıpayı, ekran ilerletilmiş
+> **Kapandı** — ikisi de yukarıdaki **12-2 hotfix** kaydında çözüldü.
+
+- **Gecikme penceresi** (aşağıdaki ölçüm). Bildirim çıpayı, ekran ilerletilmiş
   tarihi okuyor; ikisi aynı satır için farklı şey söylüyor.
 - **#29** maddesinin yeni metni.
 
@@ -195,7 +357,8 @@ eklendi, satırın kendisine dokunulmadı.
 - Faz 15 düzenleme ekranı **çıpayı** göstermeli (ROADMAP'te madde var).
 - `PaymentCountdown.Overdue` artık yalnızca bildirim yolundan gelebiliyor; §18
   kararı onu tamamen kaldırırsa kartlardaki `error` rengi kullanımı da gözden
-  geçirilmeli (Faz 14 renk borcu).
+  geçirilmeli (Faz 14 renk borcu). *(12-2 hotfix: kaldırıldı. `error` rolü
+  `SwipeToDeleteRow`'da kullanılmaya devam ettiği için borç duruyor.)*
 
 ---
 

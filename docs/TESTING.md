@@ -72,7 +72,7 @@ etmeden bildirin; sonraki maddeler zaten bozuk bir durumun üstüne binebilir.
 | 26 | Kur alanına yazarken klavye açıkken Kaydet ve "Varsayılana dön"e ulaş | Pencere klavye kadar küçülüyor, **tek fiskede** ikisine de ulaşılıyor | 9b-2 · `adjustResize` hotfix |
 | 27 | Ekleme formunda tarih seç, kaydet | Kartta doğru gün sayısı: cihaz tarihi ile seçilen tarih arasındaki **takvim günü** farkı | 10a |
 | 28 | Tarih **seçmeden** kaydet | Kayıt oluşuyor, kartta gösterge **yok**, yer tutucu da yok, çökme yok | 10a |
-| 29 | Geçmiş bir tarih seç | Kart "gecikmiş" diyor, tarih **ilerletilmiyor** | 10a |
+| 29 | Geçmiş bir tarih seç | Kart **bir sonraki ödeme tarihine** göre gün sayısı gösteriyor, "gecikmiş" **demiyor**, çıpa değişmiyor | 10a · 12-2 hotfix |
 | 30 | Bugünün tarihini seç | Kart "Bugün ödenecek" diyor | 10a |
 | 31 | Seçicinin metin girişinden 10 yıldan uzak bir tarih gir, kaydet | Alan altında hata, **kaydedilmiyor**, sheet açık kalıyor, çökme yok | 10a |
 | 32 | Tarih seçili haldeyken sheet açıkken döndür | Tarih **korunuyor** | 10a |
@@ -126,14 +126,6 @@ etmeden bildirin; sonraki maddeler zaten bozuk bir durumun üstüne binebilir.
 | 73 | Gelecek tarihli abonelik | İlerletme **yok**, tarih olduğu gibi | 12-2 |
 | 74 | Bugünün tarihi | "Bugün ödenecek" **korunuyor** | 12-2 |
 | 75 | Geçmiş tarihli bir aboneliği kaydettikten sonra veriyi oku | Saklanan tarih **değişmemiş** — ilerletme yalnızca ekranda (`run-as` ile `subtrack.db`) | 12-2 |
-
-> **#29 hakkında (Faz 12-2 ölçümü).** "Geçmiş bir tarih seç → kart *gecikmiş*
-> diyor, tarih ilerletilmiyor" maddesi 10a'da yazıldı ve **artık bu davranış
-> yok**: 12-2'den beri kart, çıpanın bir sonraki ödeme gününe taşınmış hâline
-> sayıyor (iki emülatörde de ölçüldü: 5 gün geçmiş aylık çıpa → "25 days left").
-> Madde **bilerek değiştirilmedi** — yerine ne yazılacağı, §18'deki gecikme
-> penceresi kararıyla birlikte sohbette verilecek. O karara kadar #29 koşulurken
-> bu not okunmalı, aksi hâlde gerçek olmayan bir kırılma raporlanır.
 
 **Klavye açıkken buton erişilebilirliği — her fazda kontrol edilecek**
 
@@ -295,6 +287,28 @@ devam eder. Faz 12-1 doğrulamasında bu oldu: 29. madde "kart yok" dedi, sebep
 Kural: diyalogda Kaydet'e bastıktan sonra **"Select date" başlığının
 kaybolmasını bekle**, sonra yeniden dump al.
 
+### Yüklü emülatörde "bayat ağaç" — durum kalmış gibi görünür
+
+12-2 hotfix koşusunda üç madde (#60 filtre, #68 yıllık görünüm, #14 yazılmış
+metin) **kalıcı olmuş gibi** göründü. Üçü de yanlış alarmdı: `am start`'tan
+sonra uygulama henüz açılış ekranında (splash) beklerken alınan
+`uiautomator dump`, force-stop'tan **önceki** ağacı döndürüyor.
+
+- Kanıt: aynı anda alınan `exec-out screencap -p` yalnızca Android robot
+  ikonunu (splash) gösteriyordu; 20 saniye sonra ağaç doğru değeri verdi.
+- Kural: "durum kalıcı mı" türünden bir maddede ağaç beklenenden **farklı**
+  çıkarsa, raporlamadan önce ekran görüntüsü al. Kalan durum gerçekse
+  ekranda da görünür.
+- `restart_app` artık FAB'ı bekliyor ve bulamazsa **hata veriyor** — sessizce
+  eski ağaçla devam etmektense düşmesi iyidir.
+
+### "System UI isn't responding" diyaloğu ölçümü keser
+
+Yüklü emülatörde (özellikle API 34) bu sistem diyaloğu ekranı kaplıyor ve
+dump "boş ekran" gibi görünüyor. **Wait**'e dokunmak yetiyor; sürücü
+betiklerindeki `wait_for` artık bunu kendisi yapıyor. Diyalog tekrar
+tekrar çıkıyorsa `adb reboot` ile cihazı tazele — ürünle ilgisi yok.
+
 ### 360dp'de form artık kaydırma istiyor
 
 Periyot sırası (Faz 12-1) formu bir sıra uzattı. 360dp'lik ekranda **kategori
@@ -418,11 +432,19 @@ adb shell am instrument -w -e class com.elinacn.subtrack.reminder.PaymentReminde
 adb logcat -d -s ReminderWorkerTest:V
 ```
 
-API 33+ cihazda önce izin verilmeli, yoksa bildirim hiç gönderilmez:
+API 33+ cihazda önce izin verilmeli, yoksa bildirim hiç gönderilmez — ve
+**`pm clear`'dan SONRA**, çünkü clear izni de geri alır:
 
 ```bash
 adb shell pm grant com.elinacn.subtrack android.permission.POST_NOTIFICATIONS
 ```
+
+Bu sırayı ters çevirmek "no notification was posted" diye düşen bir koşu
+verir; hata testte değil, hazırlıktadır.
+
+**Bildirim metni okunacaksa uygulamayı açmadan önce okuyun.** `am force-stop`
+(ve dolayısıyla `restart_app`) uygulamanın bildirimlerini siler; önce
+`dumpsys notification --noredact`, sonra ekran.
 
 **`pm clear` şart.** Worker günde en fazla bir bildirim gönderir ve
 **gönderebildiği** günü kaydeder; aynı gün ikinci koşu tasarım gereği hiçbir
