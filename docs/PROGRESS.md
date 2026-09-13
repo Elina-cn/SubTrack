@@ -188,6 +188,14 @@ kaybı olmadı**; tablo eklemek var olan tabloyu bozmuyor.
 - **Cihaz dili Türkçe'ye alınınca** FAB'ın açıklaması da Türkçe oluyor ve
   sürücü "düğüm yok" diyordu; artık iki dili de tanıyor.
 
+### Commit'ler
+
+- `7b6d196` feat: give the database a place to keep each month's total
+- `6baf6c8` feat: read monthly totals as a domain series, not as rows
+- `1037b70` feat: record what a month costs as soon as it changes
+- `e7527ed` test: pin the filter trap, the one-row-per-month rule and the mapper's edges
+- `031cdf8` docs: record where a month's total comes from and why it is written when it is
+
 ### Açık kalan
 
 - **Ana ekranda "geçen aya göre" karşılaştırması Faz 13'e taşındı.** Bugün
