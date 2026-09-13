@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -15,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.tooling.preview.Preview
@@ -37,6 +39,12 @@ import com.elinacn.subtrack.ui.theme.SubTrackTheme
  * (ARCHITECTURE §12). Four distinguishable category colours would have to be invented here and
  * taken back out again in phase 14, so the label carries the distinction instead and the bar
  * carries only the size.
+ *
+ * **The track is the same colour, faded.** primaryContainer was the obvious role for it and is the
+ * wrong one: in the dark scheme primary and primaryContainer are both PastelBlue, so bar and track
+ * came out identical and every category looked full. Measured on API 34, not reasoned about. A
+ * translucent primary cannot collapse into the solid one in either theme, and it invents no colour
+ * for phase 14 to take back.
  */
 @Composable
 fun CategoryBarRow(
@@ -57,7 +65,7 @@ fun CategoryBarRow(
         percent
     )
     val barColor = MaterialTheme.colorScheme.primary
-    val trackColor = MaterialTheme.colorScheme.primaryContainer
+    val trackColor = barColor.copy(alpha = TRACK_ALPHA)
 
     Column(
         modifier = modifier
@@ -71,15 +79,22 @@ fun CategoryBarRow(
         ) {
             Text(
                 text = label,
+                // weight(1f) and a spacer, not SpaceBetween alone. At font scale 2.0 the two
+                // texts fill the line, SpaceBetween has no space left to put between them, and
+                // "Productivity" ran straight into "TRY 428,50". The weight makes the label wrap
+                // inside its own share instead of pushing against the figure.
+                modifier = Modifier.weight(1f),
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onBackground
             )
+            Spacer(modifier = Modifier.width(Dimens.SpacerSmall))
             Text(
                 // The two figures the bar cannot say for itself, kept together at the end of the
                 // line so the eye reads label first and quantity second.
                 text = stringResource(id = R.string.subscription_row_description_more, amount, percentText),
                 style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onBackground
+                color = MaterialTheme.colorScheme.onBackground,
+                textAlign = TextAlign.End
             )
         }
 
@@ -105,6 +120,14 @@ fun CategoryBarRow(
 }
 
 private const val PERCENT = 100f
+
+/**
+ * How much of the bar's own colour the empty part of it keeps.
+ *
+ * Enough to show where the bar could reach, faint enough that the filled part is unmistakably the
+ * filled part. No text sits on it, so this is not the contrast trade the dashboard card refused.
+ */
+private const val TRACK_ALPHA = 0.24f
 
 @Preview(showBackground = true)
 @Composable
