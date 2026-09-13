@@ -3,6 +3,7 @@ package com.elinacn.subtrack.di
 import android.content.Context
 import androidx.room.Room
 import com.elinacn.subtrack.data.local.SubTrackDatabase
+import com.elinacn.subtrack.data.local.dao.MonthlySnapshotDao
 import com.elinacn.subtrack.data.local.dao.SubscriptionDao
 import dagger.Module
 import dagger.Provides
@@ -36,4 +37,9 @@ object DatabaseModule {
     @Provides
     fun provideSubscriptionDao(database: SubTrackDatabase): SubscriptionDao =
         database.subscriptionDao()
+
+    /** The same, for the monthly totals table. */
+    @Provides
+    fun provideMonthlySnapshotDao(database: SubTrackDatabase): MonthlySnapshotDao =
+        database.monthlySnapshotDao()
 }

@@ -1,8 +1,10 @@
 package com.elinacn.subtrack.di
 
+import com.elinacn.subtrack.data.repository.MonthlySnapshotRepositoryImpl
 import com.elinacn.subtrack.data.repository.ReminderStateRepositoryImpl
 import com.elinacn.subtrack.data.repository.SettingsRepositoryImpl
 import com.elinacn.subtrack.data.repository.SubscriptionRepositoryImpl
+import com.elinacn.subtrack.domain.repository.MonthlySnapshotRepository
 import com.elinacn.subtrack.domain.repository.ReminderStateRepository
 import com.elinacn.subtrack.domain.repository.SettingsRepository
 import com.elinacn.subtrack.domain.repository.SubscriptionRepository
@@ -42,4 +44,11 @@ abstract class RepositoryModule {
     abstract fun bindReminderStateRepository(
         impl: ReminderStateRepositoryImpl
     ): ReminderStateRepository
+
+    /** The recorded monthly totals phase 13 will chart. See ARCHITECTURE section 19. */
+    @Binds
+    @Singleton
+    abstract fun bindMonthlySnapshotRepository(
+        impl: MonthlySnapshotRepositoryImpl
+    ): MonthlySnapshotRepository
 }
