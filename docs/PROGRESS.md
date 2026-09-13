@@ -171,6 +171,12 @@ seçili, #14 → "Half typed" korunuyor). TESTING.md'ye yazıldı.
 **Dokunulmayanlar:** `NextPaymentDate`, Room şeması, DataStore, Manifest,
 `Theme.kt`/`Color.kt`, `ui/settings/`.
 
+### Commit'ler
+
+- `322d9e3` feat: remind about the payment that is next, not the one that has gone
+- `cb5c013` refactor: drop the overdue state, which nothing can reach any more
+- `4935f86` docs: record why the lateness window went, and what its going costs
+
 ### Karşılaşılan sorunlar
 
 - **`pm clear` bildirim iznini de geri alıyor.** API 34'te ilk enstrümantasyon
