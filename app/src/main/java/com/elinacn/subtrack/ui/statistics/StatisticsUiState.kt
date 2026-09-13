@@ -1,6 +1,8 @@
 package com.elinacn.subtrack.ui.statistics
 
 import com.elinacn.subtrack.domain.model.Currency
+import com.elinacn.subtrack.domain.usecase.CategoryShare
+import com.elinacn.subtrack.domain.usecase.SubscriptionCost
 
 /**
  * Everything the statistics screen draws.
@@ -16,9 +18,18 @@ import com.elinacn.subtrack.domain.model.Currency
  * snapshot recorder).
  */
 data class StatisticsUiState(
+    /** One row per category that has money in it, biggest first. */
+    val categoryShares: List<CategoryShare> = emptyList(),
+    /** The dearest subscriptions by monthly cost, dearest first. */
+    val mostExpensive: List<SubscriptionCost> = emptyList(),
     /** What every figure on the screen is denominated in. */
     val currency: Currency = Currency.Base,
-    /** Whether there is anything at all to chart. */
+    /**
+     * Whether there is anything at all to chart.
+     *
+     * Not the same as an empty [categoryShares]: a list whose every subscription rounds to nothing
+     * has subscriptions in it, and only having none of them is an empty state.
+     */
     val hasAnySubscriptions: Boolean = false,
     val isLoading: Boolean = true
 )

@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.elinacn.subtrack.domain.repository.SettingsRepository
 import com.elinacn.subtrack.domain.repository.SubscriptionRepository
+import com.elinacn.subtrack.domain.usecase.CurrencyConverter
+import com.elinacn.subtrack.domain.usecase.SubscriptionStatistics
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -38,8 +40,13 @@ class StatisticsViewModel @Inject constructor(
         repository.observeAll(),
         settingsRepository.observeMainCurrency(),
         settingsRepository.observeRates()
-    ) { subscriptions, mainCurrency, _ ->
+    ) { subscriptions, mainCurrency, rates ->
+        // Built per emission rather than held as a field: the rates are editable, and a converter
+        // that outlived them would keep charting at yesterday's numbers.
+        val converter = CurrencyConverter(rates)
         StatisticsUiState(
+            categoryShares = SubscriptionStatistics.byCategory(subscriptions, converter, mainCurrency),
+            mostExpensive = SubscriptionStatistics.mostExpensive(subscriptions, converter, mainCurrency),
             currency = mainCurrency,
             hasAnySubscriptions = subscriptions.isNotEmpty(),
             isLoading = false
