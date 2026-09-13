@@ -411,7 +411,8 @@ kütüphanesi yok ve kurulmuyor.
 
 ### Otomatik testler
 
-Bugün **11 enstrümantasyon testi** var: 8 DAO + 1 şablon + 2 hatırlatma worker'ı.
+Bugün **19 enstrümantasyon testi** var: 8 abonelik DAO'su + **8 aylık anlık görüntü
+DAO'su (Faz 12a)** + 1 şablon + 2 hatırlatma worker'ı.
 
 ```bash
 ANDROID_SERIAL=emulator-5554 ./gradlew :app:connectedDebugAndroidTest

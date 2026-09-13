@@ -541,7 +541,14 @@ onu bozmak geri alınamaz.
 
 > Bu satır **Faz 16'da tekrar okunmalı.** Yayın anı kuralın değiştiği andır.
 
-Faz 12a'daki geçmiş takibi tablosu bu kural kapsamında sürüm 1'e eklenecek.
+**Faz 12a'da uygulandı.** `monthly_snapshots` tablosu sürüm 1'e eklendi,
+migration yazılmadı, sürüm numarası 1 kaldı ve
+`app/schemas/com.elinacn.subtrack.data.local.SubTrackDatabase/1.json` yeniden
+üretilip commit'e dahil edildi. Değişen tek şey `identityHash` ve eklenen tablo
+oldu; `subscriptions` tanımına dokunulmadı.
+
+> Bu, projenin Faz 2'den beri **ilk şema değişikliği**. Kuralın bir sonraki
+> sınavı yayın öncesi, Faz 16'da.
 
 ### Mimari karar: şema dışa aktarılır
 
@@ -1090,5 +1097,117 @@ cevabı verip hatırlatmayı her eski cihazda susturur.
 Kanal her gönderimden önce yeniden oluşturulur. Var olan bir kanalı oluşturmak
 işlemsizdir; asıl kazanç, cihaz dili değişince kanal adının ve açıklamasının
 güncellenmesidir.
+
+---
+
+## 19. Geçmiş Takibi — Aylık Anlık Görüntüler
+
+Aylık toplamın zaman içindeki kaydı. `PROJECT_SPEC.md` §1'deki "geçen aya göre
+ne değişti?" vaadinin veri tarafı; Faz 13'teki trend grafiği bu tabloyu okuyacak.
+
+### Yazma zamanı: her değişiklikte üzerine yazma
+
+Üç seçenek vardı:
+
+| seçenek | neden seçilmedi |
+|---|---|
+| **Uygulama açılışında** | Kullanıcı bir ay uygulamayı hiç açmazsa o ay için satır oluşmaz. Grafikte delik kalır ve delik "harcama yoktu" diye okunur — yanlış bir cevap, hem de sessizce. |
+| **Ay dönümünde** | Zamanlayıcı gerekir. WorkManager dakika garantisi vermez (§18), Doze altında kayar; kaçan bir dönüm o ayı tamamen kaybettirir. |
+| **Her değişiklikte** ✅ | Yazma, toplamı değiştiren eylemin kendisine bağlı. Kullanıcı uygulamayı açmadıysa toplam da değişmemiştir; kaydedilecek yeni bir şey yoktur. |
+
+**Kural:** toplamı etkileyen bir şey değiştiğinde, **içinde bulunulan ay için
+tek satır upsert** edilir. Abonelik eklemek, silmek, geri almak; ana para
+birimini veya bir kuru değiştirmek — hepsi aynı yola çıkar.
+
+**KABUL EDİLEN BEDEL:** ay içinde ekleyip silen bir kullanıcıda o ayın kaydı
+**son duruma** göre kalır, ortalamaya değil. Bilerek: "geçen aya göre ne
+değişti" sorusunun cevabı ay sonundaki durumdur, ay boyunca dolaşılan yol değil.
+
+İkinci, küçük bir bedel: ay dönümü uygulama açıkken geçerse yeni ayın satırı o
+ayki **ilk değişiklikte** açılır, gece yarısında değil. Kayıt yine doğru aya
+yazılır — yalnızca biraz geç.
+
+### Nerede: `domain/usecase/MonthlySnapshotRecorder`, ViewModel'de değil
+
+Toplam bir ekranın değil, **saklanan verinin** özelliği. Değişiklik listeden de
+gelebilir, ayarlardaki para birimi seçicisinden de, kur ekranından da; üçünde de
+kaydedilmeli. Bir ViewModel yalnızca kendi ekranının gördüğünü kaydederdi.
+
+**Filtre tuzağı — asıl sebep.** Ana ekranın toplamı kategori filtresini izler
+(§4). `HomeUiState.total` filtre açıkken **filtrelenmiş** figürdür. Oradan
+kaydetmek, filtre açıkken yanlış sayıyı yazmak demekti. Recorder repository'yi
+doğrudan okuduğu için filtre **görünmüyor bile**: hata kaçınılan değil,
+**ulaşılamaz** bir hâle geldi. Cihazda ölçüldü — ekran `TRY 25,00` derken
+tabloya `TRY 125,00` yazıldı.
+
+Kaydedilen figür her zaman **aylık**tır. Yıllık görünüm bir gösterim tercihidir
+(§6), veri değil; iki span saklamak ikisinin çelişmesine izin vermek olurdu.
+
+Bugünün ayı enjekte edilmiş `Clock`'tan (`YearMonth.now(clock)`) okunur, asla
+`LocalDate.now()` ile değil (§17).
+
+### Neden sonsuz döngü olmuyor
+
+Girdiler `subscriptions` tablosu ve DataStore tercihleri; çıktı **başka bir
+tablo**. Room, yalnızca yazılan tabloyu okuyan sorguları yeniden çalıştırır ve
+burada `monthly_snapshots`'ı gözleyen hiçbir akış yok —
+`MonthlySnapshotRepository.getByPeriod` tek seferlik bir okuma, Flow değil.
+Yani yazılan anlık görüntü yeni bir emisyon üretemez. **Yapısal garanti.**
+
+İkinci savunma hattı: değer değişmediyse yazılmaz. Bir yeniden adlandırma
+listeyi yeniden yayınlar ama toplamı oynatmaz; o durumda satır elden geçmez ve
+`recordedAt` da yerinde kalır. İleride tabloyu gözleyen bir akış eklense bile
+döngü tek turda dururdu.
+
+Recorder süreç ömrü boyunca yaşayan bir gözlemci; `@ApplicationScope`
+`CoroutineScope`'u `di/CoroutineModule` sağlıyor ve `SubTrackApplication`
+başlatıyor — hatırlatma zamanlayıcısıyla aynı yerde.
+
+Yazma hatası **bilerek yutulur**: söyleyecek bir ekran yok (kullanıcının yaptığı
+işin arkasında koşuyor) ve bir ayın defter kaydını kaybetmek, uygulamayı
+düşürmekten çok daha küçük bir zarar. `CancellationException` yutulmaz.
+
+### Boş liste: sıfır yazılır, atlanmaz
+
+Faz 13'ün **"o ay hiç abonelik yoktu"** ile **"o ay kayıt yok"** ayrımını
+yapabilmesi gerek. Bu ancak yokluğun gerçekten yokluk anlamına gelmesiyle
+mümkün: liste boşsa o ay `0` olarak kaydedilir. Temiz kurulumda uygulamanın ilk
+açılışı bu yüzden `0`'lık bir satır bırakır — "baktım, sıfırdı" demek.
+
+### Dönem gösterimi: tek `Int`, `yıl * 100 + ay`
+
+Eylül 2026 → `202609`.
+
+- **Sıralanabilir:** ay her zaman iki basamak olduğu için sayısal sıra takvim
+  sırasıdır; `ORDER BY period` tek sütunla yeter.
+- **Tekil:** bir değer tek bir takvim ayı demek, dolayısıyla doğal birincil
+  anahtar. Upsert var olan satıra iner, aynı ay için ikinci satır açılamaz.
+- **Zaman dilimi yok:** ay bir takvim olgusudur, bir an değil. Epoch millis
+  okunurken zaman dilimi ister ve sınırdakiler için yanlış ayı verir.
+- **İki sütun değil:** bileşik anahtar ve iki sütunlu `ORDER BY` gerekirdi,
+  karşılığında hiçbir şey kazandırmadan.
+- `run-as` ile alınan bir dökümde **okunabilir** kalır; bu tablonun cihazda
+  doğrulanma biçimi tam olarak budur.
+
+Domain tarafında `java.time.YearMonth` — gün yok, çünkü gün diye bir bilgi yok.
+Dönemi çözemeyen bir satır (elle düzenlenmiş, ya da yeni bir sürümün yazdığı)
+**atlanır**: uydurma bir ay grafiğe sahte bir nokta koymaktan iyidir.
+
+### Para birimi neden saklanıyor
+
+Kullanıcı ana para birimini değiştirebilir. Geçen ayın satırı, figürünün hangi
+birimde olduğunu **kendisi** taşımalı; yoksa sonraki okuyucu tahmin eder ve
+bugünkü tercihle tahmin eder. Faz 13 bu sütunu okuyacak.
+
+İçinde bulunulan ayın satırı, para birimi değişince yeni birimiyle yeniden
+yazılır (kural gereği: toplamı etkileyen bir değişiklik). Geçmiş ayların
+satırlarına dokunulmaz.
+
+### `@Upsert`, `OnConflictStrategy.REPLACE` değil
+
+`REPLACE`, SQLite'ta çakışmayı **satırı silip yenisini eklemek** suretiyle
+çözer: silme tetikleyicilerini ateşler ve bağlı satırları da götürür. `@Upsert`
+ekler, anahtar çakışırsa yerinde günceller — satır kimliğini korur. "Aynı ay,
+revize edildi" zaten budur.
 
 ---

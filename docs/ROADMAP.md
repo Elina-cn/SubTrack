@@ -317,22 +317,28 @@ taşınıyor.
 
 ---
 
-## ⬜ Faz 12a — Geçmiş Takibi
+## ✅ Faz 12a — Geçmiş Takibi
 
 Aylık toplamın zaman içindeki anlık görüntüleri. `PROJECT_SPEC.md` §1'deki
 "geçen aya göre ne değişti?" vaadinin veri tarafı.
 
-- [ ] `MonthlySnapshotEntity` — dönem, toplam (kuruş), para birimi, kayıt zamanı
-- [ ] `MonthlySnapshotDao` — `observeAll`, `upsert`, dönem bazlı sorgu
-- [ ] Anlık görüntünün ne zaman yazılacağı karara bağlansın (uygulama açılışı,
-      ay dönümü, veya her değişiklikte üzerine yazma)
-- [ ] Domain modeli + mapper, mevcut desene uygun
-- [ ] Ana ekranda "geçen aya göre" karşılaştırması
+- [x] `MonthlySnapshotEntity` — dönem, toplam (kuruş), para birimi, kayıt zamanı.
+      Dönem tek bir `Int`: `yıl * 100 + ay` (202609), birincil anahtar —
+      sıralanabilir, tekil, `run-as` dökümünde okunabilir (`ARCHITECTURE.md` §19)
+- [x] `MonthlySnapshotDao` — `observeAll` (en eski ay önce), `@Upsert`,
+      `getByPeriod`
+- [x] Anlık görüntünün ne zaman yazılacağı karara bağlandı: **her değişiklikte
+      üzerine yazma.** Üç seçeneğin gerekçesi ve kabul edilen bedel §19'da
+- [x] Domain modeli + mapper, mevcut desene uygun; `MonthlySnapshotRecorder`
+      veri katmanında — ekranın filtreli toplamına erişemediği için filtre tuzağı
+      **ulaşılamaz**
+- [x] **Faz 2'den beri ilk şema değişikliği:** sürüm 1 yeniden üretildi,
+      migration yazılmadı, `app/schemas/1.json` commit'e dahil
 
-> **Şema sürümü — karara bağlandı:** Sürüm 1 **yeniden üretilecek**, migration
-> yazılmayacak. Uygulama yayınlanmadığı için korunacak kullanıcı verisi yok.
-> Kural ve gerekçesi ARCHITECTURE §12 *"Şema sürümlemesi"* başlığında; yayından
-> sonra migration zorunlu hale geliyor.
+> **Şema sürümü — uygulandı:** Sürüm 1 **yeniden üretildi**, migration
+> yazılmadı. Uygulama yayınlanmadığı için korunacak kullanıcı verisi yoktu.
+> Kural ve gerekçesi ARCHITECTURE *"Şema sürümlemesi"* başlığında; **yayından
+> sonra migration zorunlu hale geliyor** ve o satır Faz 16'da tekrar okunacak.
 
 ---
 
@@ -341,6 +347,15 @@ Aylık toplamın zaman içindeki anlık görüntüleri. `PROJECT_SPEC.md` §1'de
 - [ ] Kategori dağılım grafiği
 - [ ] Aylık trend — **Faz 12a'daki anlık görüntüleri okur**, o faz olmadan
       gösterecek veri yok
+- [ ] **Ana ekranda "geçen aya göre" karşılaştırması** — Faz 12a'dan taşındı.
+      Karşılaştırma en az **iki ayrı ayın** verisini gerektiriyor; 12a'nın
+      bittiği gün tabloda tek ay vardı, dolayısıyla gösterilecek bir şey yoktu.
+      Veri tarafı hazır, kalan iş gösterim
+- [ ] "O ay hiç abonelik yoktu" ile "o ay kayıt yok" **ayrı çizilmeli** — 12a
+      boş listeyi bilerek `0` olarak kaydediyor (§19), grafik bunu yokluktan
+      ayırmalı
+- [ ] Eski kayıtların **kendi para biriminde** yazıldığı unutulmamalı — satır
+      `currencyCode` taşıyor, bugünkü tercihle yorumlanmamalı
 - [ ] En pahalı abonelikler
 
 ---

@@ -27,6 +27,175 @@ Her faz sonunda **en üste** yeni kayıt eklenir. Eski kayıtlar silinmez.
 
 ---
 
+## [Faz 12a] Geçmiş Takibi — Aylık Anlık Görüntüler — 2026-09-14
+
+**Durum:** Tamamlandı. Projenin Faz 2'den beri **ilk şema değişikliği**.
+Bu faz **yalnızca veri katmanı** — ekranda hiçbir şey değişmedi.
+
+### Şema: sürüm 1 yeniden üretildi, migration yok
+
+`monthly_snapshots` tablosu sürüm 1'e eklendi. Migration yazılmadı, sürüm
+numarası 1 kaldı, `app/schemas/.../1.json` yeniden üretilip commit'e dahil
+edildi. Diff'te değişen tek şey `identityHash` ve eklenen tablo;
+`subscriptions` tanımına dokunulmadı.
+
+```
+CREATE TABLE IF NOT EXISTS `monthly_snapshots` (
+  `period` INTEGER NOT NULL, `totalInCents` INTEGER NOT NULL,
+  `currencyCode` TEXT NOT NULL, `recordedAt` INTEGER NOT NULL,
+  PRIMARY KEY(`period`))
+```
+
+Kural (`ARCHITECTURE` *"Şema sürümlemesi"*) **Faz 16'da bitiyor**; o satır
+silinmedi, yanına bu fazın uygulandığı not düşüldü.
+
+### Dönem gösterimi: tek `Int`, `yıl * 100 + ay`
+
+Eylül 2026 → `202609`. Seçildi çünkü: **sıralanabilir** (ay iki basamak olduğu
+için sayısal sıra takvim sırası), **tekil** (bir değer tek bir ay → doğal
+birincil anahtar, upsert ikinci satır açamaz), **zaman dilimsiz** (ay bir
+takvim olgusu, an değil; epoch sınırdakilere yanlış ayı verirdi) ve `run-as`
+dökümünde **okunabilir** — bu tablonun cihazda doğrulanma biçimi tam olarak bu.
+İki sütun bileşik anahtar ve iki sütunlu sıralama isterdi, karşılığında hiçbir
+şey kazandırmadan.
+
+Domain tarafı `java.time.YearMonth`. Dönemi çözemeyen bir satır **atlanır** —
+uydurma bir ay, grafiğe sahte bir nokta koymaktır.
+
+### Para birimi neden satırda
+
+Kullanıcı ana para birimini değiştirebiliyor; geçen ayın satırı figürünün hangi
+birimde olduğunu kendisi taşımalı, yoksa sonraki okuyucu bugünkü tercihle tahmin
+eder. Faz 13 bu sütunu okuyacak.
+
+### Upsert: `@Upsert`, `OnConflictStrategy.REPLACE` değil
+
+`REPLACE` çakışmayı **satırı silip yenisini ekleyerek** çözer: silme
+tetikleyicilerini ateşler, bağlı satırları götürür. `@Upsert` ekler, anahtar
+çakışırsa **yerinde günceller** — satır kimliği korunur, ki "aynı ay, revize
+edildi" zaten budur. Enstrümantasyonla sabitlendi.
+
+### Yazma tetikleyicisi: `domain/usecase/MonthlySnapshotRecorder`
+
+**Neden ViewModel değil.** Promptun DOKUNMA listesi `ui/` altındaki hiçbir
+dosyaya izin vermiyordu, ama karar zaten bağımsız olarak aynı yere çıkıyordu:
+toplam bir ekranın değil saklanan verinin özelliği, ve değişiklik listeden de
+gelebilir ayarlardaki para birimi seçicisinden de kur ekranından da.
+
+**Filtre tuzağı — asıl gerekçe.** `HomeUiState.total` kategori filtresini
+izliyor, yani filtre açıkken **filtrelenmiş** figür. Oradan kaydetmek yanlış
+sayıyı yazmak olurdu. Recorder repository'yi doğrudan okuduğu için filtre
+**görünmüyor bile**: hata kaçınılan değil **ulaşılamaz**. Cihazda ölçüldü —
+ekran `TRY 25,00` derken tabloya `TRY 125,00` yazıldı.
+
+**Sonsuz döngü neden yok.** Girdiler `subscriptions` tablosu ve DataStore
+tercihleri; çıktı **başka bir tablo**. Room yalnızca yazılan tabloyu okuyan
+sorguları yeniden çalıştırır ve burada `monthly_snapshots`'ı gözleyen hiçbir
+akış yok — `getByPeriod` tek seferlik bir okuma, Flow değil. **Yapısal
+garanti.** İkinci hat: değer değişmediyse yazılmaz, yani tabloyu gözleyen bir
+akış ileride eklense bile döngü tek turda dururdu.
+
+Aylık figür saklanır (yıllık görünüm gösterim tercihi, veri değil). Ay
+`YearMonth.now(clock)` ile enjekte edilmiş saatten okunur. Yazma hatası bilerek
+yutulur — söyleyecek ekran yok, ve bir ayın defter kaydı uygulamayı düşürmeye
+değmez; `CancellationException` yutulmaz.
+
+Recorder süreç ömrü boyunca yaşıyor; `@ApplicationScope` `CoroutineScope`'u
+`di/CoroutineModule` sağlıyor, `SubTrackApplication` başlatıyor — hatırlatma
+zamanlayıcısıyla aynı yerde.
+
+### Boş liste: `0` yazılır
+
+Faz 13'ün "o ay hiç abonelik yoktu" ile "o ay kayıt yok" ayrımını yapabilmesi
+için yokluğun gerçekten yokluk anlamına gelmesi gerek. Temiz kurulumda ilk
+açılış bu yüzden `0`'lık bir satır bırakıyor — "baktım, sıfırdı".
+
+### Testler
+
+202 → **223 birim testi** (11 mapper + 10 recorder), 0 hata.
+11 → **19 enstrümantasyon testi** (8 yeni DAO testi), iki emülatörde de OK.
+`lintDebug` **0 hata, 23 uyarı** (15'i `libs.versions.toml` sürüm tazeliği).
+
+Recorder testinde `advanceUntilIdle()` **çalışmıyor**: coroutines-test 1.8'den
+beri yalnızca *ön plandaki* iş bitene kadar ilerletiyor ve `backgroundScope`
+ön plan değil — bekleyen ön plan işi yokken hiç dağıtım yapmadan dönüyor.
+Ölçüldü (`advanceUntilIdle` → çalışmadı, `runCurrent`/`yield`/`delay` →
+çalıştı) ve `settle()` yardımcısı gerekçesiyle yazıldı. **Bu tuzak mevcut
+ViewModel testlerinde de var**, orada ön planda iş olduğu için görünmüyor.
+
+### Cihaz doğrulaması — iki emülatörde birebir aynı (API 29 · API 34)
+
+| | eylem | ekran | tabloda |
+|---|---|---|---|
+| | temiz kurulum, açılış | boş durum | `202609 · 0 · TRY` |
+| (c) | 100,00 ekle | `TRY 100.00` | `202609 · 10000 · TRY` |
+| (d) | 50,00 ekle | `TRY 150.00` | `202609 · 15000 · TRY`, **satır sayısı 1** |
+| (e) | birini sil | `TRY 100.00` | `202609 · 10000 · TRY`, satır sayısı 1 |
+| (f) | sil + geri al | sil anında `TRY 0.00` → `TRY 100.00` | `10000`'e geri, satır sayısı 1 |
+| (g) | **Health filtresi açıkken 25,00 ekle** | **`TRY 25.00`** | **`202609 · 12500 · TRY`** |
+| (h) | ana para birimi USD | `$2.92` | `202609 · 292 · USD` |
+| (i) | kapat-aç (pid değişti) | `$2.92` | aynı satır, **`recordedAt` bile değişmedi** |
+
+(g) bu fazın sınavıydı: ekrandaki **25,00** ile tablodaki **125,00** yan yana.
+(i) ayrıca "değer değişmediyse yazma" kuralını cihazda kanıtlıyor.
+
+**Yapılamayan ölçüm:** ay dönümü. Emülatör imajlarında root yok (`su`
+bulunamıyor, `date` "Operation not permitted") ve saat host'tan geliyor, yani
+cihazı başka bir aya taşıyamadım. "Yeni ay kendi satırını açar, eski satır
+para birimiyle birlikte olduğu gibi kalır" iddiası
+`MonthlySnapshotDaoTest.upsert_differentMonths_keepsBothRows` ve
+`MonthlySnapshotRecorderTest.record_anotherMonth_isItsOwnRowAndLeavesTheFirstAlone`
+ile kapalı — cihazda değil, testle.
+
+### 75 maddelik sabit regresyon
+
+İki emülatörde de koşuldu. Kayıtlı istisnalar önceki fazlarla aynı
+(**API 29**: #15 koyu tema ve #16 dil — `cmd uimode`/`cmd locale` bu imajda yok;
+#34-#37, #41-#45 API 33+ maddeleri. **API 34**: #40 ve #46 API < 33 maddeleri).
+
+**#12 (kapat-aç, veri duruyor) özellikle kontrol edildi** — şema değiştiği için
+kritikti: iki emülatörde de `Total Monthly, TRY 219.89` ve iki satır yerinde.
+Kurulu bir uygulamanın üzerine yeni tabloyu içeren sürüm kuruldu ve **veri
+kaybı olmadı**; tablo eklemek var olan tabloyu bozmuyor.
+
+### Değişen dosyalar
+
+- `data/local/entity/MonthlySnapshotEntity.kt`, `data/local/dao/MonthlySnapshotDao.kt` — yeni
+- `data/local/SubTrackDatabase.kt` — tablo eklendi, sürüm 1 kaldı
+- `app/schemas/.../1.json` — yeniden üretildi
+- `domain/model/MonthlySnapshot.kt`, `domain/repository/MonthlySnapshotRepository.kt` — yeni
+- `data/mapper/MonthlySnapshotMapper.kt`, `data/repository/MonthlySnapshotRepositoryImpl.kt` — yeni
+- `domain/usecase/MonthlySnapshotRecorder.kt`, `di/CoroutineModule.kt` — yeni
+- `di/DatabaseModule.kt`, `di/RepositoryModule.kt`, `SubTrackApplication.kt` — bağlama
+- testler: `MonthlySnapshotMapperTest`, `MonthlySnapshotRecorderTest`,
+  `MonthlySnapshotDaoTest`, `FakeMonthlySnapshotRepository`
+- `docs/ARCHITECTURE.md` §19 ve şema sürümlemesi, `docs/ROADMAP.md`,
+  `docs/TESTING.md`
+
+**Dokunulmayanlar:** `ui/` (hiçbir dosya), `reminder/`, `PaymentCountdown`,
+`NextPaymentDate`, `PaymentReminderSelection`, `SubscriptionEntity`,
+`SubscriptionDao`, `SubscriptionMapper`, Manifest, `Theme.kt`, `Color.kt`,
+`Dimens.kt`.
+
+### Karşılaşılan sorunlar
+
+- **Kenardan başlayan swipe silmiyor, geri tuşu oluyor.** API 34'te satırı
+  ekranın en sağından sürüklemek sistem "geri" hareketi; sürücü artık 200 px
+  içeriden başlıyor. TESTING.md'de #61 için zaten kayıtlıydı, silme için de
+  geçerli.
+- **Undo snackbar'ı 9 saniye**, veritabanını çekmek 3-4 saniye: silme sonrası
+  önce Undo'ya dokunulmalı, sonra tablo okunmalı. Ters sırada snackbar kaçıyor.
+- **Cihaz dili Türkçe'ye alınınca** FAB'ın açıklaması da Türkçe oluyor ve
+  sürücü "düğüm yok" diyordu; artık iki dili de tanıyor.
+
+### Açık kalan
+
+- **Ana ekranda "geçen aya göre" karşılaştırması Faz 13'e taşındı.** Bugün
+  tabloda tek ay var; karşılaştırma en az iki ay ister. ROADMAP'te gerekçesiyle
+  yazılı.
+
+---
+
 ## [Faz 12-2 hotfix] Bildirim ilerletilmiş tarihi okuyor, gecikme penceresi kalktı — 2026-09-13
 
 **Durum:** Tamamlandı. 12-2'de ölçülüp sohbete bırakılan iki soru da kapandı:
