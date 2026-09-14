@@ -344,7 +344,13 @@ Aylık toplamın zaman içindeki anlık görüntüleri. `PROJECT_SPEC.md` §1'de
 
 ## ⬜ Faz 13 — İstatistik
 
-- [ ] Kategori dağılım grafiği
+**13a bitti, faz açık:** aylık trend ve "geçen aya göre" 13b'nin işi.
+
+- [x] **13a:** Kategori dağılım grafiği — Compose Canvas ile yatay çubuklar,
+      pasta değil; kategori başına renk yok, ayrımı etiket taşıyor. Yüzdeler en
+      büyük kalan yöntemiyle **her zaman 100** ediyor (`ARCHITECTURE.md` §20)
+- [x] **13a:** En pahalı abonelikler — aylık maliyete göre sıralı, ilk beş
+- [x] **13a:** Üçüncü hedef ve ana ekranın üst çubuğundan giriş (§13)
 - [ ] Aylık trend — **Faz 12a'daki anlık görüntüleri okur**, o faz olmadan
       gösterecek veri yok
 - [ ] **Ana ekranda "geçen aya göre" karşılaştırması** — Faz 12a'dan taşındı.
@@ -356,7 +362,12 @@ Aylık toplamın zaman içindeki anlık görüntüleri. `PROJECT_SPEC.md` §1'de
       ayırmalı
 - [ ] Eski kayıtların **kendi para biriminde** yazıldığı unutulmamalı — satır
       `currencyCode` taşıyor, bugünkü tercihle yorumlanmamalı
-- [ ] En pahalı abonelikler
+
+> **Renklendirme Faz 14'e bırakıldı.** 13a'da çubuklar tek renk çizildi: paletimizde
+> dört ayrı **tanımlı** rol yok ve şimdi icat etmek Faz 14'ün geri alacağı bir
+> borç olurdu (§20). Palet bütün olarak ele alınırken kategori başına renk
+> yeniden değerlendirilsin. Koyu şemada `primary` ile `primaryContainer`'ın aynı
+> renk olduğu da orada çözülmeli — 13a bunu çubuk izini saydamlaştırarak geçti.
 
 ---
 

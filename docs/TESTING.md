@@ -127,6 +127,17 @@ etmeden bildirin; sonraki maddeler zaten bozuk bir durumun üstüne binebilir.
 | 74 | Bugünün tarihi | "Bugün ödenecek" **korunuyor** | 12-2 |
 | 75 | Geçmiş tarihli bir aboneliği kaydettikten sonra veriyi oku | Saklanan tarih **değişmemiş** — ilerletme yalnızca ekranda (`run-as` ile `subtrack.db`) | 12-2 |
 
+| 76 | Ana ekran üst çubuğundaki grafik ikonuna bas | İstatistik ekranı açılıyor; ikon ayarların **solunda** | 13a |
+| 77 | Geri oku, sonra sistem geri tuşu | İkisi de ana ekrana dönüyor; bir kez daha geri → uygulamadan çıkıyor, yığında **birikme yok** | 13a |
+| 78 | Dört kategoriye yayılmış, karışık para birimli ve periyotlu abonelikler kur | Her kategorinin tutarı elle hesapla **birebir** aynı; figürler aylık | 13a |
+| 79 | Ekrandaki yüzdeleri topla | Tam **100** — her pay tek başına yuvarlansaydı 99 veya 101 olurdu | 13a |
+| 80 | En pahalı listesi | **Aylık maliyete** göre sıralı, en fazla beş satır; her satırda periyot yazıyor (yıllık abonelik onikide biriyle görünür) | 13a |
+| 81 | Ana ekranda kategori filtresi açıkken istatistiğe gir | **Tüm** abonelikler görünüyor; filtreli ana ekran toplamı ile istatistik toplamı farklı olabilir ve bu doğrudur | 13a |
+| 82 | Hiç abonelik yokken istatistiğe gir | Boş durum: "Henüz istatistik yok / Bir abonelik ekleyince dağılım burada çıkar" | 13a |
+| 83 | Tutarı sıfır olan kategori | Satır **hiç yok** — sıfırlık çubuk çizilmiyor | 13a |
+| 84 | TalkBack ile dağılım satırı | **Tek odak durağı**: "Sağlık, 2.002,00 TL, yüzde 75". Canvas ağaçta yok, telafi edilmiş olmalı | 13a |
+| 85 | Koyu tema (API 34) | Çubukların dolu kısmı iziyle **ayrı renkte**; %75 ile %2 bakışta ayrılıyor | 13a |
+
 **Klavye açıkken buton erişilebilirliği — her fazda kontrol edilecek**
 
 Metin alanı olan **her** ekranda, klavye açıkken ekranın alt kısmındaki

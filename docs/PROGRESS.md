@@ -27,6 +27,188 @@ Her faz sonunda **en üste** yeni kayıt eklenir. Eski kayıtlar silinmez.
 
 ---
 
+## [Faz 13a] İstatistik Ekranı: Kategori Dağılımı ve En Pahalı Abonelikler — 2026-09-14
+
+**Durum:** Tamamlandı. **Faz 13 AÇIK** — aylık trend ve "geçen aya göre"
+karşılaştırması 13b'nin işi. Snapshot tablosuna dokunulmadı.
+
+### Ekran ve giriş noktası
+
+Üçüncü hedef (`Destination.STATISTICS`, düz `String` sabiti — §13). Giriş ana
+ekranın üst çubuğundan, **ayarların solundan**: ayarlar Faz 9'dan beri en sağda
+ve kullanıcının bildiği hedef yerinden oynatılmadı.
+
+**İkon:** mevcut dokuz isim (PlayArrow, List, ArrowBack, Star, Settings, Delete,
+DateRange, Cloud, Add) arasında "istatistik" diye okunan yok — `DateRange` tarih,
+`List` liste demek. **`Icons.Default.BarChart`** eklendi; onuncu isim ve ekranın
+çizdiği şeyin tam karşılığı. Boş durum da aynı ikonu kullanıyor, on birinciye
+gerek kalmadı (Faz 16 ikon daraltmasında sayı önemli).
+
+`hiltViewModel()` yalnızca `composable` bloğunda; ekran durumsuz ve Hilt grafı
+olmadan preview ediliyor.
+
+### `Event` tipi yok — bilinçli bir sapma
+
+§5 her ekran için tek `UiState` **ve** tek `onEvent` istiyor. Bu ekranda
+yapılacak hiçbir şey yok; boş bir `sealed interface` ve dalsız bir `onEvent`
+mimari değil merasim olurdu. §5'e kuralın gerekçesini koruyan bir cümle eklendi
+(gerekçe altı lambda yerine tek giriş noktası; lambda yoksa kural da boşta).
+
+### Hesaplar — `domain/usecase/SubscriptionStatistics`
+
+Saf fonksiyonlar; repository, saat, Android yok. Para aritmetiğinin tamamı
+**mevcut `CurrencyConverter` zinciri** (12-1) — ikinci bir toplam yazılmadı.
+Figürlerin hepsi **aylık**.
+
+- **Kategori dağılımı:** her kategori bir **grup** olarak toplanıyor, satır satır
+  değil; her figür bir kez yuvarlanıyor (dashboard toplamıyla aynı kural).
+- **En pahalı:** **beş** satır. Liste "büyükler hangileri" sorusunun cevabı;
+  360dp'de dağılımın altına sığıyor ve ana ekranın ikinci kopyasına dönüşmüyor.
+  Sıralama **aylık maliyete** göre — yıllık 1.200,00 ile aylık 100,00 aynı şeye
+  mal olur. Uygulamadaki **satır başına çevrilmiş tek figür**; birbirleriyle
+  toplanmadıkları için satır başına yuvarlama kendisiyle çelişen bir toplam
+  üretemez.
+- **Oranlar:** **en büyük kalan yöntemi**. Her payı tek başına yuvarlamak üç eşit
+  üçte biri 33+33+33=99 yapıyor. Tamsayı aritmetiği, `Double` yok (§6).
+- **Sıfıra bölme:** toplam sıfırsa hiçbir bölme yapılmaz, hepsi sıfır. Testle
+  kapalı.
+
+### Çizim — Compose Canvas, yatay çubuk, tek renk
+
+Grafik kütüphanesi **eklenmedi** (`PROJECT_SPEC.md` §5). Pasta değil çubuk:
+360dp'de elle çizilmiş bir pastanın dört etiketi üst üste biner, ve bir çubuğun
+uzunluğu **yazılabilir** bir yüzdedir — ekran okuyucu için belirleyici oldu.
+
+Kategori başına renk yok: paletimizde dört ayırt edilebilir **tanımlı** rol yok
+ve şimdi icat etmek Faz 14'ün geri alacağı borç olurdu. Ayrımı etiket taşıyor.
+
+**Oran gösterimi hem tutar hem yüzde.** Tutar "ne kadar", yüzde "bunun ne
+kadarı" sorusunun cevabı; çubuk ikincisini çiziyor, birincisini hiçbir şey
+çizmiyor.
+
+**Sıfır tutarlı kategori satırı yok.** Dört kategori sabit bir sözlük, sabit bir
+cevap listesi değil; "Sağlık, 0,00, %0" hiçliğin çubuğunu çizer ve ekran
+okuyucuya boş bir durak verir. Faz 11a'da `OTHER`'ı kartlardan uzak tutan
+gerekçenin aynısı.
+
+### Erişilebilirlik
+
+`Canvas` erişilebilirlik ağacında **yok**. Her satır `clearAndSetSemantics` ile
+tek bir odak durağı ve tek bir cümle. Ölçüldü, iki emülatörde de:
+
+```
+nodes in the row subtree: 1 (the row itself included)
+   class=android.view.View  desc='Health, TRY 2,002.00, 75 percent'  text=''
+nodes in one "most expensive" row: 1
+   class=android.view.View  desc='Health1, Weekly, TRY 2,002.00 a month'
+```
+
+### Testler
+
+223 → **235 birim testi** (12 yeni), 0 hata. `lintDebug` **0 hata, 24 uyarı** —
+yeni olan tek uyarı `statistics_category_description`'daki `PluralsCandidate`
+("%1$d percent"); İngilizcede "percent" çekimlenmiyor, yani çoğul biçim aynı
+metni ikinci kez yazmak olurdu. Aynı türden iki uyarı zaten listede
+(`error_date_too_far`).
+
+### Cihaz doğrulaması — iki emülatörde birebir aynı (API 29 · API 34)
+
+Fikstür: dört kategori, üç para birimi, üç periyot. Elle hesap:
+
+| kategori | içerik | elle | ekranda |
+|---|---|---|---|
+| Health | 10,00 EUR haftalık → ×52/12 ×46,20 | **2.002,00 TL** | `TRY 2,002.00, 75 percent` |
+| Productivity | 10,00 USD aylık ×42,85 | **428,50 TL** | `TRY 428.50, 16 percent` |
+| Entertainment | 100,00 aylık + 1.200,00 yıllık | **200,00 TL** | `TRY 200.00, 7 percent` |
+| Other | 50,00 + 1,00 aylık | **51,00 TL** | `TRY 51.00, 2 percent` |
+
+**(c) 75 + 16 + 7 + 2 = 100.** Elle hesapta da tabanlar 74+15+7+1 = 97 ediyor ve
+artan üç puan en çok kırpılanlara (Prod, Other, Health) gidiyor.
+
+**(d)** En pahalı, ham metinle: `Health1 Weekly 2.002,00` · `Prod1 Monthly
+428,50` · `Ent1 Monthly 100,00` · `Ent2 Yearly 100,00` · `Other1 Monthly 50,00`.
+Altıncı abonelik ("Small", 1,00) **kesildi**. Eşitlikte ada göre sıra (Ent1 <
+Ent2) tutuyor.
+
+**(e) filtre tuzağı — bu maddenin kanıtı:**
+
+| | ekran |
+|---|---|
+| Ana ekran, Health filtresi açık | `Total Monthly, TRY 2,002.00` — tek satır |
+| Aynı anda istatistik ekranı | dört kategori, toplamı **2.681,50** |
+
+**(a)** İkon ekranı açıyor; geri oku ve sistem geri tuşu ikisi de ana ekrana
+dönüyor, bir kez daha geri uygulamadan çıkarıyor — yığında birikme yok.
+
+**(f)** Boş durum ham metni: `Nothing to chart yet, Add a subscription and the
+breakdown appears here` (tek düğüm).
+
+### Cihazın söylediği, akıl yürütmenin söylemediği iki kusur
+
+1. **Koyu temada her çubuk dolu görünüyordu.** İz için `primaryContainer`
+   seçilmişti; koyu şemada `primary` ve `primaryContainer` **ikisi de
+   PastelBlue**, yani çubuk ile izi aynı renkti. Ekran görüntüsüyle görüldü. İz
+   artık çubuğun kendi renginin saydamlaştırılmış hâli
+   (`primary.copy(alpha = 0.24f)`): iki temada da dolu kısma karışamaz, yeni
+   renk icat etmez. Düzeltmeden sonra %75 · %16 · %7 · %2 bakışta ayrılıyor.
+2. **fs 2.0'da etiket tutara yapışıyordu** — `SpaceBetween`'in dağıtacak boşluğu
+   kalmıyor ve "ProductivityTRY 428,50" tek kelime gibi okunuyordu. Etiket artık
+   kalan genişliği alıp kendi içinde sarıyor, araya boşluk konuyor.
+
+**(g)** fs 2.0'da kırpılma yok, iki emülatörde de her satır ekran içinde
+(API 34: `[42,…][1038,…]`, ekran 1080; API 29: `[32,…][688,…]`, ekran 720).
+**Bilinen sınır:** etiket kendi payına sığmadığında kelime ortasından bölünüyor
+("Productivit / y"). Üst üste binme veya kırpılma değil; §20'de yazılı.
+
+**(h)** Koyu tema (API 34): düzeltmeden sonra çubuklar ayrışıyor, metinler
+okunur.
+
+### 85 maddelik sabit regresyon
+
+Liste 75 → **85** madde (13a'nın on maddesi eklendi). İki emülatörde de koşuldu.
+Kayıtlı istisnalar önceki fazlarla aynı (**API 29**: #15 koyu tema ve #16 dil —
+`cmd uimode`/`cmd locale` bu imajda yok; #34-#37, #41-#45 API 33+ maddeleri.
+**API 34**: #40 ve #46 API < 33 maddeleri).
+
+Ana ekranın üst çubuğu değiştiği için 1-19 özellikle bakıldı; hepsi geçti.
+
+### Değişen dosyalar
+
+- `ui/statistics/` — `StatisticsScreen`, `StatisticsUiState`, `StatisticsViewModel`
+- `ui/statistics/components/` — `CategoryBarRow`, `ExpensiveSubscriptionRow`
+- `domain/usecase/SubscriptionStatistics.kt` — yeni
+- `ui/navigation/Destination.kt`, `SubTrackNavHost.kt` — üçüncü hedef
+- `ui/home/HomeScreen.kt` — yalnızca üst çubuğa ikon; `HomeScreenPreviews.kt`
+- `ui/common/EmptyState.kt` — `EmptyStatistics` (imza değişmedi)
+- `ui/theme/Dimens.kt` — çubuk ölçüleri
+- `res/values/strings.xml`, `res/values-en/strings.xml`
+- `test/.../StatisticsViewModelTest.kt` — yeni
+- `docs/ARCHITECTURE.md` §5, §13 ve yeni §20; `docs/ROADMAP.md`, `docs/TESTING.md`
+
+**Dokunulmayanlar:** `reminder/`, snapshot tarafı, `PaymentCountdown`,
+`NextPaymentDate`, `PaymentReminderSelection`, Room entity/dao/database,
+`app/schemas/`, `ui/settings/`, kur ekranı, `DashboardCard`, `SubscriptionCard`,
+`AndroidManifest.xml`, `Theme.kt`, `Color.kt`.
+
+### Karşılaşılan sorunlar
+
+- **Yüklü emülatörde sheet bir turda açılmıyor.** Sürücü artık sheet'in zaten
+  açık olup olmadığına bakıyor (açıkken FAB'a basmak sheet'e basmak demek) ve
+  açılmasını 15 saniyeye kadar bekliyor.
+- **Cihaz dili Türkçe'ye alınınca** FAB'ın açıklaması da Türkçe; sürücü artık
+  iki dili de tanıyor.
+- API 34 emülatörü tekrar tıkandı, `adb reboot` ile tazelendi — üründe karşılığı
+  yok.
+
+### Sonraki faz için not
+
+- **13b:** aylık trend + "geçen aya göre". `monthly_snapshots` hazır; "o ay
+  abonelik yoktu" ile "o ay kayıt yok" ayrımı çizilmeli (§19).
+- **Faz 14:** kategori başına renklendirme yeniden değerlendirilsin; koyu şemada
+  `primary` ile `primaryContainer`'ın aynı renk olması orada çözülmeli.
+
+---
+
 ## [Faz 12a] Geçmiş Takibi — Aylık Anlık Görüntüler — 2026-09-14
 
 **Durum:** Tamamlandı. Projenin Faz 2'den beri **ilk şema değişikliği**.

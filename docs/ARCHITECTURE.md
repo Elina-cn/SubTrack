@@ -147,6 +147,11 @@ fun onEvent(event: HomeEvent)
 `MutableStateFlow` **private** kalır. Composable'a 6 tane ayrı lambda
 geçirmiyoruz, tek `onEvent` yeterli.
 
+**Eylemi olmayan ekranda `Event` tipi de olmaz.** Kuralın gerekçesi altı lambda
+yerine tek giriş noktası; yapılacak hiçbir şey yoksa geçirilecek lambda da yok.
+İstatistik ekranı (Faz 13a) böyle: boş bir `sealed interface` ve dalsız bir
+`onEvent` mimari değil merasim olurdu (§20).
+
 ### Form alanları composable'da, listeyi etkileyen state ViewModel'da
 
 Kural iki cümle:
@@ -610,8 +615,12 @@ suspend fonksiyonu kullanılır — tek doğruluk kaynağı, yarış yok.
 ## 13. Navigation
 
 - Tek Activity, tek `NavHost` (`ui/navigation/SubTrackNavHost.kt`).
+- Hedefler: **ana ekran**, **ayarlar**, **kur ekranı**, **istatistik** (Faz 13a).
+  İstatistiğe giriş ana ekranın üst çubuğından, ayarlar ikonunun **solundan** —
+  ayarlar Faz 9'dan beri en sağda ve kullanıcının bildiği hedef yerinden
+  oynatılmadı.
 - Rotalar düz `String` sabiti (`ui/navigation/Destination.kt`). Type-safe rota
-  v1.0'da kullanılmıyor: argümansız iki hedef için kazancı yok ve AGP 9'da ek
+  v1.0'da kullanılmıyor: argüman alan hedef yok, yani kazancı yok, ve AGP 9'da ek
   derleyici plugin'i riski var (bkz. Faz 0, @Parcelize). Faz 15'te yeniden bakılacak.
 - `hiltViewModel()` yalnızca `composable` bloğunda çağrılır. Ekran composable'ları
   durumsuz kalır; preview'lar Hilt grafına ihtiyaç duymaz.
@@ -1209,5 +1218,117 @@ satırlarına dokunulmaz.
 çözer: silme tetikleyicilerini ateşler ve bağlı satırları da götürür. `@Upsert`
 ekler, anahtar çakışırsa yerinde günceller — satır kimliğini korur. "Aynı ay,
 revize edildi" zaten budur.
+
+---
+
+## 20. İstatistik Ekranı ve Grafik Çizimi
+
+Faz 13a: kategori dağılımı ve en pahalı abonelikler. Aylık trend ve "geçen aya
+göre" karşılaştırması 13b'nin işi; bu ekran snapshot tablosuna dokunmuyor.
+
+### Grafik kütüphanesi yok — Compose Canvas
+
+`PROJECT_SPEC.md` §5 üçüncü parti SDK'ları kapsam dışı bırakıyor ve bir çubuk
+listesi bir kütüphaneyi hak etmiyor: çizilen şey dolu bir dikdörtgen ile onun
+altındaki iz. `Canvas` zaten Compose'un içinde, APK'ya bir şey eklemiyor ve
+Faz 16'daki küçültme çalışmasına yeni bir bağımlılık taşımıyor.
+
+### Pasta değil, yatay çubuk
+
+360dp'de elle çizilmiş bir pastanın dört etiketi üst üste biner ve dilimlerin
+oranı ancak açıyla okunur. Çubuk listesi hem daha okunur hem de **metne
+çevrilebilir**: bir çubuğun uzunluğu bir yüzdedir ve yüzde yazılabilir. Ekran
+okuyucu için bu belirleyici oldu (aşağıya bakın).
+
+### Kategori başına renk YOK
+
+Paletimizde dört ayırt edilebilir **tanımlı** rol yok; `outline` ve
+`onSurfaceVariant` hâlâ tanımsız ve Material baseline'ına düşüyor (§12).
+Şimdi dört grafik rengi icat etmek, Faz 14'ün palet çalışmasında geri alınacak
+bir borç olurdu. Ayrımı **etiket** taşıyor, çubuk yalnızca büyüklüğü.
+
+> Faz 14 paleti bütün olarak ele alırken renklendirme yeniden değerlendirilebilir
+> — ROADMAP'te madde var.
+
+**İz (track) rengi ölçümle seçildi.** İlk deneme `primaryContainer`'dı ve yanlış
+çıktı: **koyu şemada `primary` ve `primaryContainer` ikisi de PastelBlue**, yani
+çubuk ile izi aynı renk oldu ve her kategori dolu göründü. API 34'te ekran
+görüntüsüyle görüldü, akıl yürütmeyle değil. İz artık çubuğun kendi renginin
+saydamlaştırılmış hâli (`primary.copy(alpha = 0.24f)`): iki temada da dolu kısma
+karışamaz ve yeni bir renk icat etmez. Üstünde metin olmadığı için bu, dashboard
+kartının reddettiği kontrast takası değil.
+
+### Oran gösterimi: hem tutar hem yüzde
+
+Tutar "ne kadar" sorusunun, yüzde "bunun ne kadarı" sorusunun cevabı. Çubuk
+ikincisini çiziyor, birincisini hiçbir şey çizmiyor. Yalnız yüzde bırakmak
+okuyucuyu bilinmeyen bir bütünün oranlarıyla baş başa bırakırdı; yalnız tutar
+bırakmak çubuğu kendi değerinin yazılı olmadığı tek yer hâline getirirdi.
+
+### Yüzdeler toplamı her zaman 100
+
+Her payı tek başına yuvarlamak üç eşit üçte biri 33 + 33 + 33 = 99 yapıyor ve
+parçaları bütünü etmeyen bir dağılım güvenilmez okunur. **En büyük kalan
+yöntemi** kullanılıyor: her pay aşağı yuvarlanır, artan puanlar en çok kırpılana
+verilir. Tamsayı aritmetiği; `Double` paranın yanına girmiyor (§6). Toplam
+sıfırsa hiçbir bölme yapılmaz, hepsi sıfırdır.
+
+### Sıfır tutarlı kategori satırı yok
+
+Dört kategori sabit bir **sözlük**, sabit bir cevap listesi değil. "Sağlık,
+0,00, %0" satırı hiçliğin çubuğunu çizer ve ekran okuyucuya kullanıcının sağlık
+aboneliği olmadığını söyleyen fazladan bir durak verir — ekranın sorusu bu
+değil. Aynı gerekçe Faz 11a'da `OTHER`'ı kartlardan uzak tutmuştu.
+
+### Erişilebilirlik: Canvas görünmez, satır konuşur
+
+`Canvas` erişilebilirlik ağacında **yok**; çizdiği oran hiçbir ekran okuyucuya
+ulaşmaz. Bu yüzden her satır `clearAndSetSemantics` ile **tek bir odak durağı**
+ve tek bir cümle: "Sağlık, 2.002,00 TL, yüzde 75". Ölçüldü — satır alt ağacında
+**tek düğüm** var (iki emülatörde de).
+
+`mergeDescendants` yetmezdi: birleştirme çocukları ağaçta bırakır ve delege
+birleştirilmemiş ağacı gezer — 8a'da dashboard kartı tam olarak buna takılmıştı.
+
+### En pahalı: beş satır, aylık maliyete göre
+
+Beş, çünkü liste "büyükler hangileri" sorusunun cevabı; listenin tamamının
+değil. 360dp'de dağılımın altına sığıyor ve bölüm ana ekranın ikinci bir
+kopyasına dönüşmüyor.
+
+Sıralama **aylık maliyete** göre, karttaki fiyata göre değil: yıllık 1.200,00
+ile aylık 100,00 aynı şeye mal olur ve listede yan yana durmalıdır. Bu yüzden
+her satırda **periyot yazıyor** — yoksa kartta 1.200,00 gösteren abonelik burada
+100,00 görünür ve iki sayı çelişki gibi okunur.
+
+Bu, uygulamada **satır başına çevrilmiş tek figür**. Birbirleriyle toplanmadığı
+için satır başına yuvarlama, kendisiyle çelişen bir toplam üretemez (§6).
+
+### Filtre tuzağı — üçüncü kez
+
+Ana ekranın toplamı kategori filtresini izler. İstatistik ekranı **her zaman
+tüm abonelikleri** gösterir ve bunu filtreyi hiç görmeyen bir kaynaktan okuyarak
+yapar: `StatisticsViewModel` repository'ye bakar, `HomeUiState`'e değil. 12a'daki
+snapshot kaydedicisiyle aynı çözüm, aynı gerekçe. Cihazda ölçüldü: filtreliyken
+ana ekran `TRY 2.002,00` derken istatistik ekranı dört kategoriyi ve
+`TRY 2.681,50`'yi gösteriyordu.
+
+### Bu ekranın `Event` tipi yok
+
+§5 her ekran için tek `UiState` ve tek `onEvent` istiyor; gerekçesi bir
+composable'a altı ayrı lambda geçirmemek. Bu ekranda **yapılacak hiçbir şey
+yok** — okur, eylemez. Boş bir `sealed interface` ve dalsız bir `onEvent`
+mimari değil merasim olurdu. Geri gitme, diğer ekranlardaki gibi kendi
+lambda'sıyla geliyor.
+
+### Bilinen sınır: fs 2.0'da etiket kelime ortasından bölünüyor
+
+Yazı ölçeği 2.0'da kategori etiketi kendi payına sığmadığı için kelime
+ortasından kırılıyor ("Productivit / y"). Kırpılma veya üst üste binme **yok**,
+iki emülatörde de ölçüldü. İlk hâlinde `SpaceBetween` yerleştirmeye boşluk
+bırakmıyordu ve etiket tutara yapışıyordu ("ProductivityTRY 428,50") — etiket
+artık kalan genişliği alıp kendi içinde sarıyor ve araya bir boşluk konuyor.
+Etikete daha fazla pay vermek tutarı sıkıştırırdı; büyük ölçeklerde satırı alt
+alta yığmak bir kırılma noktası ister ve bu fazın kapsamını aşar.
 
 ---
