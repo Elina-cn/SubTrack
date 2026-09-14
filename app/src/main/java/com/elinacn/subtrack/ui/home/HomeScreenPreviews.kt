@@ -35,7 +35,8 @@ private fun HomeScreenEmptyPreview() {
             uiState = HomeUiState(isLoading = false),
             onEvent = {},
             onNavigateToSettings = {},
-            onNavigateToStatistics = {}
+            onNavigateToStatistics = {},
+            onEditSubscription = {}
         )
     }
 }
@@ -48,7 +49,8 @@ private fun HomeScreenLoadingPreview() {
             uiState = HomeUiState(isLoading = true),
             onEvent = {},
             onNavigateToSettings = {},
-            onNavigateToStatistics = {}
+            onNavigateToStatistics = {},
+            onEditSubscription = {}
         )
     }
 }
@@ -65,7 +67,8 @@ private fun HomeScreenErrorPreview() {
             ),
             onEvent = {},
             onNavigateToSettings = {},
-            onNavigateToStatistics = {}
+            onNavigateToStatistics = {},
+            onEditSubscription = {}
         )
     }
 }
@@ -86,7 +89,8 @@ private fun HomeScreenPopulatedPreview() {
             ),
             onEvent = {},
             onNavigateToSettings = {},
-            onNavigateToStatistics = {}
+            onNavigateToStatistics = {},
+            onEditSubscription = {}
         )
     }
 }
@@ -110,7 +114,8 @@ private fun HomeScreenMixedCurrencyPreview() {
             ),
             onEvent = {},
             onNavigateToSettings = {},
-            onNavigateToStatistics = {}
+            onNavigateToStatistics = {},
+            onEditSubscription = {}
         )
     }
 }

@@ -50,9 +50,9 @@ import com.elinacn.subtrack.ui.theme.Dimens
  * The home screen. Stateless with respect to data: it renders [uiState] and reports back through
  * [onEvent], holding nothing but whether the add sheet is open.
  *
- * [onNavigateToSettings] and [onNavigateToStatistics] arrive as lambdas rather than a
- * NavController, so the screen knows only that those screens exist somewhere, not how to reach
- * them.
+ * [onNavigateToSettings], [onNavigateToStatistics] and [onEditSubscription] arrive as lambdas
+ * rather than a NavController, so the screen knows only that those screens exist somewhere, not
+ * how to reach them.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -61,6 +61,7 @@ fun HomeScreen(
     onEvent: (HomeEvent) -> Unit,
     onNavigateToSettings: () -> Unit,
     onNavigateToStatistics: () -> Unit,
+    onEditSubscription: (Long) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val moneyFormatter = rememberMoneyFormatter()

@@ -6,9 +6,13 @@ import androidx.compose.ui.Modifier
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
+import com.elinacn.subtrack.ui.edit.EditSubscriptionScreen
+import com.elinacn.subtrack.ui.edit.EditSubscriptionViewModel
 import com.elinacn.subtrack.ui.home.HomeScreen
 import com.elinacn.subtrack.ui.home.HomeViewModel
 import com.elinacn.subtrack.ui.settings.SettingsScreen
@@ -50,7 +54,30 @@ fun SubTrackNavHost(
                 },
                 onNavigateToStatistics = {
                     navController.navigate(Destination.STATISTICS) { launchSingleTop = true }
+                },
+                onEditSubscription = { id ->
+                    navController.navigate(Destination.editSubscription(id)) {
+                        launchSingleTop = true
+                    }
                 }
+            )
+        }
+
+        composable(
+            route = Destination.EDIT_SUBSCRIPTION,
+            // Declared as a Long here, which is what makes the id typed by the time the ViewModel
+            // reads it out of its SavedStateHandle - see Destination.
+            arguments = listOf(
+                navArgument(Destination.EDIT_SUBSCRIPTION_ARG) { type = NavType.LongType }
+            )
+        ) {
+            val viewModel: EditSubscriptionViewModel = hiltViewModel()
+            val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
+            EditSubscriptionScreen(
+                uiState = uiState,
+                onEvent = viewModel::onEvent,
+                onNavigateBack = { navController.popBackStack() }
             )
         }
 
