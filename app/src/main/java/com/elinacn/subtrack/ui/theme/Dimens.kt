@@ -86,6 +86,17 @@ object Dimens {
     val TrendChartHeight = 120.dp
 
     /**
+     * The widest a trend column is drawn, however few months there are.
+     *
+     * Without a ceiling the column is a share of the slot, and the slot is the width divided by the
+     * number of months: measured on the narrow emulator, two months gave columns 98dp wide, which
+     * read as two panels rather than as a chart. Six months come out at 33dp on a 360dp screen and
+     * 37dp on a 411dp one, so this cap leaves the full window untouched and only reins in the
+     * sparse one.
+     */
+    val TrendBarMaxWidth = 40.dp
+
+    /**
      * Corner radius of a trend column.
      *
      * Smaller than [BarCorner]: a column can be a few pixels tall, and a 6dp radius on a 2dp

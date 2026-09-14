@@ -31,6 +31,7 @@ import com.elinacn.subtrack.ui.theme.Dimens
 import com.elinacn.subtrack.ui.theme.SubTrackTheme
 import java.time.YearMonth
 import kotlin.math.max
+import kotlin.math.min
 
 /**
  * What the months cost, drawn as one column each and said in a sentence underneath the drawing.
@@ -47,6 +48,13 @@ import kotlin.math.max
  * else (§12), and the track is the bar's own colour faded - measured in phase 13a, where
  * primaryContainer turned out to be the same PastelBlue as primary in the dark scheme and made
  * every bar look full.
+ *
+ * The fade cannot be deepened to make an empty track easier to see. Measured on the device, a
+ * column reads 3.96:1 against the light background and 9.25:1 against the dark one, and 3.01:1
+ * against its own track in the light scheme - already at the 3:1 floor a graphical object is asked
+ * for. More alpha would move the track towards the column and take that below the floor. So the
+ * empty track stays faint, and the difference between "recorded as zero" and "no record" is
+ * carried in full by the sentence, which says one or the other in words.
  *
  * **Two sets of labels, neither of which can collide.** The scale is written once, above the plot,
  * as the highest month in the window; the months are written once each, under their own column.
@@ -98,7 +106,10 @@ fun MonthlyTrendChart(
                 .height(Dimens.TrendChartHeight)
         ) {
             val slotWidth = size.width / points.size
-            val barWidth = slotWidth * BAR_WIDTH_RATIO
+            // Capped, not just a share of the slot: two months would otherwise be drawn as two
+            // 98dp blocks - measured, not guessed - and a column's width would mean "how many
+            // months do you have" rather than nothing at all.
+            val barWidth = min(slotWidth * BAR_WIDTH_RATIO, Dimens.TrendBarMaxWidth.toPx())
             val corner = CornerRadius(Dimens.TrendBarCorner.toPx())
             val minimumHeight = Dimens.TrendBarMinHeight.toPx()
             val peakCents = peak?.cents ?: 0L
