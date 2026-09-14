@@ -200,6 +200,15 @@ Ana ekranın üst çubuğu değiştiği için 1-19 özellikle bakıldı; hepsi g
 - API 34 emülatörü tekrar tıkandı, `adb reboot` ile tazelendi — üründe karşılığı
   yok.
 
+### Commit'ler
+
+- `18551db` feat: add a statistics screen and a way into it
+- `1f19024` feat: work out where the money goes and which subscriptions are the big ones
+- `c7e94ad` feat: draw the breakdown as bars that a screen reader can also read
+- `aef9408` feat: list the dearest subscriptions by what they cost a month
+- `4816318` fix: two things the emulator said about the chart that reasoning did not
+- `06606d7` docs: record why the chart is hand-drawn, one colour, and readable aloud
+
 ### Sonraki faz için not
 
 - **13b:** aylık trend + "geçen aya göre". `monthly_snapshots` hazır; "o ay
