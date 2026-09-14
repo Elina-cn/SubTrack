@@ -150,4 +150,26 @@
     <string name="statistics_monthly_cost">ayda %1$s</string>
     <!-- Bir "en pahalı" satırının tek odak durağı olarak okunan hâli: ad, periyot, aylik maliyet. -->
     <string name="statistics_cost_description">%1$s, %2$s, ayda %3$s</string>
+
+    <!-- Aylık trend -->
+    <string name="statistics_trend">Aylık Trend</string>
+    <!-- Sıfır ve tek aylık hâlin ikisi için de doğru olan tek cümle. -->
+    <string name="statistics_trend_collecting">Trend için en az iki ay gerekiyor. Her ayın toplamı kaydediliyor; ikinci ay dolduğunda grafik burada çıkar.</string>
+    <!-- Grafiğin ölçeğinin tepesi: penceredeki en yüksek ay. -->
+    <string name="statistics_trend_scale">en yüksek %1$s</string>
+    <!-- Grafiğin tek odak durağı olarak okunan hâli; %1$s aylık liste. -->
+    <string name="statistics_trend_description">Aylık trend: %1$s</string>
+    <!-- Ay, tutar -->
+    <string name="statistics_trend_point">%1$s %2$s</string>
+    <!-- O ay için satır yok — "0,00" ile karıştırılmamalı. -->
+    <string name="statistics_trend_point_missing">%1$s kayıt yok</string>
+    <string name="statistics_trend_separator">", "</string>
+    <!-- Türkçede tek çoğul biçim var; yalnızca "other" kullanılıyor. -->
+    <plurals name="statistics_trend_other_currency">
+        <item quantity="other">Başka para biriminde kaydedilen %1$d ay gösterilmiyor</item>
+    </plurals>
+    <!-- Geçen aya göre değişim: yön sözcükle yazılıyor, renkle değil. -->
+    <string name="statistics_change_up">Geçen aya göre %1$s arttı</string>
+    <string name="statistics_change_down">Geçen aya göre %1$s azaldı</string>
+    <string name="statistics_change_same">Geçen aya göre değişmedi</string>
 </resources>

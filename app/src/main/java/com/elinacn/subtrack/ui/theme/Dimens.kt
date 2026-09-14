@@ -76,6 +76,32 @@ object Dimens {
     /** Gap between a breakdown bar and the label above it. */
     val BarLabelSpacing = 6.dp
 
+    /**
+     * Height of the trend chart's plot area.
+     *
+     * Tall enough that a month worth half of another is visibly half of it, short enough that the
+     * chart, its scale label and its month labels all fit under the sections above it on a 360dp
+     * screen without the reader losing the section heading off the top.
+     */
+    val TrendChartHeight = 120.dp
+
+    /**
+     * Corner radius of a trend column.
+     *
+     * Smaller than [BarCorner]: a column can be a few pixels tall, and a 6dp radius on a 2dp
+     * column draws a lens rather than a bar.
+     */
+    val TrendBarCorner = 3.dp
+
+    /**
+     * The least a column may be drawn as while still standing for a real amount.
+     *
+     * A month that cost a fraction of the peak rounds to no pixels at all, and a column of nothing
+     * is how this chart says "recorded as zero". Anything above zero gets at least this much so the
+     * two cannot be confused.
+     */
+    val TrendBarMinHeight = 2.dp
+
     /** Gap between an icon and the text that follows it. */
     val IconSpacing = 16.dp
 

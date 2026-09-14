@@ -149,4 +149,26 @@
     <string name="statistics_monthly_cost">%1$s a month</string>
     <!-- Spoken form of one "most expensive" row: name, billing period, monthly cost. -->
     <string name="statistics_cost_description">%1$s, %2$s, %3$s a month</string>
+
+    <!-- Monthly trend -->
+    <string name="statistics_trend">Monthly trend</string>
+    <!-- One sentence that is true of both the no-month and the one-month state. -->
+    <string name="statistics_trend_collecting">A trend needs at least two months. Each month\'s total is recorded as you go, and the chart appears once the second month is in.</string>
+    <!-- The top of the chart's scale: the highest month in the window. -->
+    <string name="statistics_trend_scale">peak %1$s</string>
+    <!-- Spoken form of the whole chart as one focus stop; %1$s is the list of months. -->
+    <string name="statistics_trend_description">Monthly trend: %1$s</string>
+    <!-- Month, amount -->
+    <string name="statistics_trend_point">%1$s %2$s</string>
+    <!-- No row for that month - not to be confused with "0.00". -->
+    <string name="statistics_trend_point_missing">%1$s no record</string>
+    <string name="statistics_trend_separator">", "</string>
+    <plurals name="statistics_trend_other_currency">
+        <item quantity="one">%1$d month recorded in another currency is not shown</item>
+        <item quantity="other">%1$d months recorded in another currency are not shown</item>
+    </plurals>
+    <!-- Change since last month: the direction is written in words, not carried by colour. -->
+    <string name="statistics_change_up">%1$s more than last month</string>
+    <string name="statistics_change_down">%1$s less than last month</string>
+    <string name="statistics_change_same">Unchanged from last month</string>
 </resources>

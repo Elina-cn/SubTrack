@@ -18,6 +18,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import com.elinacn.subtrack.R
@@ -27,6 +28,7 @@ import com.elinacn.subtrack.ui.common.labelRes
 import com.elinacn.subtrack.ui.common.rememberMoneyFormatter
 import com.elinacn.subtrack.ui.statistics.components.CategoryBarRow
 import com.elinacn.subtrack.ui.statistics.components.ExpensiveSubscriptionRow
+import com.elinacn.subtrack.ui.statistics.components.MonthlyTrendChart
 import com.elinacn.subtrack.ui.theme.Dimens
 import com.elinacn.subtrack.ui.theme.SubTrackTheme
 
@@ -70,7 +72,7 @@ fun StatisticsScreen(
                 .verticalScroll(rememberScrollState())
         ) {
             DelayedLoadingIndicator(isLoading = uiState.isLoading)
-            if (!uiState.isLoading && !uiState.hasAnySubscriptions) {
+            if (!uiState.isLoading && uiState.hasNothingToShow) {
                 EmptyStatistics()
             }
 
@@ -96,10 +98,56 @@ fun StatisticsScreen(
                         monthlyCost = moneyFormatter.format(cost.monthlyCost, uiState.currency)
                     )
                 }
-                Spacer(modifier = Modifier.height(Dimens.SpacerXLarge))
             }
+
+            // The trend stands down only when the whole screen has nothing to say - otherwise it
+            // is shown even with one month behind it, because "collecting" is the honest answer
+            // and the usual one for a new user.
+            if (!uiState.isLoading && !uiState.hasNothingToShow) {
+                SectionTitle(text = stringResource(id = R.string.statistics_trend))
+                if (uiState.canDrawTrend) {
+                    MonthlyTrendChart(
+                        points = uiState.trend,
+                        peak = uiState.trendPeak,
+                        currency = uiState.currency
+                    )
+                } else {
+                    TrendNotice(text = stringResource(id = R.string.statistics_trend_collecting))
+                }
+                if (uiState.monthsInOtherCurrency > 0) {
+                    TrendNotice(
+                        text = pluralStringResource(
+                            id = R.plurals.statistics_trend_other_currency,
+                            count = uiState.monthsInOtherCurrency,
+                            uiState.monthsInOtherCurrency
+                        )
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(Dimens.SpacerXLarge))
         }
     }
+}
+
+/**
+ * A paragraph under the trend: either why there is no chart yet, or what the chart is not showing.
+ *
+ * Plain text rather than an [EmptyStatistics]-style block with a glyph. This is a note inside a
+ * section, not an empty screen, and a second illustrated empty state under the breakdown would
+ * read as a second page.
+ */
+@Composable
+private fun TrendNotice(text: String, modifier: Modifier = Modifier) {
+    Text(
+        text = text,
+        modifier = modifier.padding(
+            horizontal = Dimens.ScreenPadding,
+            vertical = Dimens.RowSpacing
+        ),
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onBackground
+    )
 }
 
 /** The heading over one section, indented and spaced like the home screen's own. */
