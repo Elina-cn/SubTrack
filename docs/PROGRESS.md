@@ -27,6 +27,256 @@ Her faz sonunda **en üste** yeni kayıt eklenir. Eski kayıtlar silinmez.
 
 ---
 
+## [Faz 13b] Aylık Trend ve "Geçen Aya Göre" — 2026-09-14
+
+**Durum:** Tamamlandı. **Faz 13 KAPANDI.** Snapshot tablosuna yalnızca okuma
+yapıldı; yazma tarafı (recorder, upsert, tetikleyici) 12a'da kapanmıştı ve bu
+fazda **dokunulmadı**.
+
+### Okuma tarafı — `domain/usecase/MonthlyTrend`
+
+Saf fonksiyonlar; repository, saat, Android yok. Bugünün ayı parametre olarak
+geliyor (`YearMonth.now(clock)` ViewModel'de, §17). DAO'ya **yeni sorgu
+eklenmedi** — 12a'daki `observeAll()` kullanıldı; pencere, delik doldurma ve
+para birimi süzmesi domain'de yapılıyor.
+
+### Para birimi tuzağı — seçim ve gerekçe
+
+Satırlar yazıldıkları andaki para biriminde duruyor (§19). Seçilen yol:
+**bugünkü ana para birimindeki ayları çiz, ötekileri çevirme, say ve söyle.**
+
+- **Bugünkü kurla çevirmek** geçmişi hiç doğru olmamış bir sayıyla yeniden
+  yazmak olurdu; kurlar elle giriliyor ve düzenlenebiliyor (§15), yani her kur
+  düzenlemesi geçmişi sessizce yeniden çizerdi. Tarihsel kur saklamıyoruz.
+- **Hepsini aynı eksene koymak** elmayla armut toplamaktı: kullanıcı yalnızca
+  bir ayar değiştirmişken grafik uçurum gösterirdi.
+
+**Kullanıcıya görünüşü:** grafik kısalıyor ve altında bir cümle çıkıyor —
+"Başka para biriminde kaydedilen 2 ay gösterilmiyor". Aynı kural karşılaştırmaya
+da uyuyor: geçen ay başka birimdeyse çıkarma yapılmaz, karşılaştırma **hiç**
+gösterilmez. Gerekçenin tamamı `ARCHITECTURE.md` §21'de.
+
+### Pencere: altı ay — ölçüldü, tahmin edilmedi
+
+360dp'de paddingler sonrası 328dp kalıyor, altı sütuna 54dp düşüyor. Cihazda
+ölçülen, komşu ay etiketleri arasındaki **en dar** boşluk:
+
+| ekran | fs 1.0 | fs 2.0 |
+|---|---|---|
+| 360dp (API 29) | 68px ≈ **34dp** | 23px ≈ **11,5dp** |
+| 411dp (API 34) | 111px ≈ **42dp** | 53px ≈ **20dp** |
+
+Hiçbirinde üst üste binme veya kırpılma yok. On iki ay bu payı yarıya indirirdi.
+
+### Delikler ve sıfırlar — 12a'nın ödediği ayrım
+
+Kaydı olmayan ay **yuvasını koruyor**, değeri boş. Atlamak iki aylık tırmanışı
+bir aylık gibi gösterirdi. Sütun grafiği seçilmesinin asıl sebebi bu üç hâl:
+değeri olan ay (iz + dolu), **sıfır kaydedilen** ay (yalnızca iz), **kaydı
+olmayan** ay (hiçbir şey). Çizgi grafiği bunu yapamazdı: delikte kopuk çizgi
+hata gibi okunur, düz çizgi ise kimsenin kaydetmediği bir sayıyı çizer.
+
+### Karşılaştırma ana ekranda değil (ROADMAP maddesi taşındı)
+
+Dashboard kartı 8a'da `clearAndSetSemantics` ile tek odak durağı ve tek cümle
+hâline getirildi; içine ikinci bir değer koymak onu bozardı. Karşılaştırmanın
+çalışması (grafik) zaten istatistik ekranında. ROADMAP bu gerekçeyle güncellendi.
+
+Yön **renkle değil sözcükle**: `error` şemada tanımsız (§12), yeşil palette hiç
+yok, ve renk tek başına ayırt edemeyen okuyucuya bir şey söylemez. Ok ile metin
+aynı renkte; ok dekoratif. Değişim yoksa ok da yok. **Önceki ay yoksa hiçbir şey
+yok** — yer tutucu da yok (10a kuralı).
+
+### Testler
+
+235 → **268 birim testi** (33 yeni: 20 `MonthlyTrendTest`, 13
+`StatisticsViewModelTest`), 0 hata. `lintDebug` **0 hata, 24 uyarı** — sayı
+13a'daki ile aynı, bu fazdan **yeni uyarı çıkmadı**.
+
+Kapsanan hâller: sıfır ay · tek ay · iki ay · çok ay (pencere kırpması) ·
+aralarda boşluk · sıfır kaydedilmiş ay · gelecekteki ay · karışık para birimi
+(üç varyant) · artış · azalış · değişim yok · önceki ay yok · geçen ay başka
+birimde · abonelik yokken geçmişi olan ekran.
+
+### Cihaz doğrulaması — iki emülatörde (API 29 · 360dp, API 34 · 411dp)
+
+Çok aylık veri `run-as` fikstürüyle kuruldu: uygulama durduruldu, `subtrack.db`
+dışarı alındı, host'ta `monthly_snapshots` satırları yazıldı, geri kondu, WAL
+silindi. **Cihazda `sqlite3` yok** (iki imajda da), bu yüzden düzenleme host'ta.
+Üretim koduna test kancası açılmadı. Yöntem `TESTING.md`'ye yazıldı.
+
+**(a) Hiç veri yok.** Ham metin (iki emülatörde de):
+`Nothing to chart yet, Add a subscription and the breakdown appears here`.
+Trend bölümü **hiç çıkmıyor** — iki şey birden söylemesin diye.
+**Bulgu:** "tabloda sıfır satır" hâli çalışırken görülemiyor; kaydedici açılışta
+o ayı yazıyor (§19). Temiz kurulumda tabloda `(202609, 0, TRY)` var.
+
+**(b) Tek ay.** Ham metin: `A trend needs at least two months. Each month's
+total is recorded as you go, and the chart appears once the second month is in.`
+Grafik yok, karşılaştırma yok.
+
+**(c) İki ay.** API 29, Ağustos 200,00 → Eylül 250,00:
+`TRY 50.00 more than last month` · grafik düğümü `[32,867][688,1203]`.
+Sütunlar (piksel): `156-235` ve `484-563`, ikisi de **80px = 40dp** (tavan).
+Etiketler `Aug 175-216`, `Sep 504-543`.
+
+**(d) Altı ay.** API 29: sütunlar `54-118 · 164-227 · 273-337 · 382-446 ·
+492-555 · 601-665` (her biri 64-65px = 32,5dp). Etiket boşlukları
+`70 · 68 · 76 · 74 · 69` px. API 34: sütunlar 98px, etiket boşlukları 111-121px.
+Yedi ay kayıtlıyken en eskisi (Mart) çizilmedi — pencere son altı ay.
+
+**(e) Boşluklu veri.** Nisan, Mayıs, **Temmuz**, Eylül kayıtlı; Haziran ve
+Ağustos yok. Sütunlar yalnızca 1., 2., 4. ve 6. yuvalarda; 3. ve 5. yuvada
+**hiçbir şey**, ama etiketleri yerinde. Sesli okunuş:
+`Monthly trend: April TRY 1,200.00, May TRY 1,450.00, June no record,
+July TRY 2,100.00, August no record, September TRY 250.00`.
+Ağustos'un kaydı olmadığı için karşılaştırma da **hiç** çıkmadı.
+
+**Sıfır ↔ kayıt yok (API 34, ekran görüntüsüyle):** Mayıs `0` kaydedilmiş →
+yalnızca iz; Haziran kaydı yok → hiçbir şey. Okunuşu
+`May TRY 0.00, June no record`.
+
+**(f) Karşılaştırmanın üç hâli**, ham metinle:
+
+| hâl | ham metin |
+|---|---|
+| artış | `TRY 50.00 more than last month` (yukarı ok) |
+| azalış | `TRY 150.00 less than last month` (aşağı ok) |
+| değişim yok | `Unchanged from last month` (**ok yok**, metin x=32'den başlıyor) |
+| önceki ay yok | satır **hiç yok** — grafik yukarı kayıyor |
+
+**(g) Karışık para birimi — bu maddenin kanıtı.** API 29'da gerçek yol:
+ayarlardan ana para birimi USD yapıldı. Tablo:
+
+```
+(202607, 210000, 'TRY')   <- eski aylar kendi biriminde kaldı
+(202608,  40000, 'TRY')
+(202609,    583, 'USD')   <- kaydedici içinde bulunulan ayı yeni birimle yazdı
+```
+
+Ekranda: grafik **çizilmedi** (yeni birimde tek ay var), yerine "veri toplanıyor"
+cümlesi, altında `2 months recorded in another currency are not shown`.
+İkinci varyant (iki USD ayı + bir TRY ayı): grafik çizildi, altında tekil biçim
+`1 month recorded in another currency is not shown`. API 34'te iki EUR ayı ile
+tekrarlandı: `2 months … are not shown`.
+
+**(h) fs 2.0.** İki emülatörde de kırpılma yok; altı etiket de yerinde
+(yukarıdaki tablo). Karşılaştırma cümlesi iki satıra sarıyor, ok dikeyde
+ortalanıyor. Grafik ve etiketler ekran içinde.
+
+**(i) Koyu tema (API 34).** 13a'nın tuzağına düşülmedi: sütun `(174,198,207)`,
+iz `(63,71,76)`, arka plan `(28,32,34)` — üçü de ayrı. Ekran görüntüsüyle
+kontrol edildi; sıfır kaydedilmiş ay ile kaydı olmayan ay koyu temada da ayrı
+görünüyor.
+
+**Ölçülen kontrast:** sütun/arka plan **3,96:1** (açık), **9,25:1** (koyu);
+sütun/kendi izi **3,01:1** (açık), **5,31:1** (koyu). Sonuncusu grafik nesnesi
+için istenen 3:1'in tam üstünde, yani **iz daha koyu yapılamaz**. İz/arka plan
+1,32:1 kalıyor: "sıfır" ile "kayıt yok" farkını gözle ayırmak zayıf, ayrımı
+**cümle** taşıyor. Faz 14'e madde olarak yazıldı.
+
+**(j) Erişilebilirlik.** İki emülatörde de:
+
+```
+nodes in the chart subtree: 1
+   class=android.view.View  desc='Monthly trend: April TRY 1,200.00, May TRY 1,450.00,
+   June TRY 980.00, July TRY 2,100.00, August TRY 200.00, September TRY 250.00'
+nodes in the comparison subtree: 1
+   class=android.widget.TextView  text='TRY 50.00 more than last month'
+```
+
+Ok `contentDescription = null` olduğu için ağaca düğüm eklemiyor.
+
+**Türkçe (API 34, `cmd locale set-app-locales`; ayrıca `wm density 480` ile
+360dp'ye indirilerek):** `Aylık Trend` · `Geçen aya göre ₺5.948,00 azaldı` ·
+`en yüksek ₺8.000,00` · etiketler `Nis May Haz Tem Ağu Eyl` · okunuş
+`Aylık trend: Nisan ₺6.000,00, Mayıs ₺5.200,00, Haziran ₺0,00, Temmuz kayıt yok,
+Ağustos ₺8.000,00, Eylül ₺2.052,00`. Uzun cümle 360dp'de üç satıra sarıyor,
+kırpılma yok: `Trend için en az iki ay gerekiyor. Her ayın toplamı kaydediliyor;
+ikinci ay dolduğunda grafik burada çıkar.` Ay adları `MonthFormatter` ile
+locale'den geliyor.
+
+### Cihazın söylediği, akıl yürütmenin söylemediği kusur
+
+**İki aylık grafik iki panel çiziyordu.** Sütun genişliği yuvanın payı olarak
+hesaplanıyordu; yuva = genişlik / ay sayısı, yani iki ay **98dp**lik iki blok
+demekti. Dar emülatörde ölçüldü (`98-293` ve `426-621`, 196px). Genişliğe tavan
+kondu (`TrendBarMaxWidth = 40dp`); altı ay 33dp ve 37dp olduğu için dolu pencere
+etkilenmedi. Düzeltme sonrası iki sütun 80px = 40dp.
+
+### 95 maddelik sabit regresyon
+
+Liste 85 → **95** madde (13b'nin on maddesi). İki emülatörde de koşuldu.
+
+**Kayıtlı istisnalar** (önceki fazlarla aynı): **API 29** — #15 koyu tema ve
+#16 dil: `cmd uimode night yes` bu imajda tutmuyor (`settings put secure
+ui_night_mode 2` de işe yaramadı), `cmd locale` yok; #34-#37, #41-#45 API 33+
+maddeleri. **API 34** — #40 ve #46 API < 33 maddeleri.
+
+**Bu turda eklenen istisna:** **#39 (yalnızca kanalı kapat)** iki emülatörde de
+**koşulamadı.** Sistem bildirim ayarları uygulama hiç bildirim göndermeden
+kanalı listelemiyor ("This app has not posted any notifications"), kanalı adb
+ile kapatmanın da yolu yok. Bildirim göndermek worker'ı koşturmayı gerektiriyor;
+o da `TESTING.md`'deki enstrümantasyon yolu. Madde **doğrulanmadı**, atlanmadı.
+
+**Sürücü hatası, uygulama hatası değil:** #6-#10 ilk turda yanlış yönde
+kaydırılarak koşuldu (bileşen **bitiş kenarına**, yani LTR'de sola kaydırıyor).
+Yanlış yön #10'un ta kendisi olduğu için hepsi "silmiyor" diyordu. Doğru yönle
+tekrarlandı: #6, #7, #8 silmiyor; #9 siliyor.
+
+### Değişen dosyalar
+
+- `domain/usecase/MonthlyTrend.kt` — yeni; `TrendPoint`, `TrendDirection`,
+  `MonthlyChange`, `MonthlyTrendSeries`, `series`/`changeSince`/`peak`
+- `ui/statistics/StatisticsUiState.kt` — dört yeni alan + `canDrawTrend`,
+  `hasNothingToShow`; `Event` tipi **yok** (13a gerekçesi geçerli)
+- `ui/statistics/StatisticsViewModel.kt` — dördüncü Flow (snapshot) ve `Clock`
+- `ui/statistics/StatisticsScreen.kt` — trend bölümü, `TrendNotice`
+- `ui/statistics/components/MonthlyTrendChart.kt` — yeni
+- `ui/statistics/components/MonthlyChangeRow.kt` — yeni
+- `ui/common/MonthFormatter.kt` — yeni (locale'den ay adı)
+- `ui/theme/Dimens.kt` — trend ölçüleri
+- `res/values/strings.xml`, `res/values-en/strings.xml`
+- `test/.../domain/usecase/MonthlyTrendTest.kt` — yeni
+- `test/.../ui/statistics/StatisticsViewModelTest.kt` — genişletildi
+- `docs/ARCHITECTURE.md` yeni §21; `docs/ROADMAP.md` (Faz 13 kapandı),
+  `docs/TESTING.md` (86-95 ve fikstür yöntemi)
+
+**Dokunulmayanlar:** `MonthlySnapshotRecorder`, snapshot DAO'nun yazma tarafı,
+Room entity/database, `app/schemas/`, `reminder/`, `PaymentCountdown`,
+`NextPaymentDate`, `PaymentReminderSelection`, `ui/home/` (DashboardCard dahil),
+`ui/settings/`, kur ekranı, `AndroidManifest.xml`, `Theme.kt`, `Color.kt`.
+
+### Karşılaşılan sorunlar
+
+- **Cihazda `sqlite3` yok.** İki imajda da `/system/bin/sqlite3` bulunmuyor;
+  fikstür host'ta düzenlenip geri kondu. WAL dosyası ayrıca katlanmalı, yoksa
+  geri konan ana dosya bayat kalıyor.
+- **`adb shell input swipe` yön hatası** yukarıda anlatıldı; ders: bileşenin
+  hangi yöne kaydırdığını kaynaktan doğrula, "silmiyor" sonucunu başarı sanma.
+- **API 34 emülatörü ağır yüklendi** (iki emülatör + Play Store güncellemeleri);
+  iki kez "isn't responding" diyaloğu çıktı, beklendi ve geçti. Üründe karşılığı
+  yok, ölçümleri etkilemedi.
+- `uiautomator dump` çıktısı Git Bash'te yol dönüşümüne uğruyor
+  (`/sdcard/ui.xml` → Windows yolu); `MSYS_NO_PATHCONV=1` gerekiyor.
+
+### Commit'ler
+
+- `9d58192` feat: read the recorded months as a trend and as a difference from last month
+- `fbd6b3a` feat: draw the months as columns, and say in words when there are not enough
+- `ccf166f` feat: say how this month compares with last month, in words rather than colour
+- `24b40af` fix: stop a two-month chart from drawing two panels
+
+### Sonraki faz için not
+
+- **Faz 14:** iz saydamlığının tavanı ölçüldü (sütun-iz 3,01:1). "Sıfır
+  kaydedilmiş ay" ile "kaydı olmayan ay" ayrımı gözle zayıf; palet elden
+  geçerken çözülmeli. Kategori başına renk maddesi de orada.
+- **#39** hâlâ doğrulanmamış; bildirim gönderen bir enstrümantasyon testi
+  yazılırsa aynı turda kapatılabilir.
+
+---
+
 ## [Faz 13a] İstatistik Ekranı: Kategori Dağılımı ve En Pahalı Abonelikler — 2026-09-14
 
 **Durum:** Tamamlandı. **Faz 13 AÇIK** — aylık trend ve "geçen aya göre"

@@ -342,32 +342,43 @@ Aylık toplamın zaman içindeki anlık görüntüleri. `PROJECT_SPEC.md` §1'de
 
 ---
 
-## ⬜ Faz 13 — İstatistik
+## ✅ Faz 13 — İstatistik
 
-**13a bitti, faz açık:** aylık trend ve "geçen aya göre" 13b'nin işi.
+**13a + 13b bitti, faz kapandı.**
 
 - [x] **13a:** Kategori dağılım grafiği — Compose Canvas ile yatay çubuklar,
       pasta değil; kategori başına renk yok, ayrımı etiket taşıyor. Yüzdeler en
       büyük kalan yöntemiyle **her zaman 100** ediyor (`ARCHITECTURE.md` §20)
 - [x] **13a:** En pahalı abonelikler — aylık maliyete göre sıralı, ilk beş
 - [x] **13a:** Üçüncü hedef ve ana ekranın üst çubuğundan giriş (§13)
-- [ ] Aylık trend — **Faz 12a'daki anlık görüntüleri okur**, o faz olmadan
-      gösterecek veri yok
-- [ ] **Ana ekranda "geçen aya göre" karşılaştırması** — Faz 12a'dan taşındı.
-      Karşılaştırma en az **iki ayrı ayın** verisini gerektiriyor; 12a'nın
-      bittiği gün tabloda tek ay vardı, dolayısıyla gösterilecek bir şey yoktu.
-      Veri tarafı hazır, kalan iş gösterim
-- [ ] "O ay hiç abonelik yoktu" ile "o ay kayıt yok" **ayrı çizilmeli** — 12a
-      boş listeyi bilerek `0` olarak kaydediyor (§19), grafik bunu yokluktan
-      ayırmalı
-- [ ] Eski kayıtların **kendi para biriminde** yazıldığı unutulmamalı — satır
-      `currencyCode` taşıyor, bugünkü tercihle yorumlanmamalı
+- [x] **13b:** Aylık trend — **Faz 12a'daki anlık görüntüleri okuyor**, son
+      **altı ay**, Compose Canvas ile sütunlar. Altı, 360dp'de ölçüldü:
+      etiketler fs 2.0'da bile çakışmıyor (`ARCHITECTURE.md` §21)
+- [x] **13b: "Geçen aya göre" karşılaştırması — ana ekranda değil, istatistik
+      ekranında.** Bu madde 12a'dan "ana ekran" diye taşınmıştı; **taşındı**,
+      çünkü dashboard kartı 8a'da `clearAndSetSemantics` ile **tek odak durağı
+      ve tek cümle** hâline getirildi ve içine ikinci bir değer koymak onu
+      bozardı. Karşılaştırmanın çalışması (trend grafiği) zaten istatistik
+      ekranında; cevabı gerekçesinin yanına koymak daha doğru. Gerekçe §21'de
+- [x] **13b:** "O ay hiç abonelik yoktu" ile "o ay kayıt yok" **ayrı çiziliyor**
+      — sıfır kaydedilen ay yalnızca iz, kaydı olmayan ay hiçbir şey; ekran
+      okuyucu ikisini sözcükle ayırıyor ("0,00 TL" ↔ "kayıt yok")
+- [x] **13b:** Eski kayıtlar **kendi para biriminde** yorumlanıyor — bugünkü
+      ana para biriminde olmayan aylar **çevrilmiyor**, çizilmiyor ve
+      **sayılarak kullanıcıya söyleniyor**. Gerekçe ve seçilmeyen iki yol §21'de
+- [x] **13b:** Yeterli veri yok hâli istisna değil **varsayılan** olarak ele
+      alındı; sıfır ve tek aylık durumlar tek bir cümleyle kapatıldı
 
 > **Renklendirme Faz 14'e bırakıldı.** 13a'da çubuklar tek renk çizildi: paletimizde
 > dört ayrı **tanımlı** rol yok ve şimdi icat etmek Faz 14'ün geri alacağı bir
 > borç olurdu (§20). Palet bütün olarak ele alınırken kategori başına renk
 > yeniden değerlendirilsin. Koyu şemada `primary` ile `primaryContainer`'ın aynı
 > renk olduğu da orada çözülmeli — 13a bunu çubuk izini saydamlaştırarak geçti.
+>
+> **Faz 14'e ikinci madde:** 13b'de iz saydamlığının bir **tavanı** olduğu
+> ölçüldü (sütun–iz kontrastı açık temada 3,01:1, sınırın tam üstünde). Bu
+> yüzden "sıfır kaydedilmiş ay" ile "kaydı olmayan ay" gözle zor ayrılıyor;
+> ayrımı şimdilik cümle taşıyor. Palet elden geçerken bu da çözülsün (§21).
 
 ---
 

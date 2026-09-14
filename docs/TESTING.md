@@ -137,6 +137,43 @@ etmeden bildirin; sonraki maddeler zaten bozuk bir durumun üstüne binebilir.
 | 83 | Tutarı sıfır olan kategori | Satır **hiç yok** — sıfırlık çubuk çizilmiyor | 13a |
 | 84 | TalkBack ile dağılım satırı | **Tek odak durağı**: "Sağlık, 2.002,00 TL, yüzde 75". Canvas ağaçta yok, telafi edilmiş olmalı | 13a |
 | 85 | Koyu tema (API 34) | Çubukların dolu kısmı iziyle **ayrı renkte**; %75 ile %2 bakışta ayrılıyor | 13a |
+| 86 | Tabloda tek ay varken istatistiğe gir | "Aylık Trend" başlığı var, **grafik yok**; yerine "Trend için en az iki ay gerekiyor…" cümlesi. Karşılaştırma da yok | 13b |
+| 87 | İki ay kayıtlıyken | Grafik çiziliyor; her sütunun altında kendi ay kısaltması, üstünde bir kez "en yüksek …" | 13b |
+| 88 | Altıdan çok ay kayıtlıyken | Yalnızca **son altı ay**; daha eskisi çizilmiyor | 13b |
+| 89 | Aralarda **kaydı olmayan** bir ay | O ayın yuvası duruyor, etiketi yazılı, **hiçbir şey çizilmiyor**; sesli okunuşta "… kayıt yok" | 13b |
+| 90 | **Sıfır kaydedilmiş** bir ay | Yalnızca **iz** çiziliyor (dolu kısım yok); sesli okunuşta "0,00 TL" — 89'dan farklı | 13b |
+| 91 | Bu ay geçen aydan farklı | Grafiğin üstünde ok + cümle: "Geçen aya göre 150,00 TL arttı / azaldı". Yön **sözcükte**, renk ikisinde de aynı | 13b |
+| 92 | Bu ay geçen ayla aynı | "Geçen aya göre değişmedi"; **ok yok** | 13b |
+| 93 | Geçen ayın kaydı yok | Karşılaştırma **hiç** gösterilmiyor — yer tutucu da, tire de yok | 13b |
+| 94 | Ana para birimini değiştir, istatistiğe gir | Grafik yalnızca **yeni** birimdeki ayları çiziyor; altında "Başka para biriminde kaydedilen N ay gösterilmiyor". Eski aylar **çevrilmiyor** | 13b |
+| 95 | TalkBack ile grafik | **Tek odak durağı**, bütün aylar tek cümlede: "Aylık trend: Nisan …, Mayıs …, Haziran kayıt yok, …" | 13b |
+
+**86-95 için veri nasıl kurulur — ay dönümü cihazda üretilemiyor**
+
+12a'nın bulgusu burada da geçerli: `google_apis_playstore` imajlarında root
+yok, `adb shell date` "Operation not permitted" diyor ve saat host'tan geliyor.
+**Yani ay dönümü cihazda bekletilerek veya zorlanarak üretilemez.** Çok aylık
+veri, uygulama durdurulup veritabanı `run-as` ile dışarı alınarak, host'ta
+düzenlenip geri konarak kurulur:
+
+```bash
+adb shell am force-stop com.elinacn.subtrack
+adb exec-out run-as com.elinacn.subtrack cat databases/subtrack.db > subtrack.db
+# host'ta: monthly_snapshots tablosuna (period, totalInCents, currencyCode, recordedAt)
+# satırları eklenir; period = yıl*100 + ay (202608). WAL varsa önce katlanır.
+adb push subtrack.db /data/local/tmp/fixture.db
+adb shell "cat /data/local/tmp/fixture.db | run-as com.elinacn.subtrack sh -c 'cat > databases/subtrack.db'"
+adb shell "run-as com.elinacn.subtrack sh -c 'rm -f databases/subtrack.db-wal databases/subtrack.db-shm'"
+```
+
+Cihazda `sqlite3` **yok** (iki imajda da), bu yüzden düzenleme host'ta yapılır.
+Uygulama **durdurulmuş** olmalı: Room dışarıdan yapılan yazıyı fark etmez.
+Bu bir **test fikstürüdür**; üretim kodunda buna açılmış bir kanca yoktur.
+
+**İçinde bulunulan ayı fikstür belirlemez.** Kaydedici uygulama açılır açılmaz
+o ayı kendi hesabıyla yazar (§19); fikstür yalnızca **geçmiş** ayları kurar.
+Aynı sebeple **"hiç satır yok" hâli çalışırken görülemez** — ekranda görülebilen
+en boş hâl "tek ay"dır.
 
 **Klavye açıkken buton erişilebilirliği — her fazda kontrol edilecek**
 
@@ -567,3 +604,6 @@ Bilinen eksik: (bu fazda kasıtlı olarak yapılmayan, hata sanılmaması gereke
 uygulamanın kalıcı bir özelliği ise ve sonraki fazlarda bozulabilecekse.
 
 ### (şu an boş — bir sonraki faz sonunda doldurulacak)
+
+Faz 13b'nin maddeleri doğrudan sabit listeye (86-95) yazıldı: hepsi kalıcı
+davranış ve hepsi sonraki fazlarda bozulabilir.

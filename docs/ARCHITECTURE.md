@@ -1223,8 +1223,9 @@ revize edildi" zaten budur.
 
 ## 20. İstatistik Ekranı ve Grafik Çizimi
 
-Faz 13a: kategori dağılımı ve en pahalı abonelikler. Aylık trend ve "geçen aya
-göre" karşılaştırması 13b'nin işi; bu ekran snapshot tablosuna dokunmuyor.
+Faz 13a: kategori dağılımı ve en pahalı abonelikler. Faz 13b: aylık trend ve
+"geçen aya göre" karşılaştırması (§21). Ekran snapshot tablosunu **yalnızca
+okur**; yazma tarafı 12a'da kapandı (§19).
 
 ### Grafik kütüphanesi yok — Compose Canvas
 
@@ -1330,5 +1331,138 @@ bırakmıyordu ve etiket tutara yapışıyordu ("ProductivityTRY 428,50") — et
 artık kalan genişliği alıp kendi içinde sarıyor ve araya bir boşluk konuyor.
 Etikete daha fazla pay vermek tutarı sıkıştırırdı; büyük ölçeklerde satırı alt
 alta yığmak bir kırılma noktası ister ve bu fazın kapsamını aşar.
+
+---
+
+## 21. Aylık Trend ve "Geçen Aya Göre"
+
+Faz 13b. `monthly_snapshots` tablosunun **okuma** tarafı: `MonthlyTrend`
+(domain, saf fonksiyonlar) satırları bir seriye çeviriyor, `MonthlyTrendChart`
+onu çiziyor, `MonthlyChangeRow` iki ayı karşılaştırıyor. Bu faz tabloya
+yazmıyor — yazma 12a'da kapandı (§19).
+
+### Karışık para birimi: çevrilmiyor, dışarıda bırakılıyor ve söyleniyor
+
+Bir satır **yazıldığı andaki** para biriminde saklanıyor (§19). Kullanıcı ana
+para birimini değiştirirse tabloda iki birim birden olur. Üç yol vardı:
+
+| yol | neden seçilmedi |
+|---|---|
+| **Bugünkü kurla çevirmek** | Geçmişi hiç doğru olmamış bir sayıyla yeniden yazmak olurdu. Kurlar elle giriliyor ve düzenlenebiliyor (§15); her kur düzenlemesi geçmiş ayları sessizce yeniden çizerdi. Tarihsel kur saklamıyoruz, dolayısıyla doğrusu zaten elimizde yok. |
+| **Hepsini aynı eksene koymak** | Elmayla armut toplamak. 5.000 TL'lik ay ile 120 USD'lik ay yan yana çizilince kullanıcı yalnızca bir **ayar** değiştirmişken grafik uçurum gösterir. |
+| **Ana para birimindekileri çizmek** ✅ | Eksen tek bir şey demek. Uydurulan sayı yok. Kendi kendini iyileştiriyor: altı ay sonra eski birimdeki satırlar pencereden zaten çıkmış olur. |
+
+**Kullanıcıya nasıl görünüyor:** grafik yalnızca bugünkü ana para birimindeki
+ayları çiziyor, geri kalanlar **sayılıyor** ve grafiğin altında bir cümleyle
+söyleniyor: *"Başka para biriminde kaydedilen 2 ay gösterilmiyor"*. Sessizce
+kısalan bir grafik, hiçbir şey söylemeden yanıltan bir grafiktir.
+
+Aynı kural karşılaştırmaya da uyuyor: geçen ay başka bir birimdeyse çıkarma
+yapılmaz ve **karşılaştırma hiç gösterilmez** (aşağıya bakın). Para birimi
+değiştirildikten hemen sonra ekran "veri toplanıyor" hâline döner — doğrusu bu:
+yeni birimde henüz bir ay vardır.
+
+### Karşılaştırma ana ekranda değil, istatistik ekranında
+
+ROADMAP "ana ekranda geçen aya göre" diyordu; **taşındı.** Ana ekranın
+dashboard kartı `clearAndSetSemantics` ile **tek bir odak durağı** ve tek bir
+cümledir (8a). İçine ikinci bir değer koymak ya o cümleyi uzatır ya da ikinci
+bir durak açar — 8a'da bile bile kapatılan şey. Karşılaştırmanın bir de
+**çalışması** var: trend grafiği. İkisini yan yana koymak, cevabı kendi
+gerekçesinin yanında bırakıyor.
+
+Hesap `MonthlyTrend.changeSince` içinde; composable'da aritmetik yok (§4).
+
+### Pencere: son altı ay
+
+360dp'de ekran paddingleri sonrası 328dp kalıyor; altı sütuna **54dp** düşüyor
+ve üç harfli ay kısaltması yazı ölçeği 2.0'da bile sığıyor. Ölçüldü: 360dp'de
+komşu etiketler arası en dar boşluk fs 1.0'da 34dp, **fs 2.0'da 11,5dp**;
+411dp'de 42dp ve 20dp. On iki ay bu payı yarıya indirir ve etiketler normal
+ölçekte bile çakışır. Altı ay ayrıca yarım yıl — bakarken akılda tutulabilen
+bir aralık.
+
+### Delikler yerinde kalıyor
+
+Bir ayın satırı yoksa o ay yine bir yuva alır, değeri boş olur. Atlamak kalan
+sütunları yan yana sıkıştırır ve **iki aylık bir tırmanışı bir aylık gibi**
+gösterir — eksen zamansa, aralık da zaman olmalı. Bugün her değişiklikte
+yazıldığı için delik beklenmiyor; bir ay hiç açılmayan uygulama delik bırakır.
+
+Serinin **başındaki** boş aylar kırpılıyor: grafik kayıtların başladığı yerden
+başlıyor, boşlukla değil.
+
+### Çizgi değil sütun — üç hâl gerektiği için
+
+Bir çizginin, değeri olmayan bir ayla yapacağı her şey yanlış: kopuk çizgi
+çizim hatası gibi okunur, delik boyunca düz giden çizgi ise **kimsenin
+kaydetmediği bir sayıyı** çizer. Sütun grafiği yuvayı boş bırakır. Asıl sebep
+ise 12a'nın parasını ödediği ayrım: sütun üç hâli ayırabiliyor —
+
+| hâl | çizim | sesli okunuş |
+|---|---|---|
+| Değeri olan ay | iz + dolu kısım | "Nisan 1.200,00 TL" |
+| **Sıfır** kaydedilen ay | yalnızca iz | "Haziran 0,00 TL" |
+| **Kaydı olmayan** ay | hiçbir şey | "Temmuz kayıt yok" |
+
+### İz rengi yükseltilemez — ölçülen kontrast
+
+Cihazda ölçüldü: sütun açık temada arka plana karşı **3,96:1**, koyu temada
+**9,25:1**; sütun **kendi izine** karşı açık temada **3,01:1**. Sonuncusu bir
+grafik nesnesi için istenen 3:1 sınırının tam üstünde. İzi koyulaştırmak onu
+arka plandan daha görünür yapardı ama sütun–iz farkını sınırın **altına**
+düşürürdü. Bu yüzden `alpha = 0.24f` (13a'da seçilen değer) bir tavan:
+"sıfır kaydedilmiş ay" ile "kaydı olmayan ay" arasındaki farkı gözle ayırmak
+zayıf kalıyor ve ayrımı **cümle** taşıyor. Bilinen sınır, §12'nin palet
+borcuyla birlikte Faz 14'te tekrar okunmalı.
+
+### Eksen etiketleri: ölçek bir kez, aylar birer kez
+
+Her sütunun üstüne tutar yazmak 328dp'ye altı tutar sığdırmak demek — hiçbir
+yazı ölçeğinde olmuyor. Soldan bir tutar ekseni ise fs 2.0'da çizim alanının
+üçte birini yer. Bunun yerine **ölçeğin tepesi** grafiğin üstünde bir kez
+yazılıyor ("en yüksek 8.000,00 TL"), aylar da kendi sütunlarının altında birer
+kez. İkisi birbirine giremez.
+
+Sütun genişliğinin **tavanı var** (`Dimens.TrendBarMaxWidth`). Yuvanın payı
+olarak bırakılınca iki aylık grafik 98dp'lik iki panel çiziyordu (dar
+emülatörde ölçüldü); artık sütunun genişliği "kaç ayın var" demiyor.
+
+Bir aya ait tutar sıfırdan büyük ama piksele yuvarlanınca sıfır oluyorsa en az
+`Dimens.TrendBarMinHeight` kadar çiziliyor — yoksa "az" ile "hiç" aynı görünür.
+
+### Artış/azalış: renk değil, ok ve cümle
+
+Kırmızı/yeşil iki kere birden yok: `error` şemada tanımsız ve Material
+baseline'ına düşüyor (§12), yeşil palette hiç yok. Zaten yanlış araç olurdu —
+renk tek başına ayırt edemeyen okuyucuya bir şey söylemez ve harcamanın artması
+bilerek abonelik ekleyen biri için kötü haber değildir. Ok ile metin **aynı**
+renkte (`primary`), yön **sözcükle** yazılıyor: *"Geçen aya göre 150,00 TL
+arttı"*. Ok dekoratif (`contentDescription = null`), çünkü cümle zaten yönü
+söylüyor; ekran okuyucu bilgiyi bir kez duyuyor. Değişim yoksa ok da yok: yana
+bakan bir ok setimizde yok ve tire, azalma gibi okunur.
+
+**Önceki ay yoksa hiçbir şey gösterilmiyor** — yer tutucu da, tire de yok.
+10a'daki "tarihi olmayan abonelikte gösterge yok" kuralının aynısı.
+
+### "Yeterli veri yok" istisna değil, varsayılan
+
+Yeni kullanıcıda tabloda **tek ay** vardır ve ikinci ay gelene kadar öyle kalır.
+Bu yüzden sıfır ve tek aylık hâller grafiğin kendisi kadar özenli: grafik
+çizilmiyor, yerine iki hâlde de doğru olan **tek** bir cümle yazılıyor
+("Trend için en az iki ay gerekiyor…"). Bölüm içinde bir paragraf, ikinci bir
+resimli boş durum değil — ekranın zaten bir boş durumu var.
+
+Temiz kurulumda **sıfır satırlı hâl çalışırken görülemiyor:** kaydedici
+uygulama açılır açılmaz içinde bulunulan ayı yazıyor (§19). Ekranda görülen
+hâl "tek ay"dır; sıfır satır yalnızca birim testinde kurulabiliyor.
+
+### Yükleme: tek gösterge, tek parça ekran
+
+Snapshot okuması dördüncü bir Flow olarak aynı `combine`'a giriyor; `combine`
+her kaynağı beklediği için `isLoading` trendi de kapsıyor ve ekran tek parça
+geliyor. Grafiğin üstüne ikinci bir gösterge koymak, tek veritabanından tek
+seferde yüklenen bir sayfaya iki dönen çember koymak olurdu. 8a'daki 300 ms
+gecikme sayesinde olağan okumada hiç gösterge çıkmıyor.
 
 ---
