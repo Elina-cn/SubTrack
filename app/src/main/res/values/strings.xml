@@ -172,4 +172,11 @@
     <string name="statistics_change_up">Geçen aya göre %1$s arttı</string>
     <string name="statistics_change_down">Geçen aya göre %1$s azaldı</string>
     <string name="statistics_change_same">Geçen aya göre değişmedi</string>
+
+    <!-- Düzenleme ekranı -->
+    <string name="edit_subscription_title">Aboneliği Düzenle</string>
+    <string name="edit_subscription">Düzenle</string>
+    <string name="error_load_failed">Abonelik yüklenemedi</string>
+    <string name="subscription_missing_title">Bu abonelik artık yok</string>
+    <string name="subscription_missing_message">Silinmiş olabilir. Geri dönüp listeye bakın.</string>
 </resources>

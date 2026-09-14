@@ -171,4 +171,11 @@
     <string name="statistics_change_up">%1$s more than last month</string>
     <string name="statistics_change_down">%1$s less than last month</string>
     <string name="statistics_change_same">Unchanged from last month</string>
+
+    <!-- Edit screen -->
+    <string name="edit_subscription_title">Edit subscription</string>
+    <string name="edit_subscription">Edit</string>
+    <string name="error_load_failed">Could not load the subscription</string>
+    <string name="subscription_missing_title">This subscription is gone</string>
+    <string name="subscription_missing_message">It may have been deleted. Go back and check the list.</string>
 </resources>
