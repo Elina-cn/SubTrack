@@ -28,12 +28,18 @@ import com.elinacn.subtrack.ui.common.labelRes
 import com.elinacn.subtrack.ui.common.rememberMoneyFormatter
 import com.elinacn.subtrack.ui.statistics.components.CategoryBarRow
 import com.elinacn.subtrack.ui.statistics.components.ExpensiveSubscriptionRow
+import com.elinacn.subtrack.ui.statistics.components.MonthlyChangeRow
 import com.elinacn.subtrack.ui.statistics.components.MonthlyTrendChart
 import com.elinacn.subtrack.ui.theme.Dimens
 import com.elinacn.subtrack.ui.theme.SubTrackTheme
 
 /**
- * The statistics screen: where the money goes, and what the dearest subscriptions are.
+ * The statistics screen: where the money goes, which subscriptions are the dear ones, and how the
+ * months have run.
+ *
+ * The trend and the comparison with last month live here rather than on the home screen. The
+ * dashboard card is one focus stop with one sentence in it (phase 8a), and a second figure inside
+ * it would break that; beside the chart the comparison is next to its own working anyway.
  *
  * Stateless with respect to data - it renders [uiState] and nothing else. [onNavigateBack] arrives
  * as a lambda rather than a NavController, so the screen has no opinion about where it sits in the
@@ -105,6 +111,14 @@ fun StatisticsScreen(
             // and the usual one for a new user.
             if (!uiState.isLoading && !uiState.hasNothingToShow) {
                 SectionTitle(text = stringResource(id = R.string.statistics_trend))
+                // Above the chart: the comparison is the answer, the chart is the working. Absent
+                // rather than blank when there is no last month to compare with.
+                uiState.monthlyChange?.let { change ->
+                    MonthlyChangeRow(
+                        change = change,
+                        amount = moneyFormatter.format(change.amount, uiState.currency)
+                    )
+                }
                 if (uiState.canDrawTrend) {
                     MonthlyTrendChart(
                         points = uiState.trend,
