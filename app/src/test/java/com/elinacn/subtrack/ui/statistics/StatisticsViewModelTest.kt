@@ -2,9 +2,12 @@ package com.elinacn.subtrack.ui.statistics
 
 import com.elinacn.subtrack.domain.model.BillingPeriod
 import com.elinacn.subtrack.domain.model.Currency
+import com.elinacn.subtrack.domain.model.MonthlySnapshot
 import com.elinacn.subtrack.domain.model.Money
 import com.elinacn.subtrack.domain.model.Subscription
 import com.elinacn.subtrack.domain.model.SubscriptionCategory
+import com.elinacn.subtrack.domain.usecase.TrendDirection
+import com.elinacn.subtrack.fake.FakeMonthlySnapshotRepository
 import com.elinacn.subtrack.fake.FakeSettingsRepository
 import com.elinacn.subtrack.fake.FakeSubscriptionRepository
 import kotlinx.coroutines.Dispatchers
@@ -19,9 +22,14 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import java.time.Clock
+import java.time.Instant
+import java.time.YearMonth
+import java.time.ZoneOffset
 
 /**
  * What the statistics screen is told, read from the ViewModel's only public surface.
@@ -35,8 +43,13 @@ class StatisticsViewModelTest {
 
     private val dispatcher = StandardTestDispatcher()
 
+    /** Mid-September 2026, so "this month" is a fixed fact rather than whenever the suite runs. */
+    private val clock = Clock.fixed(Instant.parse("2026-09-14T09:00:00Z"), ZoneOffset.UTC)
+    private val thisMonth = YearMonth.of(2026, 9)
+
     private lateinit var repository: FakeSubscriptionRepository
     private lateinit var settings: FakeSettingsRepository
+    private lateinit var snapshots: FakeMonthlySnapshotRepository
     private lateinit var viewModel: StatisticsViewModel
 
     @Before
@@ -44,6 +57,7 @@ class StatisticsViewModelTest {
         Dispatchers.setMain(dispatcher)
         repository = FakeSubscriptionRepository()
         settings = FakeSettingsRepository()
+        snapshots = FakeMonthlySnapshotRepository()
     }
 
     @After
@@ -254,13 +268,179 @@ class StatisticsViewModelTest {
         assertEquals(2, viewModel.uiState.value.mostExpensive.size)
     }
 
+    // --- the trend ------------------------------------------------------------------------------
+
+    @Test
+    fun uiState_noRecordedMonths_hasNoTrendAndNothingToDraw() = runTest {
+        collectState()
+
+        val state = viewModel.uiState.value
+        assertTrue(state.trend.isEmpty())
+        assertTrue(!state.canDrawTrend)
+        assertNull(state.trendPeak)
+        assertNull(state.monthlyChange)
+    }
+
+    @Test
+    fun uiState_oneRecordedMonth_isAPointButNotAChart() = runTest {
+        record(monthsAgo = 0, cents = 25_000)
+        collectState()
+
+        val state = viewModel.uiState.value
+        assertEquals(1, state.trend.size)
+        assertTrue("one month is a dot, not a direction", !state.canDrawTrend)
+        assertNull(state.monthlyChange)
+    }
+
+    @Test
+    fun uiState_twoRecordedMonths_areAChartWithAPeak() = runTest {
+        record(monthsAgo = 1, cents = 20_000)
+        record(monthsAgo = 0, cents = 25_000)
+        collectState()
+
+        val state = viewModel.uiState.value
+        assertTrue(state.canDrawTrend)
+        assertEquals(listOf(YearMonth.of(2026, 8), thisMonth), state.trend.map { it.period })
+        assertEquals(Money(25_000), state.trendPeak)
+    }
+
+    @Test
+    fun uiState_manyRecordedMonths_areCutToTheWindow() = runTest {
+        (0L until 9L).forEach { back -> record(monthsAgo = back, cents = 10_000 + back) }
+        collectState()
+
+        val state = viewModel.uiState.value
+        assertEquals(6, state.trend.size)
+        assertEquals(YearMonth.of(2026, 4), state.trend.first().period)
+        assertEquals(thisMonth, state.trend.last().period)
+    }
+
+    @Test
+    fun uiState_aMonthWithNoRow_staysInPlaceWithNoFigure() = runTest {
+        record(monthsAgo = 2, cents = 20_000)
+        record(monthsAgo = 0, cents = 25_000)
+        collectState()
+
+        val state = viewModel.uiState.value
+        assertEquals(listOf(Money(20_000), null, Money(25_000)), state.trend.map { it.total })
+        // Last month has no figure, so there is nothing to compare this month with.
+        assertNull(state.monthlyChange)
+    }
+
+    @Test
+    fun uiState_monthsInAnotherCurrency_areReportedRatherThanConverted() = runTest {
+        record(monthsAgo = 1, cents = 100_000, currency = Currency.TRY)
+        record(monthsAgo = 0, cents = 2_500, currency = Currency.USD)
+        settings.setMainCurrency(Currency.USD)
+        collectState()
+
+        val state = viewModel.uiState.value
+        // The lira month is not redrawn at today's rate; it is left out and counted.
+        assertEquals(listOf(thisMonth), state.trend.map { it.period })
+        assertEquals(1, state.monthsInOtherCurrency)
+    }
+
+    @Test
+    fun uiState_theMainCurrencyChanges_theTrendFollowsItAndTheOldMonthsDropOut() = runTest {
+        record(monthsAgo = 1, cents = 100_000, currency = Currency.TRY)
+        record(monthsAgo = 0, cents = 120_000, currency = Currency.TRY)
+        collectState()
+        assertEquals(2, viewModel.uiState.value.trend.size)
+
+        settings.setMainCurrency(Currency.USD)
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertTrue(state.trend.isEmpty())
+        assertEquals(2, state.monthsInOtherCurrency)
+        assertNull("apples and pears cannot be subtracted", state.monthlyChange)
+    }
+
+    @Test
+    fun uiState_recordedHistoryButNoSubscriptionsLeft_isNotAnEmptyScreen() = runTest {
+        record(monthsAgo = 1, cents = 100_000)
+        record(monthsAgo = 0, cents = 0)
+        collectState()
+
+        val state = viewModel.uiState.value
+        assertTrue("the subscriptions are gone", !state.hasAnySubscriptions)
+        assertTrue("but the months they cost money in are not", !state.hasNothingToShow)
+    }
+
+    @Test
+    fun uiState_noSubscriptionsAndOnlyThisMonthRecorded_isAnEmptyScreen() = runTest {
+        // A clean install: the recorder leaves one row saying "looked, and it was nothing".
+        record(monthsAgo = 0, cents = 0)
+        collectState()
+
+        assertTrue(viewModel.uiState.value.hasNothingToShow)
+    }
+
+    // --- against last month ---------------------------------------------------------------------
+
+    @Test
+    fun uiState_spendingWentUp_isAnIncreaseOfTheDifference() = runTest {
+        record(monthsAgo = 1, cents = 20_000)
+        record(monthsAgo = 0, cents = 25_000)
+        collectState()
+
+        val change = viewModel.uiState.value.monthlyChange
+        assertEquals(TrendDirection.UP, change?.direction)
+        assertEquals(Money(5_000), change?.amount)
+    }
+
+    @Test
+    fun uiState_spendingWentDown_isADecreaseOfTheDifference() = runTest {
+        record(monthsAgo = 1, cents = 25_000)
+        record(monthsAgo = 0, cents = 20_000)
+        collectState()
+
+        val change = viewModel.uiState.value.monthlyChange
+        assertEquals(TrendDirection.DOWN, change?.direction)
+        assertEquals(Money(5_000), change?.amount)
+    }
+
+    @Test
+    fun uiState_spendingStayedStill_isNoChangeRatherThanNoComparison() = runTest {
+        record(monthsAgo = 1, cents = 25_000)
+        record(monthsAgo = 0, cents = 25_000)
+        collectState()
+
+        val change = viewModel.uiState.value.monthlyChange
+        assertEquals(TrendDirection.UNCHANGED, change?.direction)
+        assertEquals(Money.ZERO, change?.amount)
+    }
+
+    @Test
+    fun uiState_thereIsNoLastMonth_showsNoComparison() = runTest {
+        record(monthsAgo = 0, cents = 25_000)
+        collectState()
+
+        assertNull(viewModel.uiState.value.monthlyChange)
+    }
+
     private fun store(vararg subscriptions: Subscription) {
         repository.setSubscriptions(subscriptions.toList())
     }
 
+    /**
+     * Puts rows in the snapshot table the way the recorder would have, counting back from this
+     * month - `record(0, ...)` is September, `record(1, ...)` is August.
+     */
+    private suspend fun record(monthsAgo: Long, cents: Long, currency: Currency = Currency.TRY) {
+        snapshots.upsert(
+            MonthlySnapshot(
+                period = thisMonth.minusMonths(monthsAgo),
+                total = Money(cents),
+                currency = currency,
+                recordedAt = 1_000L
+            )
+        )
+    }
+
     /** WhileSubscribed keeps the state cold until something collects it. */
     private fun TestScope.collectState() {
-        viewModel = StatisticsViewModel(repository, settings)
+        viewModel = StatisticsViewModel(repository, settings, snapshots, clock)
         backgroundScope.launch { viewModel.uiState.collect() }
         advanceUntilIdle()
     }
