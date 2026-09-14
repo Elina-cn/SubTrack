@@ -5,7 +5,6 @@ import androidx.lifecycle.viewModelScope
 import com.elinacn.subtrack.R
 import com.elinacn.subtrack.domain.model.BillingPeriod
 import com.elinacn.subtrack.domain.model.Currency
-import com.elinacn.subtrack.domain.model.Money
 import com.elinacn.subtrack.domain.model.Subscription
 import com.elinacn.subtrack.domain.model.SubscriptionCategory
 import com.elinacn.subtrack.domain.model.TotalPeriod
@@ -15,8 +14,11 @@ import com.elinacn.subtrack.domain.repository.SubscriptionRepository
 import com.elinacn.subtrack.domain.usecase.CurrencyConverter
 import com.elinacn.subtrack.domain.usecase.NextPaymentDate
 import com.elinacn.subtrack.domain.usecase.PaymentCountdown
+import com.elinacn.subtrack.domain.usecase.PriceResult
+import com.elinacn.subtrack.domain.usecase.SubscriptionInput
 import com.elinacn.subtrack.reminder.ReminderNotificationStatus
 import com.elinacn.subtrack.ui.common.UiText
+import com.elinacn.subtrack.ui.common.asUiText
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -27,8 +29,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import java.math.BigDecimal
-import java.math.RoundingMode
 import java.time.Clock
 import java.time.LocalDate
 import javax.inject.Inject
@@ -162,16 +162,17 @@ class HomeViewModel @Inject constructor(
         category: SubscriptionCategory,
         billingPeriod: BillingPeriod
     ) {
-        val trimmedName = name.trim()
-        val nameError = if (trimmedName.isEmpty()) UiText.Resource(R.string.error_name_empty) else null
-        val priceResult = parsePrice(rawPrice)
-        val dateError = validateDate(nextPaymentDate)
+        val trimmedName = SubscriptionInput.trimName(name)
+        val nameError = SubscriptionInput.validateName(name)?.asUiText()
+        val priceResult = SubscriptionInput.parsePrice(rawPrice)
+        val dateError = SubscriptionInput.validateDate(nextPaymentDate, LocalDate.now(clock))
+            ?.asUiText()
 
         if (nameError != null || priceResult is PriceResult.Invalid || dateError != null) {
             screenState.update {
                 it.copy(
                     nameError = nameError,
-                    priceError = (priceResult as? PriceResult.Invalid)?.reason,
+                    priceError = (priceResult as? PriceResult.Invalid)?.problem?.asUiText(),
                     dateError = dateError
                 )
             }
@@ -238,59 +239,6 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    /**
-     * A past date is fine - someone entering a subscription they already have knows when it
-     * last renewed. Only the far future is refused, for the same reason as [MAX_PRICE]: it
-     * catches a slipped keystroke in the year, not a plausible entry.
-     */
-    private fun validateDate(nextPaymentDate: LocalDate?): UiText? {
-        if (nextPaymentDate == null) return null
-        val furthest = LocalDate.now(clock).plusYears(MAX_YEARS_AHEAD)
-        // The limit travels as an argument so message and constant cannot drift apart.
-        return if (nextPaymentDate.isAfter(furthest)) {
-            UiText.Resource(R.string.error_date_too_far, listOf(MAX_YEARS_AHEAD))
-        } else {
-            null
-        }
-    }
-
-    /**
-     * Reads what the user typed into whole minor units.
-     *
-     * BigDecimal, never Double: "159,99" has to come back out as exactly 15999 kuruş, and binary
-     * floating point cannot promise that.
-     *
-     * Both the ceiling and the decimal count are checked before converting, so nothing is ever
-     * quietly reshaped on the way to storage.
-     */
-    private fun parsePrice(rawPrice: String): PriceResult {
-        val normalized = rawPrice.trim().replace(',', '.')
-        if (normalized.isEmpty()) {
-            return PriceResult.Invalid(UiText.Resource(R.string.error_price_empty))
-        }
-        val amount = normalized.toBigDecimalOrNull()
-            ?: return PriceResult.Invalid(UiText.Resource(R.string.error_price_invalid))
-        if (amount.signum() <= 0) {
-            return PriceResult.Invalid(UiText.Resource(R.string.error_price_not_positive))
-        }
-        if (amount > MAX_PRICE) {
-            // The limit is handed to the message instead of being written into it, so the two
-            // cannot drift apart when the ceiling changes.
-            return PriceResult.Invalid(
-                UiText.Resource(R.string.error_price_too_large, listOf(MAX_PRICE.toLong()))
-            )
-        }
-        // Trailing zeros do not count: "159.990" is two decimals written long, "159.999" is three.
-        if (amount.stripTrailingZeros().scale() > MINOR_UNIT_DIGITS) {
-            return PriceResult.Invalid(UiText.Resource(R.string.error_price_too_many_decimals))
-        }
-        val cents = amount
-            .movePointRight(MINOR_UNIT_DIGITS)
-            .setScale(0, RoundingMode.HALF_UP)
-            .toLong()
-        return PriceResult.Valid(Money(cents))
-    }
-
     /** Falls back to a generic line when the exception has nothing readable to say. */
     private fun Exception.asMessage(fallback: Int): UiText =
         message?.takeIf { it.isNotBlank() }?.let { UiText.Raw(it) } ?: UiText.Resource(fallback)
@@ -347,37 +295,11 @@ class HomeViewModel @Inject constructor(
         dateError = null
     )
 
-    private sealed interface PriceResult {
-        data class Valid(val money: Money) : PriceResult
-        data class Invalid(val reason: UiText) : PriceResult
-    }
-
     private companion object {
         /** Outlives a configuration change, expires on a real departure. */
         const val STOP_TIMEOUT_MS = 5_000L
 
-        const val MINOR_UNIT_DIGITS = 2
-
         /** The list holds exactly one dated subscription only right after the first one lands. */
         const val FIRST_DATED_SUBSCRIPTION = 1
-
-        /**
-         * How far ahead a renewal date may be set.
-         *
-         * A product ceiling like [MAX_PRICE], not a technical one: ten years is
-         * longer than any subscription anyone signs, so beyond it is a typed year.
-         */
-        const val MAX_YEARS_AHEAD = 10L
-
-        /**
-         * A product ceiling, not a Long limit.
-         *
-         * Long would not complain until roughly 92 quadrillion kuruş, so guarding against overflow
-         * catches nothing a person could plausibly type. One million per billing period is already
-         * three orders of magnitude above the priciest real subscription, and leaves room for
-         * weaker currencies when phase 9 adds the choice - while still rejecting a slipped keypress
-         * that adds digits.
-         */
-        val MAX_PRICE: BigDecimal = BigDecimal("1000000")
     }
 }
