@@ -2,6 +2,7 @@ package com.elinacn.subtrack.ui.home.components
 
 import androidx.compose.animation.core.animate
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
@@ -30,6 +31,7 @@ import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.LayoutDirection
 import com.elinacn.subtrack.R
@@ -50,10 +52,17 @@ private const val DeleteThresholdFraction = 0.5f
  *
  * Velocity is deliberately ignored - distance alone decides. A fast flick that covers little
  * ground must not delete, which is what repeatedly went wrong with the library component.
+ *
+ * **Tapping opens the row, dragging still deletes it.** The click is a modifier beside the drag,
+ * not a change to it: none of the offset handling, the threshold or the settle below has been
+ * touched (§12 records how hard they were to get right). The two cannot both win, because a drag
+ * consumes the movement as soon as it passes touch slop and a consumed change cancels the pending
+ * click - so a swipe that is long enough to mean anything is never also a tap.
  */
 @Composable
 fun SwipeToDeleteRow(
     onDelete: () -> Unit,
+    onClick: () -> Unit,
     contentDescription: String,
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit
@@ -73,6 +82,7 @@ fun SwipeToDeleteRow(
 
     // Hoisted out of the semantics lambda, which is not a composable scope.
     val deleteLabel = stringResource(id = R.string.delete)
+    val editLabel = stringResource(id = R.string.edit_subscription)
     val rowDescription = contentDescription
 
     val dragState = rememberDraggableState { delta ->
@@ -92,6 +102,11 @@ fun SwipeToDeleteRow(
             // instead of one. Clearing drops the subtree, and this node speaks for all of it.
             .clearAndSetSemantics {
                 this.contentDescription = rowDescription
+                // Declared here rather than left to the clickable below: clearing drops the
+                // subtree's semantics, so the tap would otherwise exist for a finger and not for
+                // TalkBack. The label is what a screen reader offers as the action's name; the
+                // row stays one stop and gains an action rather than a second node.
+                onClick(label = editLabel) { onClick(); true }
                 // Swiping is unreachable with TalkBack, so expose deletion as an explicit action.
                 customActions = listOf(CustomAccessibilityAction(deleteLabel) { onDelete(); true })
             }
@@ -119,6 +134,9 @@ fun SwipeToDeleteRow(
         Box(
             modifier = Modifier
                 .offset { IntOffset(offsetX.roundToInt(), 0) }
+                // Before the drag in the chain, and semantics are already set above, so this
+                // contributes a tap and its ripple and nothing else.
+                .clickable(onClick = onClick)
                 .draggable(
                     state = dragState,
                     orientation = Orientation.Horizontal,

@@ -238,6 +238,7 @@ fun HomeScreen(
                 val countdown = uiState.countdowns[subscription.id]
                 SwipeToDeleteRow(
                     onDelete = { onEvent(HomeEvent.Delete(subscription.id)) },
+                    onClick = { onEditSubscription(subscription.id) },
                     // The row is one focus stop with its own label, so everything the card draws
                     // has to reach that sentence or it is not announced at all.
                     contentDescription = subscriptionRowDescription(subscription, price, countdown)
