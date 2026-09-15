@@ -151,8 +151,9 @@ Script tam yolla çağrılır, `${CLAUDE_PLUGIN_ROOT}` yoktur.
 
 **YASAK: `--design-system` modu.** Palet, tipografi ve efekt üretir.
 Bunlar `docs/ARCHITECTURE.md`'de karara bağlandı ve kontrast
-değerleriyle ölçüldü (primary = DeepBlue #46707F, primaryContainer =
-PastelBlue #AEC6CF). `--persist` da kullanılmaz.
+değerleriyle ölçüldü (primary = Emerald #0B5C3F açık temada, Gold
+#D4AF37 koyu temada; primaryContainer = #CDE8DA açık temada).
+`--persist` da kullanılmaz.
 
 Skill'den somut renk veya font önerisi gelirse **uygulama**, sohbete ilet.
 Yapısal kurallar (semantic token kullanımı, satır yüksekliği oranları,

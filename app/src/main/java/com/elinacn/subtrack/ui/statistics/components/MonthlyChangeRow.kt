@@ -97,7 +97,9 @@ fun MonthlyChangeRow(
 @Preview(showBackground = true)
 @Composable
 private fun MonthlyChangeRowPreview() {
-    val formatter = MoneyFormatter(Locale("tr", "TR"))
+    // forLanguageTag, not the Locale constructor: that constructor is deprecated as of Java 19,
+    // and the tag is the same value written the way the platform now asks for it.
+    val formatter = MoneyFormatter(Locale.forLanguageTag("tr-TR"))
     SubTrackTheme {
         Column {
             TrendDirection.entries.forEach { direction ->
