@@ -58,7 +58,7 @@ etmeden bildirin; sonraki maddeler zaten bozuk bir durumun üstüne binebilir.
 | 12 | Uygulamayı tamamen kapat, yeniden aç | Liste **duruyor** (Room zinciri) | 5a |
 | 13 | Ekran döndür | Liste duruyor, **titremiyor** | 5a |
 | 14 | Sheet açık ve metin yazılıyken ekran döndür | Sheet **açık kalıyor**, metin duruyor | 5b |
-| 15 | Sistem temasını koyuya al | Tüm metinler okunabilir, kartlar arka plandan ayrışıyor | 1b · kontrast 1c |
+| 15 | Sistem temasını koyuya al | Tüm metinler okunabilir, kartlar arka plandan ayrışıyor (14a'dan sonra **1,50:1**, önceki 1,29:1 değil). Vurgu rengi **altın**, açık temadaki zümrüt değil; hiçbir yerde mor kalmamış olmalı | 1b · kontrast 1c · palet 14a |
 | 16 | Cihaz dilini İngilizceye al | Metinler çevrilmiş geliyor | 1b |
 | 17 | Boş ad veya geçersiz fiyatla Kaydet'e bas | Sheet **açık kalıyor**, hata ilgili alanın **altında** | 6 |
 | 18 | Bir satırı sil, Snackbar'a dokunma | Birkaç saniyede **kendiliğinden** kayboluyor | 6 |
@@ -136,7 +136,7 @@ etmeden bildirin; sonraki maddeler zaten bozuk bir durumun üstüne binebilir.
 | 82 | Hiç abonelik yokken istatistiğe gir | Boş durum: "Henüz istatistik yok / Bir abonelik ekleyince dağılım burada çıkar" | 13a |
 | 83 | Tutarı sıfır olan kategori | Satır **hiç yok** — sıfırlık çubuk çizilmiyor | 13a |
 | 84 | TalkBack ile dağılım satırı | **Tek odak durağı**: "Sağlık, 2.002,00 TL, yüzde 75". Canvas ağaçta yok, telafi edilmiş olmalı | 13a |
-| 85 | Koyu tema (API 34) | Çubukların dolu kısmı iziyle **ayrı renkte**; %75 ile %2 bakışta ayrılıyor | 13a |
+| 85 | Koyu tema (API 34) | Çubukların dolu kısmı iziyle **ayrı renkte**; %75 ile %2 bakışta ayrılıyor. 14a'dan sonra iz saydam bir çubuk değil, kendi rolü (`outlineVariant`): çubuk `#D4AF37`, iz `#3A5A48`, oran 3,65:1 | 13a · 14a |
 | 86 | Tabloda tek ay varken istatistiğe gir | "Aylık Trend" başlığı var, **grafik yok**; yerine "Trend için en az iki ay gerekiyor…" cümlesi. Karşılaştırma da yok | 13b |
 | 87 | İki ay kayıtlıyken | Grafik çiziliyor; her sütunun altında kendi ay kısaltması, üstünde bir kez "en yüksek …" | 13b |
 | 88 | Altıdan çok ay kayıtlıyken | Yalnızca **son altı ay**; daha eskisi çizilmiyor | 13b |
@@ -441,6 +441,22 @@ adb shell cmd uimode night no
 `settings put secure ui_night_mode 2` de tutmuyor. Koyu tema testleri
 `subtrack_wide_api34` üzerinde yapılır.
 
+**Faz 14a'dan sonra koyu temada ne aranır.** İki şema aynı rolleri farklı hue'lara
+veriyor (`ARCHITECTURE.md` §12), o yüzden "koyu tema açık temanın koyusu" değil:
+
+| Nerede | Açık tema | Koyu tema |
+|---|---|---|
+| Vurgu / ikon / grafik | zümrüt `#0B5C3F` | altın `#D4AF37` |
+| Dolu altın yüzey | `tertiary` (üstünde koyu mürekkep) | yok, altın mürekkep |
+| Kart / arka plan | `#FFFFFF` / `#D3E2D8` | `#1F3D2D` / `#0D1A14` |
+
+Kural: **açık temada altın metin görünüyorsa hata** (beyazda 2,42:1). Ekranın
+herhangi bir yerinde mor/lila bir piksel görünüyorsa, bir rol tanımsız kalmış
+demektir — 14a'da bunun iki örneği Snackbar'ın "Geri al"ı ve chip kenarlığıydı.
+
+Karşılaştırma için: `docs/screenshots/phase-14a/` altında her ekranın iki temada
+çekilmiş hâli var.
+
 ### TalkBack
 
 **Şu an yapılamıyor.** Ne API 29 ne API 34 `google_apis_playstore` imajında
@@ -472,6 +488,15 @@ adb exec-out screencap > ekran.raw
 Baştaki 12 veya 16 baytlık başlıktan sonra RGBA gelir; `dosya_boyutu -
 genişlik*yükseklik*4` başlığın hangisi olduğunu verir. Bu makinede görüntü
 kütüphanesi yok ve kurulmuyor.
+
+**Kendiliğinden kaybolan bir şeyin pikseli** (Snackbar gibi) `exec-out` ile
+yakalanmıyor: birkaç megabaytın USB üzerinden host'a akması Snackbar'ın ömrünün
+kayda değer bir kısmını yiyor. Çözüm, önce cihaz üstüne yazmak:
+
+```bash
+adb shell screencap /sdcard/frame.raw   # anlık, aynı karede biter
+adb exec-out cat /sdcard/frame.raw > ekran.raw
+```
 
 ### Otomatik testler
 

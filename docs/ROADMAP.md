@@ -382,25 +382,32 @@ Aylık toplamın zaman içindeki anlık görüntüleri. `PROJECT_SPEC.md` §1'de
 
 ---
 
-## ⬜ Faz 14 — Tema Tamamlama
+## 🟡 Faz 14 — Tema Tamamlama
 
-- [ ] Dynamic color (Material You, Android 12+)
-- [ ] Manuel tema tercihi (sistem/açık/koyu)
-- [ ] Koyu temada kart ↔ arka plan ayrımı 1.29:1, gözden geçirilsin
-- [ ] **Renk paleti bütün olarak yeniden ele alınacak.** Tanımlanmamış roller
-      Material baseline'ına düşüyor ve palet dışı renkler çıkıyor: Snackbar'daki
-      "Geri al" eylemi `inversePrimary` tanımsız olduğu için **mor** görünüyor
-      (#D0BCFF / #6750A4). Aynı sebeple Faz 9b-1'de ölçülen iki rol daha:
-      `outline` tanımsız, chip kenarlığı koyu temada **#49454F**; `onSurfaceVariant`
-      tanımsız, seçilmemiş chip etiketi ve ayarlar açıklama metni koyu temada
-      **#CAC4D0**, açık temada **#49454F**. İkisi de mor-gri, kontrast AA geçiyor
-      (koyu 9.66:1, açık 6.85:1) — sorun okunabilirlik değil, palet tutarlılığı.
-      Faz 10a'da üçüncüsü eklendi: `error` tanımsız, Material baseline
-      kırmızısına düşüyor. Kartlardaki "gecikmiş" kullanımı 12-2 hotfix'inde
-      düştü ama rol hâlâ kullanılıyor (`SwipeToDeleteRow`), yani borç duruyor.
-      Paletimiz mavi-camgöbeği ailesinde. Tüm `colorScheme`
-      rolleri gözden geçirilip eksikler tanımlanmalı, sadece bunlar değil.
-- [ ] Para birimi gösterimi tutarlı hale getirilsin: `NumberFormat` locale'e göre
+**14a bitti, faz açık:** dynamic color, manuel tema tercihi ve para birimi
+gösterimi 14b'nin işi.
+
+- [x] **14a: Renk paleti bütün olarak yeniden ele alındı.** Pastel mavi-camgöbeği
+      → **koyu zümrüt + altın**; gerekçe ürün kararı, uygulama para takip ediyor.
+      Temel kural ölçümle kondu: altın beyazda **2,42:1** (grafik için gereken
+      3:1'i bile geçmiyor), zümrüt **8,02:1**. Bu yüzden açık temada zümrüt
+      mürekkep / altın yalnızca dolu yüzey, koyu temada altın mürekkep / zümrüt
+      ailesi yüzey (`ARCHITECTURE.md` §12)
+- [x] **14a: Tanımlanmamış roller borcu kapandı.** Şemanın tamamı (37 rol, iki
+      şemada da) tanımlandı — kodun adıyla çağırmadıkları dahil, çünkü onları
+      Material'ın kendi bileşenleri çiziyor. Cihazda piksel olarak doğrulandı:
+      Snackbar'ın "Geri al"ı artık mor değil **`#D4AF37`**, zemini **`#1F3D2D`**;
+      chip kenarlığı **`#5C7F6C`**, seçilmemiş chip etiketi **`#35594A`**
+- [x] **14a: Koyu temada kart ↔ arka plan** 1,29:1 → **1,50:1**; cihazda
+      `#1F3D2D` üstüne `#0D1A14` ölçülerek doğrulandı
+- [x] **14a:** Her çift için kontrast hesaplandı ve belgelendi; en düşük gereken
+      çift 3,32:1 (kenarlık), eşiğin altında tek çift yok. Tablo §12'de
+- [x] **14a:** Grafik izi artık tanımlı bir rol (`outlineVariant`), saydamlık
+      değil — eski gerekçe (koyu şemada `primary` ile `primaryContainer` aynı
+      renkti) yeni palette geçersiz, ölçüldü: 4,35:1
+- [ ] **14b:** Dynamic color (Material You, Android 12+)
+- [ ] **14b:** Manuel tema tercihi (sistem/açık/koyu)
+- [ ] **14b:** Para birimi gösterimi tutarlı hale getirilsin: `NumberFormat` locale'e göre
       bazen sembol bazen ISO kodu yazıyor (EN dilinde toplam "TRY 1.785,45",
       kart "$10.99"). Her yerde sembol mü zorlanacak, her yerde kod mu —
       karar verilecek.
@@ -437,9 +444,12 @@ Aylık toplamın zaman içindeki anlık görüntüleri. `PROJECT_SPEC.md` §1'de
 
 ## ⬜ Faz 16 — Play Store Hazırlığı
 
-- [ ] Uygulama ikonu (adaptive) ve marka kimliği. **Bildirim ikonu da bu işin
-      parçası:** `res/drawable/ic_notification.xml` Faz 10b'de konan geçici bir
-      siluet, marka çalışmasıyla birlikte yenilenecek.
+- [ ] Uygulama ikonu (adaptive) ve marka kimliği — **Faz 14a'nın paletine göre:**
+      koyu zümrüt + altın, ve altının mürekkep olarak kullanılamayacağı kuralı
+      ikonda da geçerli (§12). Ekran görüntüleri `docs/screenshots/phase-14a/`
+      altında. **Bildirim ikonu da bu işin parçası:**
+      `res/drawable/ic_notification.xml` Faz 10b'de konan geçici bir siluet,
+      marka çalışmasıyla birlikte yenilenecek.
 - [ ] Release imzalama yapılandırması, keystore güvenliği
 - [ ] ProGuard/R8 kuralları, release build testi
 - [ ] `isMinifyEnabled = true` (R8) — APK boyutu ve açılış süresi düşer

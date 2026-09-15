@@ -425,26 +425,91 @@ sıfırlanıyor (`onDragStarted`), böylece birikme yapısal olarak imkânsız.
 oy kullanmıyor. (`computeTarget`'ın üç dalından ikisi `positionalThreshold`'u
 hiç okumuyordu; hızlı fiskenin silmesinin sebebi buydu.)
 
-### Bilinen borç: tanımlanmamış renk rolleri
+### Kapandı (Faz 14a): tanımlanmamış renk rolleri
 
-`colorScheme`'de **tanımlamadığımız her rol Material baseline değerine düşer** ve
-paletimizin dışında renkler üretir.
+**Bu borç kapandı.** `colorScheme`'de tanımlamadığımız her rol Material
+baseline'ına düşüyordu ve paletin dışında renk üretiyordu. Faz 14a'da **her rol
+tanımlandı** — kodun kendi adıyla çağırmadıkları dahil.
 
-Tespit edilenler:
+**Neden hepsi, sadece kullanılanlar değil.** "Biz kullanmıyoruz" ile "kimse
+kullanmıyor" aynı şey değil: rolleri isteyen bileşenler Material'ın kendi
+bileşenleri. Envanter bunu gösteriyordu —
 
-| Rol | Düştüğü değer | Nerede görünüyor |
+| Rol | Kodumuz çağırıyor mu | Kim çiziyordu | Baseline'da ne çıkıyordu |
+|---|---|---|---|
+| `error` | **evet** (`SwipeToDeleteRow`) | silme zemini ve ikonu | Material kırmızısı |
+| `onSurfaceVariant` | **evet** (`SettingsRow`, `SettingsScreen`) | alt satırlar, seçilmemiş chip etiketi | mor-gri |
+| `outline` | hayır | `OutlinedTextField` kenarı, chip kenarlığı | mor-gri |
+| `inversePrimary` | hayır | Snackbar'ın "Geri al"ı | **mor** |
+| `inverseSurface` / `inverseOnSurface` | hayır | Snackbar zemini ve metni | nötr gri |
+| `outlineVariant` | hayır | `HorizontalDivider` | mor-gri |
+| `surfaceVariant`, `surfaceContainer*`, `scrim`, `secondary*`, `tertiary*`, `errorContainer` | hayır | tarih seçici, sheet, diyalog, elevation | baseline |
+
+Faz 14a envanteri (kod taraması, `grep colorScheme.`):
+
+- **Kullanılan roller (9):** `background` (5 dosya), `error` (1), `onBackground`
+  (15), `onPrimaryContainer` (12), `onSurface` (7), `onSurfaceVariant` (2),
+  `primary` (7), `primaryContainer` (10), `surface` (3).
+- **Kullanılan ama tanımsız olanlar (2):** `error`, `onSurfaceVariant` → ikisi de
+  artık tanımlı.
+- **Tanımlı ama kodun çağırmadığı (4):** `onPrimary`, `secondary`, `onSecondary`,
+  `tertiary` → Material bileşenleri bunları yine de çiziyor.
+
+**Karar: şemanın tamamı tanımlanır** (37 rol, iki şemada da). Kullanılmayan bir
+rolü tanımlamak ileride sessizce doğru rengi verir; tanımlamamak sessizce
+baseline verir. Bu fazın amacı da tam olarak "hiçbir rol baseline'a düşmesin"di.
+
+**Cihazda doğrulandı** (piksel, `screencap` ham RGBA):
+
+| Ne | Önce | Sonra | Rol |
+|---|---|---|---|
+| Snackbar "Geri al" | mor | `#D4AF37` | `inversePrimary` |
+| Snackbar zemini | nötr gri | `#1F3D2D` | `inverseSurface` |
+| Seçilmemiş chip kenarlığı | mor-gri | `#5C7F6C` | `outline` |
+| Seçilmemiş chip etiketi | mor-gri | `#35594A` | `onSurfaceVariant` |
+
+**Kural duruyor:** yeni bir `colorScheme` rolü kullanmadan önce `Theme.kt`'de
+tanımlı olup olmadığı kontrol edilir. Bugün hepsi tanımlı; ileride Material yeni
+bir rol eklerse bu kontrol yine gerekir.
+
+### Faz 14a kontrast tablosu
+
+Her çift hesaplandı; normal metin 4,5:1, büyük metin ve grafik bileşeni 3:1.
+
+| Çift | Açık | Koyu |
 |---|---|---|
-| `inversePrimary` | #D0BCFF / #6750A4 (mor) | Snackbar'ın eylem düğmesi ("Geri al") |
-| `inverseSurface` | #322F35 / #E6E0E9 (nötr gri) | Snackbar zemini |
+| `onSurface` / `surface` | 14,45 | 10,05 |
+| `onBackground` / `background` | 10,76 | 15,08 |
+| `primary` / `surface` | 8,02 | 5,66 |
+| `primary` / `background` | 5,98 | 8,50 |
+| `onPrimary` / `primary` | 8,02 | 6,87 |
+| `onPrimaryContainer` / `primaryContainer` | 11,12 | 8,07 |
+| `onSecondary` / `secondary` | 6,29 | 7,65 |
+| `onSecondaryContainer` / `secondaryContainer` | 12,05 | 7,24 |
+| `onTertiary` / `tertiary` | 5,97 | 8,23 |
+| `onTertiaryContainer` / `tertiaryContainer` | 10,83 | 7,03 |
+| `onSurfaceVariant` / `surface` | 7,84 | 7,24 |
+| `onSurfaceVariant` / `background` | 5,84 | 10,87 |
+| `onSurfaceVariant` / `surfaceVariant` | 6,31 | 5,68 |
+| `error` / `surface` | 7,92 | 5,85 |
+| `onError` / `error` | 7,92 | 8,33 |
+| `onErrorContainer` / `errorContainer` | 10,35 | 8,06 |
+| `inversePrimary` / `inverseSurface` | 5,66 | 6,77 |
+| `inverseOnSurface` / `inverseSurface` | 10,05 | 15,08 |
+| `outline` / `surface` *(kenarlık, 3:1)* | 4,46 | 4,46 |
+| `outline` / `background` *(kenarlık, 3:1)* | **3,32** | 6,69 |
+| `primary` / `primaryContainer` *(ikon, 3:1)* | 6,17 | 4,35 |
+| Çubuk / iz *(grafik, 3:1)* | 4,40 | **3,65** |
+| `onSurface` / `surfaceContainerHighest` | 11,29 | 7,88 |
 
-Kontrastları AA'yı geçiyor, yani erişilebilirlik sorunu değil — **kimlik**
-sorunu. Paletimiz mavi-camgöbeği ailesinde, oradan mor çıkıyor.
+En düşük gereken çift: **3,32:1** (kenarlık, 3:1 eşiğinin üstünde). Tek bir çift
+bile eşiğin altında değil.
 
-**Faz 14'te tüm roller gözden geçirilecek**, sadece bu ikisi yamanmayacak.
+**Ayrışma oranları** (kontrast eşiği değil, okunabilirlik notu): kart/arka plan
+açık temada **1,34:1**, koyu temada **1,50:1** — koyu temadaki 1,29:1 borcu
+(ROADMAP Faz 14) böylece kapandı, cihazda `#1F3D2D` üstüne `#0D1A14` ölçülerek
+doğrulandı.
 
-**Yeni bir `colorScheme` rolü kullanmadan önce `Theme.kt`'de tanımlı olup
-olmadığı kontrol edilmeli.** Tanımsızsa ya tanımlanır ya da o rolü kullanan
-bileşenin palet dışına çıkacağı bilinerek kullanılır.
 
 ### Snackbar süresi her zaman açıkça verilir
 
@@ -582,27 +647,47 @@ Bunun yerine isim eşleştirilir ve eşleşme yoksa varsayılana düşülür
 sessiz `try/catch` değildir: davranış kodda açıkça yazılıdır ve kaybedilen şey
 yalnızca o tek alandır, satırın tamamı değil.
 
-### Mimari karar: mavi iki role bölünmüştür
+### Mimari karar: iki hue, ve rolleri şemalar arasında yer değiştiriyor
 
-| Rol | Renk | Kullanım |
+**Faz 14a'da palet değişti:** pastel mavi-camgöbeği → **koyu zümrüt + altın.**
+Gerekçe ürün kararı: uygulama para takip ediyor, palet bunu söylesin. Faz 1c'den
+beri yürürlükte olan "maviyi iki role böl" kuralı **silinmedi, genişletildi** —
+artık ayrım yalnızca roller arasında değil, **iki şema arasında** da geçiyor.
+
+**Kural ve ölçüsü.** Altın dolu bir yüzey olarak güzel, mürekkep olarak
+kullanılamaz:
+
+| Ölçüm | Oran | Sonuç |
 |---|---|---|
-| `primary` | `DeepBlue` #46707F | Metin ve ikon aksanı: abonelik fiyatı, kart ikonu |
-| `primaryContainer` | `PastelBlue` #AEC6CF | Dolu yüzeyler: dashboard kartı, FAB, Kaydet butonu |
-| `onPrimaryContainer` | `DarkText` #2D3436 | O yüzeylerin üstündeki yazı ve ikon |
+| Altın `#C9A227`, beyaz üstünde | **2,42:1** | Grafik bileşeni için gereken 3:1'i bile geçmiyor |
+| Zümrüt `#0B5C3F`, beyaz üstünde | **8,02:1** | Metin eşiğinin (4,5:1) çok üstünde |
+| Altın `#D4AF37`, koyu kart `#1F3D2D` üstünde | **5,66:1** | Koyu şemada metin olabiliyor |
 
-**Bu ayrım kasıtlıdır.** `PastelBlue` dolu bir yüzey olarak güzel çalışıyor
-(üstünde `DarkText` ile 7.11:1), ama *metin rengi* olarak beyaz kart üzerinde
-yalnızca **1.78:1** veriyordu — fiyatlar silik görünüyordu. Tek bir maviyi
-koyulaştırmak dashboard kartını ve FAB'ı da değiştirirdi; ikiye bölmek pastel
-kimliği yüzeylerde korurken metnin WCAG AA eşiğini geçmesini sağlıyor.
+Buradan çıkan kural:
 
-**Yeni renk eklenirken bu ayrıma uyulmalı:** metin/ikon olarak kullanılacak bir
-renk `primary` ailesinden ve kontrast hesabı yapılmış olmalı; dolu bir yüzey
-gerekiyorsa `*Container` rolleri kullanılmalı. Bir rengi hem zemin hem metin
-olarak kullanmak bu paletle çalışmıyor.
+- **Açık şema:** zümrüt metin/ikon/grafik, altın **yalnızca dolu yüzey**
+  (`tertiary`). Üstüne `onTertiary` = `#08301F` geliyor, 5,97:1.
+- **Koyu şema:** altın metin/ikon/grafik (`primary`), **zümrüt ailesi yüzey**
+  (`primaryContainer`, `surface`, `background`).
 
-Koyu şemada `primary` `PastelBlue` olarak kalır — koyu yüzey üstünde zaten
-7.11:1 veriyor, koyulaştırmaya gerek yok.
+Aynı mantığın devamı: bir rengi hem zemin hem mürekkep yapma. Yeni renk
+eklenirken de geçerli — metin olacak renk kontrast hesabı yapılmış olmalı, dolu
+yüzey gerekiyorsa `*Container` rolleri kullanılmalı.
+
+**Çıpa renkler** (değiştirilmez; türetilen bir renk kontrastı geçmiyorsa o renk
+değişir, çıpa değil):
+
+| | Açık | Koyu |
+|---|---|---|
+| `primary` | `#0B5C3F` zümrüt | `#D4AF37` altın |
+| `primaryContainer` | `#CDE8DA` | `#14523A` |
+| `background` | `#D3E2D8` | `#0D1A14` |
+| `surface` | `#FFFFFF` | `#1F3D2D` |
+| `error` | `#9B2226` | `#F2A0A0` |
+
+Renkler `Color.kt`'de adlandırılmış sabitler; hiçbir dosyada hardcoded hex yok
+(CLAUDE.md §4). Şemalar `by lazy` — bkz. *"renk şemaları `by lazy` ile kurulur"*.
+
 
 **Sürükleme `Animatable` ile değil düz `mutableFloatStateOf` ile yapılır.**
 `Animatable`, `snapTo` ve `animateTo` çağrılarını tek mutex ile koruyor;
@@ -1273,21 +1358,34 @@ okuyucu için bu belirleyici oldu (aşağıya bakın).
 
 ### Kategori başına renk YOK
 
-Paletimizde dört ayırt edilebilir **tanımlı** rol yok; `outline` ve
-`onSurfaceVariant` hâlâ tanımsız ve Material baseline'ına düşüyor (§12).
-Şimdi dört grafik rengi icat etmek, Faz 14'ün palet çalışmasında geri alınacak
-bir borç olurdu. Ayrımı **etiket** taşıyor, çubuk yalnızca büyüklüğü.
+Paletimizde dört ayırt edilebilir **tanımlı** rol yoktu; 13a yazılırken `outline`
+ve `onSurfaceVariant` da tanımsızdı ve Material baseline'ına düşüyordu.
+Dört grafik rengi icat etmek, Faz 14'ün palet çalışmasında geri alınacak bir borç
+olurdu. Ayrımı **etiket** taşıyor, çubuk yalnızca büyüklüğü.
 
-> Faz 14 paleti bütün olarak ele alırken renklendirme yeniden değerlendirilebilir
-> — ROADMAP'te madde var.
+> **Faz 14a'da yeniden bakıldı, karar değişmedi.** Roller artık tanımlı, ama
+> kategori başına renk hâlâ yok: paletin kuralı tek bir hue'nun mürekkep
+> olabileceğini söylüyor (§12), dört kategori için dört eşit okunaklı renk
+> üretmek o kuralı bozar. Ayrım etikette kalıyor.
 
 **İz (track) rengi ölçümle seçildi.** İlk deneme `primaryContainer`'dı ve yanlış
 çıktı: **koyu şemada `primary` ve `primaryContainer` ikisi de PastelBlue**, yani
 çubuk ile izi aynı renk oldu ve her kategori dolu göründü. API 34'te ekran
-görüntüsüyle görüldü, akıl yürütmeyle değil. İz artık çubuğun kendi renginin
-saydamlaştırılmış hâli (`primary.copy(alpha = 0.24f)`): iki temada da dolu kısma
-karışamaz ve yeni bir renk icat etmez. Üstünde metin olmadığı için bu, dashboard
-kartının reddettiği kontrast takası değil.
+görüntüsüyle görüldü, akıl yürütmeyle değil. İz o gün çubuğun kendi renginin
+saydamlaştırılmış hâli oldu (`primary.copy(alpha = 0.24f)`).
+
+**Faz 14a'da düzeltildi: iz artık saydamlık değil, tanımlı bir rol
+(`outlineVariant`).** Saydamlığın gerekçesi çakışmaydı, çakışmayı doğuran da
+koyu şemadaki aynı-renk sorunuydu; yeni palette `primary` altın,
+`primaryContainer` zümrüt, sorun kalmadı. Ölçülen: çubuk↔iz açık temada
+**4,40:1**, koyu temada **3,65:1** — ikisi de grafik bileşeni eşiği 3:1'in
+üstünde, eski solgun izin koyu temada veremediği bir şey. Üstünde metin olmadığı
+için bu, dashboard kartının reddettiği kontrast takası değil.
+
+**Kapanmayan kısım: iz ↔ arka plan** (açık 1,36:1, koyu 2,33:1). Bir izin hem
+çubuktan hem arka plandan 3:1 ayrışması için çubuğun arka plana karşı 9:1'e
+çıkması gerekir; paletin zümrütü beyazda 8,02:1 ve bu çıpa değişmiyor. "Sıfır
+kaydedildi" ile "kayıt yok" ayrımını bu yüzden tümüyle cümle taşıyor (§21).
 
 ### Oran gösterimi: hem tutar hem yüzde
 
@@ -1437,14 +1535,20 @@ ise 12a'nın parasını ödediği ayrım: sütun üç hâli ayırabiliyor —
 
 ### İz rengi yükseltilemez — ölçülen kontrast
 
-Cihazda ölçüldü: sütun açık temada arka plana karşı **3,96:1**, koyu temada
-**9,25:1**; sütun **kendi izine** karşı açık temada **3,01:1**. Sonuncusu bir
-grafik nesnesi için istenen 3:1 sınırının tam üstünde. İzi koyulaştırmak onu
-arka plandan daha görünür yapardı ama sütun–iz farkını sınırın **altına**
-düşürürdü. Bu yüzden `alpha = 0.24f` (13a'da seçilen değer) bir tavan:
-"sıfır kaydedilmiş ay" ile "kaydı olmayan ay" arasındaki farkı gözle ayırmak
-zayıf kalıyor ve ayrımı **cümle** taşıyor. Bilinen sınır, §12'nin palet
-borcuyla birlikte Faz 14'te tekrar okunmalı.
+13b'de ölçülen: sütun açık temada arka plana karşı **3,96:1**, koyu temada
+**9,25:1**; sütun **kendi izine** karşı açık temada **3,01:1** — 3:1 sınırının
+tam üstünde, yani sınırın kendisi kadar iyi.
+
+**Faz 14a'da tekrar okundu ve iyileşti.** İz artık saydamlık değil,
+`outlineVariant`: sütun↔iz açık temada **4,40:1**, koyu temada **3,65:1**;
+sütun↔arka plan açık **5,98:1**, koyu **8,50:1**.
+
+Ama başlıktaki sınır **duruyor ve kalıcı.** İz hem sütundan hem arka plandan
+3:1 ayrışamıyor (iz↔arka plan açık 1,36:1, koyu 2,33:1) ve bu bir renk seçme
+meselesi değil: iki koşul birlikte sütunun arka plana karşı **9:1**'e çıkmasını
+gerektiriyor, paletin zümrütü beyazda 8,02:1 ve çıpa değişmiyor (§12). Yani
+"sıfır kaydedilmiş ay" ile "kaydı olmayan ay" farkını gözle ayırmak hâlâ zayıf,
+ayrımı **cümle** taşıyor.
 
 ### Eksen etiketleri: ölçek bir kez, aylar birer kez
 
@@ -1463,10 +1567,13 @@ Bir aya ait tutar sıfırdan büyük ama piksele yuvarlanınca sıfır oluyorsa 
 
 ### Artış/azalış: renk değil, ok ve cümle
 
-Kırmızı/yeşil iki kere birden yok: `error` şemada tanımsız ve Material
-baseline'ına düşüyor (§12), yeşil palette hiç yok. Zaten yanlış araç olurdu —
-renk tek başına ayırt edemeyen okuyucuya bir şey söylemez ve harcamanın artması
-bilerek abonelik ekleyen biri için kötü haber değildir. Ok ile metin **aynı**
+Kırmızı/yeşil iki kere birden yok. 13b'de gerekçe "`error` tanımsız, yeşil
+palette hiç yok"du; **Faz 14a ikisini de değiştirdi ve karar yine aynı kaldı,
+hatta güçlendi:** artık paletin nötr mürekkebi zümrüt, yani *yeşil*. Yeşil bir
+ok "bu iyi gitti" değil "bu uygulama" demektir, kırmızı bir ok da sıradan bir ay
+için "bir şey bozuldu" der. Zaten yanlış araç: renk tek başına ayırt edemeyen
+okuyucuya bir şey söylemez ve harcamanın artması bilerek abonelik ekleyen biri
+için kötü haber değildir. Ok ile metin **aynı**
 renkte (`primary`), yön **sözcükle** yazılıyor: *"Geçen aya göre 150,00 TL
 arttı"*. Ok dekoratif (`contentDescription = null`), çünkü cümle zaten yönü
 söylüyor; ekran okuyucu bilgiyi bir kez duyuyor. Değişim yoksa ok da yok: yana

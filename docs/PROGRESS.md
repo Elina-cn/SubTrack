@@ -27,6 +27,168 @@ Her faz sonunda **en üste** yeni kayıt eklenir. Eski kayıtlar silinmez.
 
 ---
 
+## [Faz 14a] Renk Paletinin Yeniden Tasarımı: Zümrüt + Altın — 2026-09-15
+
+**Durum:** Tamamlandı. **Faz 14 KAPANMADI** — dynamic color, manuel tema tercihi
+ve para birimi gösterimi 14b'nin işi. `Dimens.kt`, `Type.kt`, `domain/`, `data/`,
+`reminder/`, Room, DataStore ve `AndroidManifest.xml` değişmedi; hiçbir boyut,
+düzen veya jest mantığına dokunulmadı.
+
+### Temel kural, ve neden ölçüyle kondu
+
+Palet pastel mavi-camgöbeğinden koyu zümrüt + altına geçti. Altın çıpa rengi
+tek başına bir sorun taşıyor:
+
+| Ölçüm | Oran | Sonuç |
+|---|---|---|
+| Altın `#C9A227`, beyaz üstünde | **2,42:1** | Grafik bileşeni için gereken 3:1'i bile geçmiyor |
+| Zümrüt `#0B5C3F`, beyaz üstünde | **8,02:1** | Metin eşiğinin (4,5:1) çok üstünde |
+| Altın `#D4AF37`, koyu kart `#1F3D2D` üstünde | **5,66:1** | Koyu şemada metin olabiliyor |
+
+Buradan çıkan kural, ve bu fazın omurgası: **açık temada zümrüt
+metin/ikon/grafik, altın yalnızca dolu yüzey; koyu temada altın
+metin/ikon/grafik, zümrüt ailesi yüzey.** İki şema aynı rollere farklı hue
+veriyor — koyu tema açık temanın koyultulmuşu değil (`ARCHITECTURE.md` §12).
+
+### Envanter: "biz kullanmıyoruz" ile "kimse kullanmıyor" aynı şey değil
+
+Kod yazmadan önce `grep colorScheme.` ile tarandı. Kodun adıyla çağırdığı **9**
+rol var; bunlardan **2'si** (`error`, `onSurfaceVariant`) şemada tanımsızdı,
+yani Material baseline'ından geliyordu. Ama asıl bulgu şu: tanımsız rolleri
+çizen bileşenler bizim değil, Material'ın kendi bileşenleri. Snackbar'ın "Geri
+al"ı `inversePrimary` istiyor, chip kenarlığı `outline`, ayraç `outlineVariant`.
+Hiçbiri kodumuzda geçmiyordu ve üçü de baseline mordan çiziliyordu.
+
+**Karar: şemanın tamamı tanımlanır** — iki şemada da 37 rol. Tanımlamak
+ileride sessizce doğru rengi verir, tanımlamamak sessizce baseline verir.
+
+### Kontrast tablosu
+
+Her çift hesaplandı; eşik normal metin 4,5:1, büyük metin ve grafik 3:1.
+
+| Çift | Açık | Koyu |
+|---|---|---|
+| `onSurface` / `surface` | 14,45 | 10,05 |
+| `onBackground` / `background` | 10,76 | 15,08 |
+| `primary` / `surface` | 8,02 | 5,66 |
+| `primary` / `background` | 5,98 | 8,50 |
+| `onPrimary` / `primary` | 8,02 | 6,87 |
+| `onPrimaryContainer` / `primaryContainer` | 11,12 | 8,07 |
+| `onSecondary` / `secondary` | 6,29 | 7,65 |
+| `onSecondaryContainer` / `secondaryContainer` | 12,05 | 7,24 |
+| `onTertiary` / `tertiary` | 5,97 | 8,23 |
+| `onTertiaryContainer` / `tertiaryContainer` | 10,83 | 7,03 |
+| `onSurfaceVariant` / `surface` | 7,84 | 7,24 |
+| `onSurfaceVariant` / `background` | 5,84 | 10,87 |
+| `onSurfaceVariant` / `surfaceVariant` | 6,31 | 5,68 |
+| `error` / `surface` | 7,92 | 5,85 |
+| `onError` / `error` | 7,92 | 8,33 |
+| `onErrorContainer` / `errorContainer` | 10,35 | 8,06 |
+| `inversePrimary` / `inverseSurface` | 5,66 | 6,77 |
+| `inverseOnSurface` / `inverseSurface` | 10,05 | 15,08 |
+| `outline` / `surface` *(kenarlık, 3:1)* | 4,46 | 4,46 |
+| `outline` / `background` *(kenarlık, 3:1)* | **3,32** | 6,69 |
+| `primary` / `primaryContainer` *(ikon, 3:1)* | 6,17 | 4,35 |
+| Çubuk / iz *(grafik, 3:1)* | 4,40 | **3,65** |
+| `onSurface` / `surfaceContainerHighest` | 11,29 | 7,88 |
+
+En düşük gereken çift **3,32:1**, eşiğin üstünde. Eşiğin altında tek çift yok;
+hiçbir eşik indirilmedi, çıpa renklerin hiçbiri değiştirilmedi.
+
+### Kapanan üç ölçülmüş borç
+
+- **Koyu temada kart ↔ arka plan** 1,29:1 → **1,50:1**. Cihazda `#1F3D2D`
+  üstüne `#0D1A14` okunarak doğrulandı.
+- **13a'nın çubuk ↔ iz çakışması.** İz artık çubuğun saydamlaştırılmışı değil,
+  kendi rolü (`outlineVariant`). Eski gerekçe — koyu şemada `primary` ile
+  `primaryContainer` aynı pastel maviydi — yeni palette geçersiz.
+- **13b'nin trend sütunu ↔ iz oranı** 3,01:1 → açık 4,40:1, koyu 3,65:1.
+
+Bir borç **kapanmadı ve kapanamaz**: iz ↔ arka plan (açık 1,36:1, koyu 2,33:1).
+Cebirle gösterildi — iz hem çubuktan hem arka plandan 3:1 ayrışacaksa, çubuğun
+arka plana karşı 9:1'e çıkması gerekir; paletin zümrütü beyazda 8,02:1. "Sıfır
+kaydedildi" ile "kayıt yok" ayrımını bu yüzden hâlâ tümüyle cümle taşıyor.
+
+### Cihazda piksel olarak doğrulanan
+
+| Ne | Önce | Sonra | Rol |
+|---|---|---|---|
+| Snackbar "Geri al" (açık) | mor | `#D4AF37` | `inversePrimary` |
+| Snackbar zemini (açık) | nötr gri | `#1F3D2D` | `inverseSurface` |
+| Snackbar metni (açık) | — | `#E8EDE9` | `inverseOnSurface` |
+| Seçilmemiş chip kenarlığı (açık) | mor-gri | `#5C7F6C` | `outline` |
+| Seçilmemiş chip etiketi (açık) | mor-gri | `#35594A` | `onSurfaceVariant` |
+| Seçili chip dolgusu / mürekkebi (açık) | — | `#CDE8DA` / `#08301F` | `primaryContainer` |
+| Chip kenarlığı / etiketi (koyu) | mor-gri | `#84A694` / `#B9CFC2` | `outline` |
+| Dağılım çubuğu / izi (açık) | çubuğun solgunu | `#0B5C3F` / `#A8C7B6` | 4,40:1 |
+| Dağılım çubuğu / izi (koyu) | çubuğun solgunu | `#D4AF37` / `#3A5A48` | 3,65:1 |
+
+Ekranın hiçbir yerinde baseline mor kalmadı.
+
+**Yapılanlar**
+- `Color.kt` bütünüyle yeniden yazıldı: palet adlandırılmış sabitler hâlinde,
+  KDoc kuralı ve ölçüsünü taşıyor
+- `Theme.kt` iki şemada da 37 rolü açıkça yazıyor; `by lazy` yapısı korundu
+- Çubuk ve trend izleri `outlineVariant`'a geçti, `TRACK_ALPHA` sabitleri silindi
+- Beş chip bileşenine `FilterChipDefaults.filterChipBorder(...)` ile
+  `outline` kenarlığı verildi
+- Her ekran iki temada yeniden gözden geçirildi, 27 ekran görüntüsü alındı
+
+**Değişen dosyalar**
+- `ui/theme/Color.kt`, `ui/theme/Theme.kt` — palet ve iki şema
+- `ui/statistics/components/CategoryBarRow.kt`, `MonthlyTrendChart.kt` — iz rolü
+  ve renkle ilgili KDoc'un düzeltilmesi
+- `ui/statistics/components/MonthlyChangeRow.kt`, `ExpensiveSubscriptionRow.kt`,
+  `ui/home/components/SubscriptionCard.kt`, `ui/common/EmptyState.kt` — yalnızca
+  renk hakkında yanlış kalan yorumlar
+- `ui/common/BillingPeriodSelector.kt`, `CategoryFilterBar.kt`,
+  `CategorySelector.kt`, `CurrencySelector.kt`, `TotalPeriodToggle.kt` — chip
+  kenarlığı
+- `docs/screenshots/phase-14a/` — 27 PNG
+- `docs/ARCHITECTURE.md`, `docs/ROADMAP.md`, `docs/TESTING.md`, `docs/PROGRESS.md`
+
+**Commit'ler**
+- `ed75c25` feat: repaint the app in deep emerald and gold, with every role defined
+- `05f64ca` fix: give the chart track a real role, and correct what the code says about colour
+- `b3a42b2` fix: draw an unselected chip's border in the role meant for control boundaries
+- `b930991` docs: add phase 14a theme screenshots
+
+**Karşılaşılan sorunlar**
+- **Chip yaması bir dosyayı ıskaladı.** `CategoryFilterBar` renklerini satır
+  içinde değil `filterColors()` yardımcısıyla veriyor; aynı kalıpla yazılan
+  yama oraya oturmadı. Cihazda piksel hâlâ `#A8C7B6` çıkınca görüldü, bir
+  `filterBorder()` yardımcısı eklendi ve `#5C7F6C` yeniden ölçüldü. Ders:
+  "beş dosyaya aynı yamayı uyguladım" derlemenin geçmesiyle doğrulanmıyor.
+- **Snackbar pikseli `exec-out screencap` ile yakalanmıyor** — birkaç megabaytın
+  USB'den akması Snackbar'ın ömrünü yiyor. Önce cihaza yazıp sonra çekmek
+  gerekti (`TESTING.md`'ye eklendi).
+- `MonthlyChangeRow`'un preview'inde `Locale("tr","TR")` kullanımdan kalkmış
+  API uyarısı veriyor. **Bu fazın işi değil** — uyarı 13b'den (`ccf166f`) beri
+  duruyordu, dosya yeniden derlendiği için görünür oldu. Raporlandı,
+  düzeltilmedi (CLAUDE.md §3).
+
+**Test sonucu**
+- 298 birim testinin hepsi **değişmeden** geçti; hiçbir test eklenmedi veya
+  düzenlenmedi — renk değişikliği davranış değiştirmiyor
+- `lint`: 0 hata, 24 uyarı (öncekiyle aynı)
+- 105 maddelik regresyon listesi iki emülatörde koşturuldu; #15 koyu tema
+  maddesi ayrıca piksel ölçümüyle doğrulandı
+- Yazı tipi ölçeği 2.0'da hiçbir ekranda kırpılma yok
+
+**Sonraki faz için not**
+- **14b'ye kalanlar:** dynamic color, manuel tema tercihi, para birimi
+  gösteriminin tutarlılığı. Dynamic color açılırken dikkat: bu paletin kuralı
+  "hangi hue mürekkep olabilir" üzerine kurulu ve dynamic color o kararı
+  kullanıcının duvar kâğıdına devrediyor — kontrast garantisi Material'ın
+  ton paletinden gelmek zorunda kalacak.
+- **Faz 16 (ikon ve marka kimliği)** artık bu palete göre yapılacak; altının
+  mürekkep olamaması ikon çalışmasında da geçerli. Bildirim ikonu tek renk
+  siluet olduğu için özellikle: altın bir bildirim ikonu açık temada kaybolur.
+- `docs/screenshots/phase-14a/` bir sonraki palet değişikliğinde karşılaştırma
+  tabanı; silinmesin.
+
+---
+
 ## [Faz 15] Düzenleme Ekranı — 2026-09-15
 
 **Durum:** Tamamlandı. **Faz 15 KAPANDI.** `reminder/` yalnızca okundu,
