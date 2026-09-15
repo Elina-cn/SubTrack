@@ -2,6 +2,7 @@ package com.elinacn.subtrack.fake
 
 import com.elinacn.subtrack.domain.model.Currency
 import com.elinacn.subtrack.domain.model.ExchangeRateTable
+import com.elinacn.subtrack.domain.model.ThemeMode
 import com.elinacn.subtrack.domain.repository.SettingsRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -19,10 +20,16 @@ import kotlinx.coroutines.flow.map
  * write apart from a ViewModel that only updated its own copy.
  */
 class FakeSettingsRepository(
-    initial: Currency = Currency.Base
+    initial: Currency = Currency.Base,
+    initialThemeMode: ThemeMode = ThemeMode.Default,
+    initialDynamicColor: Boolean = false
 ) : SettingsRepository {
 
     private val stored = MutableStateFlow(initial)
+
+    private val storedThemeMode = MutableStateFlow(initialThemeMode)
+
+    private val storedDynamicColor = MutableStateFlow(initialDynamicColor)
 
     /** Only the edited rates, exactly as the real store keeps them. */
     private val storedRates = MutableStateFlow<Map<Currency, Long>>(emptyMap())
@@ -32,6 +39,10 @@ class FakeSettingsRepository(
     val writes = mutableListOf<Currency>()
 
     val rateWrites = mutableListOf<Pair<Currency, Long>>()
+
+    val themeModeWrites = mutableListOf<ThemeMode>()
+
+    val dynamicColorWrites = mutableListOf<Boolean>()
 
     var resetCount = 0
         private set
@@ -68,4 +79,20 @@ class FakeSettingsRepository(
     }
 
     override fun observeRatesUpdatedAt(): Flow<Long?> = updatedAt.asStateFlow()
+
+    override fun observeThemeMode(): Flow<ThemeMode> = storedThemeMode.asStateFlow()
+
+    override suspend fun setThemeMode(mode: ThemeMode) {
+        failOnWrite?.let { throw it }
+        themeModeWrites += mode
+        storedThemeMode.value = mode
+    }
+
+    override fun observeDynamicColor(): Flow<Boolean> = storedDynamicColor.asStateFlow()
+
+    override suspend fun setDynamicColor(enabled: Boolean) {
+        failOnWrite?.let { throw it }
+        dynamicColorWrites += enabled
+        storedDynamicColor.value = enabled
+    }
 }

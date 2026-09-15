@@ -2,6 +2,7 @@ package com.elinacn.subtrack.domain.repository
 
 import com.elinacn.subtrack.domain.model.Currency
 import com.elinacn.subtrack.domain.model.ExchangeRateTable
+import com.elinacn.subtrack.domain.model.ThemeMode
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -39,4 +40,22 @@ interface SettingsRepository {
 
     /** Emits when the rates were last edited, or null when they never have been. */
     fun observeRatesUpdatedAt(): Flow<Long?>
+
+    /** Emits the colour scheme the user asked for, again whenever it changes. */
+    fun observeThemeMode(): Flow<ThemeMode>
+
+    /** Stores the colour scheme the user asked for. */
+    suspend fun setThemeMode(mode: ThemeMode)
+
+    /**
+     * Emits whether the schemes are taken from the wallpaper instead of the app's own palette.
+     *
+     * Independent of [observeThemeMode] on purpose: the two answer different questions - which
+     * hues, and light or dark - and a user who turns the wallpaper colours on may still want to
+     * force dark.
+     */
+    fun observeDynamicColor(): Flow<Boolean>
+
+    /** Stores whether the wallpaper supplies the colours. */
+    suspend fun setDynamicColor(enabled: Boolean)
 }

@@ -3,9 +3,13 @@ package com.elinacn.subtrack.ui.theme
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.dynamicDarkColorScheme
+import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import com.elinacn.subtrack.domain.model.ThemeMode
 
 // Every role is spelled out, including the ones this app's own code never names. That is the point
 // of phase 14a: a role left undefined does not go unused, it goes to the Material baseline, and the
@@ -128,12 +132,41 @@ private val LightColorScheme by lazy {
     )
 }
 
+/**
+ * Wraps [content] in the app's colours.
+ *
+ * [themeMode] decides light or dark and [dynamicColor] decides whose hues those are; the two are
+ * independent, so forcing dark still works while the wallpaper is supplying the palette.
+ *
+ * The defaults are what a preview gets: the app's own palette, following the system. That is also
+ * what an untouched install gets, which is the point - the emerald and gold identity and the 37
+ * contrast ratios measured against it in phase 14a are the product, and wallpaper colours replace
+ * every one of them. See ARCHITECTURE section 23.
+ */
 @Composable
 fun SubTrackTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    themeMode: ThemeMode = ThemeMode.Default,
+    dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
-    val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
+    val darkTheme = when (themeMode) {
+        // Read only in this branch, so a forced theme does not recompose when the system flips.
+        ThemeMode.SYSTEM -> isSystemInDarkTheme()
+        ThemeMode.LIGHT -> false
+        ThemeMode.DARK -> true
+    }
+    val context = LocalContext.current
+    val colorScheme = when {
+        // Material You arrived in API 31. Below it there is nothing to read the wallpaper with,
+        // so the preference simply has no effect and our own palette applies - the expected
+        // behaviour on an older device, not a failure. The settings row says so rather than
+        // leaving the user to wonder; see SettingsScreen.
+        dynamicColor && DynamicColorSupport.isAvailableOnThisBuild() ->
+            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+
+        darkTheme -> DarkColorScheme
+        else -> LightColorScheme
+    }
 
     MaterialTheme(
         colorScheme = colorScheme,

@@ -2,12 +2,14 @@ package com.elinacn.subtrack.data.repository
 
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.elinacn.subtrack.domain.model.Currency
 import com.elinacn.subtrack.domain.model.ExchangeRateTable
+import com.elinacn.subtrack.domain.model.ThemeMode
 import com.elinacn.subtrack.domain.repository.SettingsRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
@@ -86,6 +88,29 @@ class SettingsRepositoryImpl @Inject constructor(
     override fun observeRatesUpdatedAt(): Flow<Long?> = readPreferences()
         .map { preferences -> preferences[RATES_UPDATED_AT] }
 
+    override fun observeThemeMode(): Flow<ThemeMode> = readPreferences()
+        .map { preferences ->
+            // Same fallback shape as the currency: a name this build does not know leaves the app
+            // with a theme rather than without one.
+            preferences[THEME_MODE]?.let(ThemeMode::fromName) ?: ThemeMode.Default
+        }
+
+    override suspend fun setThemeMode(mode: ThemeMode) {
+        dataStore.edit { preferences -> preferences[THEME_MODE] = mode.name }
+    }
+
+    /**
+     * Absent means off, and that is the product decision rather than a convenience: the emerald
+     * and gold identity and its measured contrasts are what phase 14a shipped, and wallpaper
+     * colours replace both. See ARCHITECTURE section 23.
+     */
+    override fun observeDynamicColor(): Flow<Boolean> = readPreferences()
+        .map { preferences -> preferences[DYNAMIC_COLOR] ?: false }
+
+    override suspend fun setDynamicColor(enabled: Boolean) {
+        dataStore.edit { preferences -> preferences[DYNAMIC_COLOR] = enabled }
+    }
+
     private fun readPreferences(): Flow<Preferences> = dataStore.data
         .catch { failure ->
             if (failure is IOException) emit(emptyPreferences()) else throw failure
@@ -95,6 +120,10 @@ class SettingsRepositoryImpl @Inject constructor(
         val MAIN_CURRENCY = stringPreferencesKey("main_currency")
 
         val RATES_UPDATED_AT = longPreferencesKey("rates_updated_at")
+
+        val THEME_MODE = stringPreferencesKey("theme_mode")
+
+        val DYNAMIC_COLOR = booleanPreferencesKey("dynamic_color")
 
         /** One key per currency, named by ISO code so the file stays readable. */
         fun rateKey(currency: Currency) = longPreferencesKey("rate_${currency.name}")
