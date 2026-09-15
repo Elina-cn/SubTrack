@@ -48,6 +48,15 @@ fun TotalPeriodToggle(
                 selected = period == selected,
                 onClick = { onSelect(period) },
                 label = { Text(stringResource(id = period.labelRes())) },
+                // An unselected chip is drawn by its outline, and Material's default for that is
+                // `outlineVariant` - a divider colour, 1.36:1 against our backdrop (measured on the
+                // device). `outline` is the role meant for a boundary that identifies a control and
+                // is 3.32:1 there, so the chip asks for that one by name.
+                border = FilterChipDefaults.filterChipBorder(
+                    enabled = true,
+                    selected = false,
+                    borderColor = MaterialTheme.colorScheme.outline
+                ),
                 colors = FilterChipDefaults.filterChipColors(
                     selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
                     selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer

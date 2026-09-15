@@ -46,6 +46,7 @@ fun CategoryFilterBar(
             selected = selected == null,
             onClick = { onSelect(null) },
             label = { Text(stringResource(id = R.string.filter_all)) },
+            border = filterBorder(),
             colors = filterColors()
         )
         SubscriptionCategory.entries.forEach { category ->
@@ -53,6 +54,7 @@ fun CategoryFilterBar(
                 selected = category == selected,
                 onClick = { onSelect(category) },
                 label = { Text(stringResource(id = category.labelRes())) },
+                border = filterBorder(),
                 colors = filterColors()
             )
         }
@@ -60,6 +62,20 @@ fun CategoryFilterBar(
 }
 
 /** The same selected colours as the two pickers in the add form, so a chip means one thing. */
+/**
+ * The boundary of an unselected chip.
+ *
+ * `outline`, not Material's default `outlineVariant`: the second is a divider colour and measures
+ * 1.36:1 against this screen's backdrop, while a border that identifies a control wants 3:1.
+ * `outline` is 3.32:1 there.
+ */
+@Composable
+private fun filterBorder() = FilterChipDefaults.filterChipBorder(
+    enabled = true,
+    selected = false,
+    borderColor = MaterialTheme.colorScheme.outline
+)
+
 @Composable
 private fun filterColors() = FilterChipDefaults.filterChipColors(
     selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
