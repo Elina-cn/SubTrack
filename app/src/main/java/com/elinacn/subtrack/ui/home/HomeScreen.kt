@@ -77,7 +77,10 @@ fun HomeScreen(
     val undoLabel = stringResource(id = R.string.undo)
     val errorText = uiState.errorMessage?.asString()
     val conversionNote = if (uiState.isTotalConverted) {
-        stringResource(id = R.string.total_converted_note, uiState.baseCurrency.name)
+        // The mark, not the code, for the same reason as every amount on this screen: the total
+        // right above this line is written with one, and naming the same currency two ways in two
+        // adjacent lines is the inconsistency phase 14b removed.
+        stringResource(id = R.string.total_converted_note, uiState.baseCurrency.symbol)
     } else {
         null
     }
