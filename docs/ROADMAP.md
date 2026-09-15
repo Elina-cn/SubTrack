@@ -382,10 +382,9 @@ Aylık toplamın zaman içindeki anlık görüntüleri. `PROJECT_SPEC.md` §1'de
 
 ---
 
-## 🟡 Faz 14 — Tema Tamamlama
+## ✅ Faz 14 — Tema Tamamlama
 
-**14a bitti, faz açık:** dynamic color, manuel tema tercihi ve para birimi
-gösterimi 14b'nin işi.
+**14a ve 14b bitti, faz kapandı.**
 
 - [x] **14a: Renk paleti bütün olarak yeniden ele alındı.** Pastel mavi-camgöbeği
       → **koyu zümrüt + altın**; gerekçe ürün kararı, uygulama para takip ediyor.
@@ -405,12 +404,26 @@ gösterimi 14b'nin işi.
 - [x] **14a:** Grafik izi artık tanımlı bir rol (`outlineVariant`), saydamlık
       değil — eski gerekçe (koyu şemada `primary` ile `primaryContainer` aynı
       renkti) yeni palette geçersiz, ölçüldü: 4,35:1
-- [ ] **14b:** Dynamic color (Material You, Android 12+)
-- [ ] **14b:** Manuel tema tercihi (sistem/açık/koyu)
-- [ ] **14b:** Para birimi gösterimi tutarlı hale getirilsin: `NumberFormat` locale'e göre
-      bazen sembol bazen ISO kodu yazıyor (EN dilinde toplam "TRY 1.785,45",
-      kart "$10.99"). Her yerde sembol mü zorlanacak, her yerde kod mu —
-      karar verilecek.
+- [x] **14b: Dynamic color (Material You, Android 12+), varsayılan KAPALI.** Gerekçe
+      ürün kararı: duvar kâğıdından gelen renkler 14a'nın zümrüt-altın kimliğini ve o
+      kimliğe göre ölçülmüş 37 rolun kontrastını geçersiz kılar (`ARCHITECTURE.md` §23).
+      API 34'te **iki farklı duvar kâğıdı paletiyle** ölçüldü: çubuk–iz oranı sıcak
+      tohumda **3,78:1**, soğuk tohumda **3,77:1**; Snackbar "Geri al" 10,84:1 ve
+      10,87:1. 14a'da eski palette yaşanan çakışma tekrarlamıyor
+- [x] **14b: Manuel tema tercihi** — sistemi takip et (varsayılan) / açık / koyu.
+      Dynamic color'dan **bağımsız**: duvar kâğıdı renkleri açıkken de koyu tema
+      zorlanabiliyor. API 31 altında dynamic color satırı görünür ama devre dışı ve
+      nedenini yazıyor — API 29'da ölçüldü
+- [x] **14b: Açılıştaki tema göz kırpması ölçüldü ve kapatıldı.** Tutma olmadan ana
+      ekran **açık temada tam çiziliyordu** (`#D3E2D8`, beyaz çubuk) sonra koyuya
+      dönüyordu. `MainActivity`'de `OnPreDrawListener` ile ilk kare tutuluyor;
+      ölçüm sonrası beyaz açılış penceresinden **doğrudan** koyuya geçiyor
+- [x] **14b: Para birimi HER YERDE SEMBOL** (₺ $ € £). Locale sayıyı belirlemeye devam
+      ediyor, para birimi işaretini belirlemiyor. Tek nokta `MoneyFormatter`;
+      bildirim zaten tutar taşımıyor, kur ekranı da artık sembolle adlandırıyor.
+      ₺ karakteri **API 29'da çiziliyor**, ekran görüntüsüyle doğrulandı
+- [x] **14b:** İki borç kapandı — `CLAUDE.md` §9 artık yeni paleti gerekçe gösteriyor,
+      `MonthlyChangeRow` preview'ı `Locale.forLanguageTag`'e geçti
 
 ---
 

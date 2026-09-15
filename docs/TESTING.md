@@ -158,6 +158,19 @@ etmeden bildirin; sonraki maddeler zaten bozuk bir durumun üstüne binebilir.
 | 104 | TalkBack ile bir satır | Hâlâ **tek odak durağı**; dokunma eylemi (Düzenle) ve "Sil" özel eylemi birlikte duruyor | 15 |
 | 105 | Düzenleme sonrası `monthly_snapshots` | Tek satır, toplamı **yeni** değer — kaydedici güncellemeyi de görüyor | 15 |
 
+| 106 | Ayarlar → Tema | Üç seçenekli diyalog: **Sistemi takip et** / Açık / Koyu. Satır seçili olanı yazıyor, satır tek odak durağı | 14b |
+| 107 | **Açık**'ı seç, sistem temasını koyuya al | Uygulama **direniyor** — açık kalıyor (`#D3E2D8`) | 14b |
+| 108 | **Koyu**'yu seç, sistem temasını açığa al | Uygulama **direniyor** — koyu kalıyor (`#0D1A14`) | 14b |
+| 109 | **Sistemi takip et**'i seç, sistem temasını değiştir | Uygulama **takip ediyor**, uygulama yeniden başlatılmadan | 14b |
+| 110 | Tema seç, uygulamayı tamamen kapat, yeniden aç | Seçim **duruyor**; açılışta **yanlış temada tek kare bile yok** — beyaz açılış penceresinden doğrudan seçilen temaya | 14b |
+| 111 | (API 31+) Ayarlar → Duvar kâğıdı renkleri | Anahtar **kapalı** geliyor; açınca palet duvar kâğıdından geliyor | 14b |
+| 112 | Duvar kâğıdı renkleri açıkken koyu temayı zorla | İkisi **birbirinden bağımsız**: renkler duvar kâğıdından, aydınlık/karanlık seçimden | 14b |
+| 113 | Duvar kâğıdı renkleri açıkken istatistik | Çubuk ile izi **ayrı renkte** (ölçüm 3,7:1 civarı); trend sütunu ile izi de öyle; Snackbar "Geri al" okunuyor | 14b |
+| 114 | (API < 31) Duvar kâğıdı renkleri satırı | **Görünüyor ama devre dışı**; alt satır "Android 12 ve üzeri gerekir" diyor. Dokunmak hiçbir şey yazmıyor | 14b |
+| 115 | Dashboard, kart, istatistik, trend, karşılaştırma ve kur ekranı | **Hiçbirinde ISO kodu yok** — hepsi ₺ $ € £. Bildirim zaten tutar taşımıyor | 14b |
+| 116 | Cihaz dilini İngilizceye al | Hâlâ sembol; sayı biçimi locale'e göre değişiyor ("₺3,060.43" ↔ "3.060,43 ₺") | 14b |
+| 117 | (API 29) ₺ karakteri | **Çiziliyor**, tofu kutusu değil — dashboard'daki en büyük punto dahil | 14b |
+
 **96-105 için not:** düzenleme maddeleri ekleme sheet'iyle **aynı** bileşenlerden
 kurulu bir formu sınıyor. #102 bilerek ikisini karşılaştırıyor: mesajlar
 ayrışırsa tek doğrulama kaynağı kuralı kırılmış demektir (`ARCHITECTURE.md` §22).
@@ -456,6 +469,56 @@ demektir — 14a'da bunun iki örneği Snackbar'ın "Geri al"ı ve chip kenarlı
 
 Karşılaştırma için: `docs/screenshots/phase-14a/` altında her ekranın iki temada
 çekilmiş hâli var.
+
+### Tema tercihi — uygulamanın kendi ayarı, sistem ayarı değil
+
+14b'den sonra `cmd uimode night` **tek başına yetmiyor**: uygulamada
+"Sistemi takip et" seçili değilse sistem teması değişse de uygulama
+değişmez, ve bu **doğru davranış**. Koyu tema maddelerinden önce
+Ayarlar → Tema'nın ne dediğine bakın.
+
+Tercih `theme_mode`, duvar kâğıdı anahtarı `dynamic_color` olarak DataStore'da:
+
+```bash
+adb exec-out run-as com.elinacn.subtrack cat files/datastore/settings.preferences_pb
+```
+
+Dosya **hiç yoksa** henüz hiçbir tercih yazılmamış demektir — API 29'da devre dışı
+satıra dokunmanın hiçbir şey yazmadığı böyle doğrulandı.
+
+### Duvar kâğıdı rengini değiştirme — `cmd wallpaper` işe yaramıyor
+
+`adb shell cmd wallpaper` bu imajlarda yalnızca karartma komutları taşıyor;
+**duvar kâğıdı atama komutu yok** (`help` çıktısında `set-wallpaper` bulunmuyor) ve
+resim seçici etkileşimli. Çalışan yöntem, sistemin duvar kâğıdından çıkardığı
+**tohum rengini** doğrudan yazmak — `dynamicLightColorScheme`'in okuduğu girdi
+zaten bu:
+
+```bash
+# sıcak / kırmızı palet
+adb shell "settings put secure theme_customization_overlay_packages '{\"android.theme.customization.system_palette\":\"B33A3A\",\"android.theme.customization.accent_color\":\"B33A3A\",\"android.theme.customization.theme_style\":\"VIBRANT\"}'"
+
+# soğuk / mavi palet
+adb shell "settings put secure theme_customization_overlay_packages '{\"android.theme.customization.system_palette\":\"2E4FB3\",\"android.theme.customization.accent_color\":\"2E4FB3\",\"android.theme.customization.theme_style\":\"VIBRANT\"}'"
+
+# geri al
+adb shell settings delete secure theme_customization_overlay_packages
+```
+
+Yazdıktan sonra birkaç saniye bekleyip uygulamayı yeniden başlatın. **Bu bir
+duvar kâğıdı resmi değil, o resimden çıkarılan renk** — üretilen şemalar gerçek
+duvar kâğıdıyla üretilenlerin aynısı, ama ölçüm tekrarlanabilir oluyor.
+14b'nin ölçümleri bu iki tohumla alındı;
+`docs/screenshots/phase-14b/` altında ikisinin ekran görüntüleri var.
+
+### Kaydırarak silme **sona doğru**, yani LTR'de sola
+
+14b turunda üç tur boşa gitti: soldan sağa kaydırma hiçbir şey yapmıyor çünkü
+**yapmaması gerekiyor** (liste #10). Silme kaydırması sağdan sola olmalı.
+
+Başlangıç noktası da önemli: API 34'te `x=1030`'dan başlayan bir kaydırma
+Google Lens'i açtı. Sağ kenardan **en az 150 px** içeriden başlatın
+(360dp'de `x=620→100`, 411dp'de `x=900→200` çalıştı).
 
 ### TalkBack
 

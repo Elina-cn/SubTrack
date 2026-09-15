@@ -1714,3 +1714,114 @@ ekran okuyucuya yok olurdu. Satır hâlâ **tek düğüm** — iki emülatörde 
   `EditedRow — today` diyor.
 
 ---
+
+## 23. Tema Tercihi, Dynamic Color ve Para Birimi Gösterimi
+
+Faz 14b. 14a paleti kurdu; bu bölüm kullanıcının o paletle ne yapabileceğini
+ve para birimi işaretinin nereden geldiğini kayda geçiriyor.
+
+### Dynamic color varsayılan KAPALI
+
+Material You renkleri duvar kâğıdından üretilir. Bu açıkken 14a'da kurulan
+zümrüt-altın kimliği **ve o kimliğe göre ölçülmüş 37 rolün kontrastı** ortadan
+kalkar; ikisi de ürünün kendisi, yanında duran süs değil. Bu yüzden:
+
+- Tercih yoksa **kapalı**. `observeDynamicColor()` anahtar yokken `false`
+  döndürüyor; bu bir kolaylık değil, ürün kararı.
+- Açmak kullanıcının seçimi. Açtığında palet artık bizim değil, o yüzden
+  14a'nın kontrast tablosu da geçerli değil.
+- Yalnızca **API 31+**. Altında `dynamicLightColorScheme` yok; tercih okunur,
+  saklanır ve etkisiz kalır, uygulama kendi paletine düşer. Bu bir hata değil,
+  beklenen davranış — ve ayarlar satırı bunu **yazıyor** (aşağıya bakın).
+
+**14b'de ölçüldü (API 34, iki farklı duvar kâğıdı paleti):** dynamic color
+açıkken grafik okunabilirliği bozulmuyor. Sıcak/kırmızı tohumda istatistik
+çubuğu `#C00020` ile izi `#DFBFBD` **3,78:1**; soğuk/mavi tohumda `#004FE6`
+ile `#C4C5D6` **3,77:1**. Trend sütunu her iki palette de aynı çifti
+kullanıyor. Snackbar'ın "Geri al"ı sıcakta 10,84:1, soğukta 10,87:1. Yani
+14a'da eski palette yaşanan çubuk-iz çakışması Material You'da tekrarlamıyor;
+üretilen paletler rolleri zaten ayırıyor.
+
+### Tema modu ile dynamic color BİRBİRİNDEN BAĞIMSIZ
+
+İki ayrı anahtar, iki ayrı soru: **hangi hue'lar** (dynamic color) ve
+**açık mı koyu mu** (tema modu). Duvar kâğıdı renklerini açan bir kullanıcı
+koyu temayı zorlamaya devam edebilmeli. Tek bir "tema" ayarı bu ikisini
+birleştirseydi, Material You'yu açmak aydınlık/karanlık kararını sessizce
+sisteme geri verirdi.
+
+Tema modu üç değerli: `SYSTEM` (varsayılan) / `LIGHT` / `DARK`. `SYSTEM`
+"açık"ın süslü hâli değil; sistem değiştikçe uygulama da değişsin diye verilen
+sürekli bir talimat. `isSystemInDarkTheme()` yalnızca o dalda okunuyor, böylece
+zorlanmış bir tema sistem dönerken yeniden derlenmiyor.
+
+### Yeni repository AÇILMADI
+
+Her ikisi de **mevcut** `SettingsRepository`'ye eklendi ve §14'teki tek
+`DataStore<Preferences>` örneğini kullanıyor. Gerekçe: ayrı bir
+`ThemeRepository` aynı dosyanın üstüne ikinci bir arayüz koyardı ve yeni bir
+tercihin hangisine gideceğini söyleyen bir kural olmazdı. Ana para biriminin
+deseni birebir tekrarlandı — ad ile saklama (ordinal değil), bilinmeyen değerde
+varsayılana düşme, `IOException`'da `emptyPreferences()`.
+
+`DynamicColorSupport` ise ayrı bir arayüz, çünkü `Build.VERSION.SDK_INT`
+cihaz dışında sıfır okur ve ViewModel testlenemez hâle gelir. Desen
+`ReminderNotificationStatus` ile aynı (§18). Sürüm sayısı tek bir yerde:
+`isAvailableOnThisBuild()`, `@ChecksSdkIntAtLeast` ile işaretli ki lint
+koruma çağrısını takip edebilsin.
+
+### Açılışta ilk kare TUTULUYOR
+
+**Ölçüldü (API 34, sistem açık temada, saklanan tercih koyu):** tutma
+olmadan ana ekran **açık temada tam olarak çiziliyordu** — arka plan
+`#D3E2D8`, uygulama çubuğu beyaz — ve ancak ondan sonra koyuya dönüyordu. Tek
+bir tam kare, ama kullanıcıya uygulamanın fikir değiştirdiği gibi görünüyor.
+
+Çözüm `MainActivity`'de bir `OnPreDrawListener`: tercih okunana kadar pencere
+çizilmiyor. Bekleyeceğine bir tema tahmin etmek çözüm değil — her tahmin biri
+için yanlış. Bu yolla pencerenin kendi arka planı birkaç kare yerini tutuyor,
+zaten soğuk açılışta yaptığı gibi.
+
+İki ayrıntı önemli:
+
+- Dinleyici **`setContent`'ten SONRA** kayıt ediliyor. Önce kaydedildiğinde
+  hiç çalışmadı: içerik görünümünün içine bir şey konana kadar kendi
+  `ViewTreeObserver`'ı yok, placeholder olana kayıt edilen dinleyici kayboluyor.
+  Ölçüldü — önce kayıtta açık temalı kare hâlâ görünüyordu (`#D3E2D8`).
+- Bir **son tarih** var (1 sn). Tercihler hiç gelmezse — repository'nin
+  `IOException` yedeğinin kapsamadığı bir hata — kapı yine de açılıyor ve
+  uygulama varsayılan temayla geliyor. Yanlış tema düzeltilebilir; hiç
+  çizilmeyen bir pencere düzeltilemez.
+
+Doğrulandıktan sonra: beyaz açılış penceresinden **doğrudan** koyuya
+(`#0D1A14`) geçiyor, arada açık temalı kare yok.
+
+### Para birimi: HER YERDE SEMBOL
+
+`NumberFormat` para işaretini okuyucunun locale'inden alır ve o locale'de o
+para birimi için glif yoksa **üç harfli ISO koduna** düşer. Sonuç tutarsızdı:
+İngilizce arayüzde toplam "TRY 1.785,45", kart "$10.99" diyordu — aynı ekranda
+iki farklı yazım.
+
+Kural: **locale sayıyı belirler, para birimi işareti belirlemez.** Ondalık
+ayracı, binlik gruplama ve işaretin sayının hangi tarafında durduğu okuyucunun;
+işaretin kendisi her locale'de `Currency.symbol`.
+
+- İşaret `domain/model/Currency` üzerinde, `strings.xml`'de değil. Çevrilebilir
+  metin değil: lira her dilde lira, ve çeviri dosyası onu değiştirmeye davettir.
+- Platformdan da okunmuyor; platformun cevabı zaten düzeltilen sorunun kaynağı.
+- Uygulama noktası tek: `MoneyFormatter`, `DecimalFormatSymbols.currencySymbol`
+  üzerinden. Para birimi atandıktan **sonra** yazılıyor, çünkü para birimi
+  atamak sembolü locale'in kendi cevabıyla geri yazar.
+- Kur ekranı tutar biçimlendirmiyor, para birimi **adlandırıyor** — o da aynı
+  işaretlerle ("1 $ = … ₺"). Çıpayı "TRY" diye anan, toplamı "₺" ile yazan bir
+  uygulama okuyucudan tek şey için iki ad tutmasını ister.
+- **İstisna:** ayarlardaki para birimi seçici chip'leri ISO kodunu yazmaya
+  devam ediyor (TRY / USD / EUR / GBP). Orada kod bir tutarın yazımı değil,
+  seçilen şeyin kimliği; chip'in ekran okuyucuya verdiği ad zaten tam adı
+  söylüyor (§ Faz 9b).
+
+**₺ karakteri API 29'da çiziliyor** — eski font sürümlerinde eksik olabilir
+diye ayrıca ölçüldü.
+
+---

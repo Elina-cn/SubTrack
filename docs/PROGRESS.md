@@ -27,6 +27,155 @@ Her faz sonunda **en üste** yeni kayıt eklenir. Eski kayıtlar silinmez.
 
 ---
 
+## [Faz 14b] Dynamic Color, Tema Tercihi ve Para Birimi Gösterimi — 2026-09-16
+
+**Durum:** Tamamlandı. **Faz 14 KAPANDI.** `Color.kt` değişmedi — bu faz palet
+değiştirmiyor. `Dimens.kt`, `Type.kt`, `AndroidManifest.xml`, `domain/usecase/`,
+`reminder/`, Room ve snapshot tarafı da değişmedi; jest mantığına, düzene ve
+boyutlara dokunulmadı. `Theme.kt`'deki `by lazy` yapısı olduğu gibi duruyor.
+
+### Dynamic color varsayılan kapalı — ve iki duvar kâğıdıyla ölçüldü
+
+Material You renkleri duvar kâğıdından gelir; açıldığı anda 14a'nın zümrüt-altın
+kimliği ve o kimliğe göre ölçülmüş 37 rolün kontrastı geçersiz olur. Bu yüzden
+tercih varsayılan olarak **kapalı** ve açmak kullanıcının seçimi.
+
+14a'da eski palette çubuk ile izi çakışıp grafik okunmaz olmuştu; bu fazın asıl
+sorusu Material You'da aynı şeyin olup olmadığıydı. **Olmuyor** (API 34):
+
+| Palet | İstatistik çubuğu / iz | Trend sütunu / iz | Snackbar "Geri al" |
+|---|---|---|---|
+| Sıcak (tohum `#B33A3A`) | `#C00020` / `#DFBFBD` — **3,78:1** | aynı çift | `#FFB3AF` / `#1E100F` — **10,84:1** |
+| Soğuk (tohum `#2E4FB3`) | `#004FE6` / `#C4C5D6` — **3,77:1** | aynı çift | `#B6C4FF` / `#11131C` — **10,87:1** |
+
+Kendi paletimizde aynı çift koyu temada `#D4AF37` / `#3A5A48` = **3,65:1** çıktı,
+yani 14a'nın kaydettiği değer birebir korundu.
+
+**Duvar kâğıdı nasıl değiştirildi:** `cmd wallpaper` bu imajlarda duvar kâğıdı
+atama komutu taşımıyor ve resim seçici etkileşimli. Onun yerine sistemin duvar
+kâğıdından çıkardığı **tohum rengi** doğrudan yazıldı
+(`settings put secure theme_customization_overlay_packages`) — bu, üretilen
+şemanın gerçek girdisi. Komutlar `TESTING.md`'de.
+
+### Tema tercihi üç seçenekli, dynamic color'dan bağımsız
+
+İki ayrı anahtar, iki ayrı soru: hangi hue'lar, ve açık mı koyu mu. Duvar kâğıdı
+renkleri açıkken de koyu tema zorlanabiliyor — testle ve cihazda doğrulandı.
+
+Seçim **diyalog** ile yapılıyor, chip veya segmented ile değil. Gerekçe genişlik:
+"Sistemi takip et" tek başına 360dp'nin üçte birinden geniş, ve fs 2.0'da üçü
+yan yana sığmıyor. Diyalog her seçeneğe tam satır veriyor; ölçüldü, fs 2.0'da
+seçenek satırları 75dp / 48dp / 48dp, hiçbiri kırpılmıyor.
+
+### Açılıştaki tema göz kırpması: vardı, ölçüldü, kapatıldı
+
+Sistem açık temadayken saklanan tercih koyu iken ana ekran **açık temada tam
+olarak çiziliyordu** — arka plan `#D3E2D8`, uygulama çubuğu beyaz — ve ancak
+sonra koyuya dönüyordu. Tek bir tam kare, ama uygulamanın fikir değiştirmesi gibi
+görünüyor.
+
+`MainActivity`'de `OnPreDrawListener` ile ilk kare tutuldu. İki ayrıntı ölçümle
+düzeltildi:
+
+1. **Dinleyici `setContent`'ten sonra kayıt edilmeli.** Önce kayıt edildiğinde
+   hiç çalışmadı ve açık temalı kare (`#D3E2D8`) hâlâ görünüyordu: içerik
+   görünümüne bir şey konana kadar kendi `ViewTreeObserver`'ı yok.
+2. **Son tarih bir `postDelayed` olmalı, dinleyicinin içinde okunan bir değer
+   değil.** Çizimi iptal etmek yeni bir traversal planlamıyor, dinleyici de ancak
+   bir traversal olursa çalışıyor — yani dinleyicinin içindeki son tarih, tam da
+   onun var olduğu durumda (tercih hiç gelmezse) hiç okunmuyordu. Sonuç hiç
+   çizilmeyen bir pencere, sistemin diliyle "does not have a focused window".
+
+Düzeltmeden sonra: beyaz açılış penceresinden **doğrudan** `#0D1A14`'e; arada
+açık temalı kare yok. Kare kare taramayla doğrulandı.
+
+### Para birimi: locale sayıyı belirler, işareti belirlemez
+
+`NumberFormat` para işaretini okuyucunun locale'inden alıyor ve glif yoksa ISO
+koduna düşüyordu: İngilizce arayüzde toplam "TRY 1.785,45", kart "$10.99".
+
+Artık işaret her locale'de `Currency.symbol` (₺ $ € £); ondalık ayracı, gruplama
+ve işaretin hangi tarafta durduğu locale'in kalıyor. Cihazda ham metinle
+doğrulandı:
+
+- İngilizce: `Total Monthly, ₺3,060.43` · `Spotify, $10.99` · `Gym, £9.99`
+- Türkçe: `Aylık Toplam, ₺3.060,43` · `iCloud, ₺29,99` · `Notion, €12,00`
+
+**Tarama sonucu — biçimlendirme kaç yerde yapılıyor:** tek yerde,
+`MoneyFormatter`. Dashboard, kart, istatistik dağılımı, en pahalı listesi, trend
+ekseni ve tepe etiketi, "geçen aya göre" cümlesi — hepsi oradan geçiyor.
+**Bildirim hiç tutar taşımıyor** (`reminder/` içinde ne `Money` ne `Currency`
+geçiyor; metin "ad — bugün/yarın/N gün kaldı"). **Kur ekranı** tutar
+biçimlendirmiyor, para birimi *adlandırıyor* — o da artık sembolle
+("1 $ = … ₺"). Dashboard'ın çeviri notu ilk turda gözden kaçtı, cihazda
+yakalandı ve düzeltildi.
+
+**İstisna, bilerek:** ayarlardaki para birimi seçici chip'leri ISO kodunu yazmaya
+devam ediyor. Orada kod bir tutarın yazımı değil, seçilen şeyin kimliği; chip'in
+ekran okuyucuya verdiği ad zaten "Türk lirası" / "ABD doları" diyor.
+
+**₺ karakteri API 29'da çiziliyor** — eski font sürümlerinde eksik olabilir diye
+ayrıca ölçüldü, dashboard'daki en büyük puntoda dahil tofu kutusu yok.
+
+**Değişen 298 test yok.** Mevcut testlerin hiçbiri biçimlendirilmiş bir para
+metnine bakmıyordu — `MoneyFormatter`'ın bu faza kadar hiç testi yoktu — yani
+para birimi biçimi değişince bir beklenti kırılmadı. 298 → **331**, hepsi yeşil.
+
+**Değişen dosyalar**
+- `domain/model/ThemeMode.kt` — **yeni**, üç değerli tema modu
+- `domain/repository/SettingsRepository.kt` — dört yeni üye (tema modu + dynamic color)
+- `data/repository/SettingsRepositoryImpl.kt` — `theme_mode` ve `dynamic_color` anahtarları, mevcut DataStore örneğinde
+- `ui/theme/Theme.kt` — mod ve dynamic color'a göre şema seçimi; `by lazy` korundu
+- `ui/theme/DynamicColorSupport.kt` + `AndroidDynamicColorSupport.kt` — **yeni**, API 31 kapısı tek yerde, `@ChecksSdkIntAtLeast` ile
+- `di/ThemeModule.kt` — **yeni**, bağlama
+- `MainViewModel.kt` — **yeni**, activity'nin tema durumu
+- `MainActivity.kt` — ilk kareyi tutan kapı
+- `ui/settings/SettingsUiState.kt`, `SettingsViewModel.kt`, `SettingsScreen.kt` — iki yeni satır ve olayları
+- `ui/settings/ThemeModeDialog.kt` — **yeni**, üç seçenekli chooser
+- `ui/common/SettingsSwitchRow.kt` — **yeni**, anahtarlı ayar satırı (tek odak durağı)
+- `ui/common/MoneyFormatter.kt` — sembol zorlanıyor; ölü `spacedAfterCode` kalktı
+- `domain/model/Currency.kt` — `symbol` alanı
+- `ui/settings/rates/ExchangeRatesScreen.kt`, `ui/home/HomeScreen.kt` — para birimini sembolle adlandırma
+- `ui/statistics/components/MonthlyChangeRow.kt` — `Locale.forLanguageTag`
+- `res/values{,-en}/strings.xml` — sekiz yeni metin
+- `CLAUDE.md` §9 — gerekçedeki renkler yeni palete güncellendi
+- Testler: `MoneyFormatterTest` (yeni), `SettingsViewModelThemeTest` (yeni), `SettingsRepositoryImplTest` (genişletildi), `FakeDynamicColorSupport` (yeni), `FakeSettingsRepository` (genişletildi)
+
+**Commit'ler**
+- `4833739` feat: store the theme choice and the wallpaper-colour choice, and hold the first frame
+- `3aaa72b` feat: add the theme and wallpaper-colour rows to settings
+- `15ea9ca` fix: write every amount with a currency symbol, whatever the locale says
+- `ebfd1fc` chore: clear the two phase 14a leftovers
+- `29168f2` test: cover the theme preferences and the forced currency symbol
+- `761b1b6` docs: add phase 14b dynamic colour screenshots
+- `0443481` fix: post the first-frame deadline instead of testing it inside the listener
+- `05f32e2` fix: name the currency with its mark in the dashboard's conversion note too
+
+**Karşılaşılan sorunlar**
+
+- **İlk kare kapısı iki kez yanlış kuruldu.** Birincisi `setContent`'ten önce
+  kayıt, ikincisi son tarihi dinleyicinin içinde okumak. İkisi de ölçümle
+  yakalandı; ikincisi ANR loglarındaki "does not have a focused window"
+  satırından çıktı.
+- **Dashboard'ın çeviri notu taramada kaçtı.** Kod içi arama `MoneyFormatter`
+  çağrılarına bakıyordu, o satır ise para birimini `stringResource`'a *ad* olarak
+  veriyordu. Cihazda Türkçeye geçince görüldü.
+- **Kaydırarak silme üç tur boşa gitti**: silme yönü sona doğru, yani LTR'de
+  **sola**. Sağa kaydırma hiçbir şey yapmıyor çünkü yapmaması gerekiyor
+  (liste #10). Ayrıca API 34'te sağ kenardan başlayan kaydırma Google Lens'i
+  açıyor. İkisi de `TESTING.md`'ye yazıldı.
+- **İki emülatör aynı anda koşarken** hem launcher hem uygulama ANR verdi; tek
+  emülatörle tekrarlanmadı. Ölçümler tek emülatörle alındı.
+
+**Sonraki faz için not**
+- `#39` (yalnızca kanalı kapatma) sürülemedi: kanal ilk bildirim gönderilene
+  kadar oluşmuyor, o da enstrümantasyon istiyor. TalkBack maddeleri (`#84`,
+  `#95`, `#104`) bu imajlarda hâlâ yapılamıyor — ağaçtan doğrulandı.
+- Dynamic color açıkken 14a'nın kontrast tablosu geçerli değil ve olamaz; ölçüm
+  iki tohum için yapıldı, her duvar kâğıdı için yapılamaz. Bu bilinçli bir sınır.
+
+---
+
 ## [Faz 14a] Renk Paletinin Yeniden Tasarımı: Zümrüt + Altın — 2026-09-15
 
 **Durum:** Tamamlandı. **Faz 14 KAPANMADI** — dynamic color, manuel tema tercihi
