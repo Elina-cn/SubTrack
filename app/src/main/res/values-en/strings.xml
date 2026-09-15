@@ -55,6 +55,15 @@
     <string name="main_currency_label">Main Currency</string>
     <string name="main_currency_description">The monthly total is shown in this currency.</string>
     <string name="error_setting_save_failed">Could not save the setting</string>
+    <!-- Theme -->
+    <string name="theme_mode_title">Theme</string>
+    <string name="theme_mode_system">Follow the system</string>
+    <string name="theme_mode_light">Light</string>
+    <string name="theme_mode_dark">Dark</string>
+    <string name="dynamic_color_title">Wallpaper colours</string>
+    <string name="dynamic_color_on">On — colours come from the wallpaper</string>
+    <string name="dynamic_color_off">Off — the app’s own palette</string>
+    <string name="dynamic_color_unsupported">Requires Android 12 or newer</string>
     <!-- Exchange rates -->
     <string name="exchange_rates_title">Exchange Rates</string>
     <string name="exchange_rates_row_description">Edit the rates your total is calculated with</string>

@@ -4,10 +4,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.elinacn.subtrack.R
 import com.elinacn.subtrack.domain.model.Currency
+import com.elinacn.subtrack.domain.model.ThemeMode
 import com.elinacn.subtrack.domain.repository.ReminderStateRepository
 import com.elinacn.subtrack.domain.repository.SettingsRepository
 import com.elinacn.subtrack.reminder.ReminderNotificationStatus
 import com.elinacn.subtrack.ui.common.UiText
+import com.elinacn.subtrack.ui.theme.DynamicColorSupport
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -24,7 +26,8 @@ import javax.inject.Inject
 class SettingsViewModel @Inject constructor(
     private val repository: SettingsRepository,
     private val reminderState: ReminderStateRepository,
-    private val notificationStatus: ReminderNotificationStatus
+    private val notificationStatus: ReminderNotificationStatus,
+    private val dynamicColorSupport: DynamicColorSupport
 ) : ViewModel() {
 
     /** Everything that is not stored in the settings file. */
@@ -37,10 +40,17 @@ class SettingsViewModel @Inject constructor(
      */
     val uiState: StateFlow<SettingsUiState> = combine(
         repository.observeMainCurrency(),
+        repository.observeThemeMode(),
+        repository.observeDynamicColor(),
         screenState
-    ) { currency, reminder ->
+    ) { currency, themeMode, dynamicColor, reminder ->
         SettingsUiState(
             mainCurrency = currency,
+            themeMode = themeMode,
+            isThemeDialogVisible = reminder.isThemeDialogVisible,
+            isDynamicColorEnabled = dynamicColor,
+            // Not stored: it is a property of the device, so it is read rather than remembered.
+            isDynamicColorSupported = dynamicColorSupport.isAvailable(),
             reminderPermission = reminder.permission,
             isReminderRationaleVisible = reminder.isRationaleVisible,
             pendingReminderAction = reminder.pendingAction,
@@ -56,6 +66,16 @@ class SettingsViewModel @Inject constructor(
     fun onEvent(event: SettingsEvent) {
         when (event) {
             is SettingsEvent.SelectMainCurrency -> setMainCurrency(event.currency)
+
+            SettingsEvent.ThemeRowTapped ->
+                screenState.update { it.copy(isThemeDialogVisible = true) }
+
+            is SettingsEvent.SelectThemeMode -> setThemeMode(event.mode)
+
+            SettingsEvent.ThemeDialogDismissed ->
+                screenState.update { it.copy(isThemeDialogVisible = false) }
+
+            is SettingsEvent.SetDynamicColor -> setDynamicColor(event.enabled)
 
             is SettingsEvent.RefreshReminderPermission -> refreshReminders(event.canShowRationale)
 
@@ -160,9 +180,35 @@ class SettingsViewModel @Inject constructor(
     }
 
     private fun setMainCurrency(currency: Currency) {
+        write { repository.setMainCurrency(currency) }
+    }
+
+    /**
+     * The chooser closes on the tap, not on the write.
+     *
+     * A dialog left open while the disk is written would be the only part of this screen that
+     * waits on storage. The stored value still drives what is shown underneath, so a write that
+     * fails leaves the row on the old theme and raises the snackbar.
+     */
+    private fun setThemeMode(mode: ThemeMode) {
+        screenState.update { it.copy(isThemeDialogVisible = false) }
+        write { repository.setThemeMode(mode) }
+    }
+
+    private fun setDynamicColor(enabled: Boolean) {
+        write { repository.setDynamicColor(enabled) }
+    }
+
+    /**
+     * Stores a preference and reports a failure rather than swallowing it.
+     *
+     * Every setting on this screen writes the same way - the store is the source of truth and a
+     * write that did not stick has to say so - so the shape is written once.
+     */
+    private fun write(store: suspend () -> Unit) {
         viewModelScope.launch {
             try {
-                repository.setMainCurrency(currency)
+                store()
             } catch (cancellation: CancellationException) {
                 throw cancellation
             } catch (failure: Exception) {
@@ -176,6 +222,8 @@ class SettingsViewModel @Inject constructor(
     private data class ReminderScreenState(
         val permission: ReminderPermissionState = ReminderPermissionState.SETTINGS_ONLY,
         val isRationaleVisible: Boolean = false,
+        /** The theme chooser is screen state too: nothing about it is stored. */
+        val isThemeDialogVisible: Boolean = false,
         val pendingAction: ReminderPermissionAction? = null,
         /** Mirrors the stored flag so a tap does not have to wait on a read. */
         val wasRequested: Boolean = false,

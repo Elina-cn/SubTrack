@@ -56,6 +56,15 @@
     <string name="main_currency_label">Ana Para Birimi</string>
     <string name="main_currency_description">Aylık toplam bu para biriminde gösterilir.</string>
     <string name="error_setting_save_failed">Ayar kaydedilemedi</string>
+    <!-- Theme -->
+    <string name="theme_mode_title">Tema</string>
+    <string name="theme_mode_system">Sistemi takip et</string>
+    <string name="theme_mode_light">Açık</string>
+    <string name="theme_mode_dark">Koyu</string>
+    <string name="dynamic_color_title">Duvar kâğıdı renkleri</string>
+    <string name="dynamic_color_on">Açık — renkler duvar kâğıdından geliyor</string>
+    <string name="dynamic_color_off">Kapalı — uygulamanın kendi paleti</string>
+    <string name="dynamic_color_unsupported">Android 12 ve üzeri gerekir</string>
     <!-- Exchange rates -->
     <string name="exchange_rates_title">Döviz Kurları</string>
     <string name="exchange_rates_row_description">Toplamın hesaplandığı kurları elle düzenleyin</string>

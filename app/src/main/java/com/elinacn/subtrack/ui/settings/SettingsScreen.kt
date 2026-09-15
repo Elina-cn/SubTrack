@@ -38,8 +38,10 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.elinacn.subtrack.R
 import com.elinacn.subtrack.domain.model.Currency
+import com.elinacn.subtrack.domain.model.ThemeMode
 import com.elinacn.subtrack.ui.common.CurrencySelector
 import com.elinacn.subtrack.ui.common.SettingsRow
+import com.elinacn.subtrack.ui.common.SettingsSwitchRow
 import com.elinacn.subtrack.ui.theme.Dimens
 import com.elinacn.subtrack.ui.theme.SubTrackTheme
 
@@ -175,7 +177,38 @@ fun SettingsScreen(
                 description = stringResource(id = uiState.reminderPermission.statusTextId()),
                 onClick = { onEvent(SettingsEvent.ReminderRowTapped) }
             )
+
+            HorizontalDivider()
+
+            SettingsRow(
+                title = stringResource(id = R.string.theme_mode_title),
+                description = stringResource(id = uiState.themeMode.labelId()),
+                onClick = { onEvent(SettingsEvent.ThemeRowTapped) }
+            )
+
+            HorizontalDivider()
+
+            // Shown below Android 12 rather than hidden, and switched off rather than removed.
+            // A setting that simply is not there cannot say why: a reader who has met Material You
+            // elsewhere would be left deciding whether this app lacks it or their install is
+            // broken. The description answers that, which is the same choice the reminder row
+            // makes when it says "only the system settings can turn this on".
+            SettingsSwitchRow(
+                title = stringResource(id = R.string.dynamic_color_title),
+                description = stringResource(id = uiState.dynamicColorTextId()),
+                checked = uiState.isDynamicColorEnabled,
+                onCheckedChange = { onEvent(SettingsEvent.SetDynamicColor(it)) },
+                enabled = uiState.isDynamicColorSupported
+            )
         }
+    }
+
+    if (uiState.isThemeDialogVisible) {
+        ThemeModeDialog(
+            selected = uiState.themeMode,
+            onSelect = { onEvent(SettingsEvent.SelectThemeMode(it)) },
+            onDismiss = { onEvent(SettingsEvent.ThemeDialogDismissed) }
+        )
     }
 
     if (uiState.isReminderRationaleVisible) {
@@ -197,6 +230,18 @@ fun SettingsScreen(
     }
 }
 
+/**
+ * The one line of the wallpaper-colours row that changes.
+ *
+ * Unsupported outranks on and off: below Android 12 the stored value is real but has no effect,
+ * and saying "off" for it would be a different claim than the truth.
+ */
+private fun SettingsUiState.dynamicColorTextId(): Int = when {
+    !isDynamicColorSupported -> R.string.dynamic_color_unsupported
+    isDynamicColorEnabled -> R.string.dynamic_color_on
+    else -> R.string.dynamic_color_off
+}
+
 @Preview(showBackground = true, showSystemUi = true)
 @Composable
 private fun SettingsScreenPreview() {
@@ -204,6 +249,9 @@ private fun SettingsScreenPreview() {
         SettingsScreen(
             uiState = SettingsUiState(
                 mainCurrency = Currency.USD,
+                themeMode = ThemeMode.DARK,
+                isDynamicColorEnabled = true,
+                isDynamicColorSupported = true,
                 reminderPermission = ReminderPermissionState.CAN_REQUEST
             ),
             onEvent = {},

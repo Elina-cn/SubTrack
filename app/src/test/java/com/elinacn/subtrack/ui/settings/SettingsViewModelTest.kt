@@ -3,6 +3,7 @@ package com.elinacn.subtrack.ui.settings
 import app.cash.turbine.test
 import com.elinacn.subtrack.R
 import com.elinacn.subtrack.domain.model.Currency
+import com.elinacn.subtrack.fake.FakeDynamicColorSupport
 import com.elinacn.subtrack.fake.FakeReminderNotificationStatus
 import com.elinacn.subtrack.fake.FakeReminderStateRepository
 import com.elinacn.subtrack.fake.FakeSettingsRepository
@@ -32,6 +33,7 @@ class SettingsViewModelTest {
     private lateinit var repository: FakeSettingsRepository
     private lateinit var reminderState: FakeReminderStateRepository
     private lateinit var notificationStatus: FakeReminderNotificationStatus
+    private lateinit var dynamicColorSupport: FakeDynamicColorSupport
     private lateinit var viewModel: SettingsViewModel
 
     @Before
@@ -40,6 +42,7 @@ class SettingsViewModelTest {
         repository = FakeSettingsRepository()
         reminderState = FakeReminderStateRepository()
         notificationStatus = FakeReminderNotificationStatus()
+        dynamicColorSupport = FakeDynamicColorSupport()
         viewModel = buildViewModel()
     }
 
@@ -120,7 +123,7 @@ class SettingsViewModelTest {
 
     /** uiState is WhileSubscribed, so it stays cold until something collects it. */
     private fun buildViewModel() =
-        SettingsViewModel(repository, reminderState, notificationStatus)
+        SettingsViewModel(repository, reminderState, notificationStatus, dynamicColorSupport)
 
     private fun TestScope.collectState() {
         backgroundScope.launch { viewModel.uiState.collect() }
