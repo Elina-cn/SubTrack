@@ -33,12 +33,12 @@ import java.util.Locale
  * How this month compares with last month: an arrow, and a sentence that says the same thing.
  *
  * **The direction is in the words, not in a colour.** Red and green is the obvious way to draw
- * this and it is unavailable twice over: `error` is undefined in our scheme and falls back to the
- * Material baseline (ARCHITECTURE §12), and there is no green in the palette at all - inventing
- * one here would be a debt phase 14 has to take back. It would also be the wrong instrument.
- * Colour alone carries no meaning for a reader who cannot tell the two apart, and "spending went
- * up" is not obviously bad news anyway: a user who has just added a subscription on purpose is
- * not being warned about anything.
+ * this and it is the wrong instrument here, now more than before. Since phase 14a the palette's
+ * neutral ink **is** green: emerald says "this app", not "this went well", so a green arrow would
+ * mean nothing and a red one would say "something is broken" about an ordinary month. Colour alone
+ * carries no meaning for a reader who cannot tell two hues apart either, and "spending went up" is
+ * not obviously bad news: a user who has just added a subscription on purpose is not being warned
+ * about anything.
  *
  * So the arrow and the text are both `primary`, and what changed is written out: "Geçen aya göre
  * 150,00 TL arttı". The arrow is decorative - [Icon] with a null description - because the

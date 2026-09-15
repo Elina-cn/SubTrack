@@ -65,8 +65,9 @@ fun ExpensiveSubscriptionRow(
             )
             Text(
                 text = billingPeriod,
-                // onBackground, not onSurfaceVariant: that role is undefined in our scheme and
-                // falls back to the Material baseline's purple-grey (ARCHITECTURE §12). The
+                // onBackground, not onSurfaceVariant. Both are in the palette since phase 14a;
+                // this keeps the row's two lines in one ink and lets the type size carry the
+                // difference, as the subscription card does. The
                 // smaller type already separates it from the name.
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onBackground

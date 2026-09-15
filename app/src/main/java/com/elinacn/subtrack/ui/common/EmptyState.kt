@@ -62,9 +62,10 @@ fun EmptyState(
             // Decorative: the two lines below say everything the glyph is standing in for.
             contentDescription = null,
             modifier = Modifier.size(Dimens.EmptyStateIconSize),
-            // primary, not onSurfaceVariant. That role is undefined in our scheme and falls back
-            // to the Material baseline's purple-grey, outside the palette (ARCHITECTURE §12).
-            // primary is the family this app uses for ink and icons, and it is measured.
+            // primary, not onSurfaceVariant. Both are defined since phase 14a, and both are in
+            // the palette; primary is the one this app uses for ink and icons, and a glyph this
+            // size is the loudest thing on an otherwise empty screen. 5.98:1 on the light
+            // backdrop, 8.50:1 on the dark one.
             tint = MaterialTheme.colorScheme.primary
         )
 

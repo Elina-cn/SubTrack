@@ -34,17 +34,19 @@ import com.elinacn.subtrack.ui.theme.SubTrackTheme
  * leave the bar as the only place its own value is written - which is the one place a screen
  * reader cannot go.
  *
- * **One colour for every category.** Our scheme defines primary and primaryContainer and little
- * else; outline and onSurfaceVariant are still undefined and fall back to the Material baseline
- * (ARCHITECTURE §12). Four distinguishable category colours would have to be invented here and
- * taken back out again in phase 14, so the label carries the distinction instead and the bar
- * carries only the size.
+ * **One colour for every category.** The palette is deliberately two hues, emerald and gold, and
+ * only one of them may be ink in a given scheme (§12). Four distinguishable category colours would
+ * mean four more hues invented for this one chart, and the label already carries the distinction -
+ * the bar only has to carry the size.
  *
- * **The track is the same colour, faded.** primaryContainer was the obvious role for it and is the
- * wrong one: in the dark scheme primary and primaryContainer are both PastelBlue, so bar and track
- * came out identical and every category looked full. Measured on API 34, not reasoned about. A
- * translucent primary cannot collapse into the solid one in either theme, and it invents no colour
- * for phase 14 to take back.
+ * **The track is `outlineVariant`, a defined role.** It used to be the bar's own colour faded,
+ * because in the old palette primary and primaryContainer were both the same pastel blue in the
+ * dark scheme and a bar was indistinguishable from its track. Phase 14a's palette has no such
+ * collision - gold against emerald is 4.35:1 - so the transparency is no longer buying anything,
+ * and a decorative boundary is exactly what `outlineVariant` is for.
+ *
+ * Measured, against the background these bars actually sit on: bar to track 4.40:1 in the light
+ * scheme and 3.65:1 in the dark one, both above the 3:1 a graphical object needs.
  */
 @Composable
 fun CategoryBarRow(
@@ -65,7 +67,7 @@ fun CategoryBarRow(
         percent
     )
     val barColor = MaterialTheme.colorScheme.primary
-    val trackColor = barColor.copy(alpha = TRACK_ALPHA)
+    val trackColor = MaterialTheme.colorScheme.outlineVariant
 
     Column(
         modifier = modifier
@@ -120,14 +122,6 @@ fun CategoryBarRow(
 }
 
 private const val PERCENT = 100f
-
-/**
- * How much of the bar's own colour the empty part of it keeps.
- *
- * Enough to show where the bar could reach, faint enough that the filled part is unmistakably the
- * filled part. No text sits on it, so this is not the contrast trade the dashboard card refused.
- */
-private const val TRACK_ALPHA = 0.24f
 
 @Preview(showBackground = true)
 @Composable

@@ -110,9 +110,10 @@ fun SubscriptionCard(
                 if (category != SubscriptionCategory.OTHER) {
                     Text(
                         text = stringResource(id = category.labelRes()),
-                        // onSurface, not onSurfaceVariant: that role is undefined in our scheme
-                        // and falls back to the Material baseline's purple-grey (ARCHITECTURE
-                        // section 12). The smaller type already separates it from the name.
+                        // onSurface, not onSurfaceVariant. Both are in the palette since phase
+                        // 14a, but the smaller type already separates this line from the name, and
+                        // dimming it as well would spend contrast to repeat something the size has
+                        // said. 14.45:1 on a light card, 10.05:1 on a dark one.
                         color = MaterialTheme.colorScheme.onSurface,
                         style = MaterialTheme.typography.bodySmall
                     )

@@ -44,17 +44,21 @@ import kotlin.math.min
  * row** (nothing). Phase 12a writes an empty list as zero on purpose so those last two stay apart
  * (ARCHITECTURE §19), and a chart that drew them alike would throw that away.
  *
- * **One colour, as in the breakdown.** Our scheme defines primary and primaryContainer and little
- * else (§12), and the track is the bar's own colour faded - measured in phase 13a, where
- * primaryContainer turned out to be the same PastelBlue as primary in the dark scheme and made
- * every bar look full.
+ * **One colour for the columns, and a defined role for the track.** The column is `primary` -
+ * emerald in the light scheme, gold in the dark one, which is the palette's rule about which hue
+ * may be ink (§12). The track is `outlineVariant`: it used to be the column's own colour faded,
+ * because the old palette gave primary and primaryContainer the same pastel blue in the dark
+ * scheme and a column could not be told from its track. Phase 14a removed that collision.
  *
- * The fade cannot be deepened to make an empty track easier to see. Measured on the device, a
- * column reads 3.96:1 against the light background and 9.25:1 against the dark one, and 3.01:1
- * against its own track in the light scheme - already at the 3:1 floor a graphical object is asked
- * for. More alpha would move the track towards the column and take that below the floor. So the
- * empty track stays faint, and the difference between "recorded as zero" and "no record" is
- * carried in full by the sentence, which says one or the other in words.
+ * Measured against the background these columns sit on: column to background 5.98:1 light and
+ * 8.50:1 dark; column to track 4.40:1 light and 3.65:1 dark, both above the 3:1 floor.
+ *
+ * **An empty track is still the faint case.** Track against background is 1.36:1 light and 2.33:1
+ * dark - better than the old fade managed in the dark scheme, no better in the light one. There is
+ * no colour that fixes it: for a track to clear both the column and the background by 3:1, the
+ * column would have to reach 9:1 against the background, and the palette's emerald is 8.02:1 on
+ * white by design. So the difference between "recorded as zero" and "no record" is still carried
+ * in full by the sentence, which says one or the other in words.
  *
  * **Two sets of labels, neither of which can collide.** The scale is written once, above the plot,
  * as the highest month in the window; the months are written once each, under their own column.
@@ -80,7 +84,7 @@ fun MonthlyTrendChart(
     val monthFormatter = rememberMonthFormatter()
     val description = trendDescription(points, currency, moneyFormatter, monthFormatter)
     val barColor = MaterialTheme.colorScheme.primary
-    val trackColor = barColor.copy(alpha = TRACK_ALPHA)
+    val trackColor = MaterialTheme.colorScheme.outlineVariant
 
     Column(
         modifier = modifier
@@ -199,9 +203,6 @@ private fun trendDescription(
  * of them on a 360dp screen are six things rather than one striped block.
  */
 private const val BAR_WIDTH_RATIO = 0.6f
-
-/** The same faded primary the breakdown bars use, measured in both schemes in phase 13a. */
-private const val TRACK_ALPHA = 0.24f
 
 @Preview(showBackground = true)
 @Composable
