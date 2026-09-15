@@ -96,7 +96,10 @@ fun ExchangeRatesScreen(
                 .padding(Dimens.ScreenPadding)
         ) {
             Text(
-                text = stringResource(id = R.string.exchange_rates_description, Currency.Base.name),
+                // Symbols here too, for the same reason as every amount in the app: one mark for
+                // one currency, wherever the reader meets it. A screen that names the anchor "TRY"
+                // and then totals in "₺" is asking the reader to hold two names for one thing.
+                text = stringResource(id = R.string.exchange_rates_description, Currency.Base.symbol),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onBackground
             )
@@ -120,8 +123,8 @@ fun ExchangeRatesScreen(
                         Text(
                             stringResource(
                                 id = R.string.rate_field_label,
-                                currency.name,
-                                Currency.Base.name
+                                currency.symbol,
+                                Currency.Base.symbol
                             )
                         )
                     },
@@ -138,7 +141,7 @@ fun ExchangeRatesScreen(
             // Shown but not editable: every other rate is quoted against it, so a TRY of anything
             // but one would make the whole table meaningless.
             Text(
-                text = stringResource(id = R.string.rate_anchor_note, Currency.Base.name),
+                text = stringResource(id = R.string.rate_anchor_note, Currency.Base.symbol),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onBackground
             )

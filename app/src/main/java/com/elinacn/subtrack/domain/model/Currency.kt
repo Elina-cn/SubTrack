@@ -8,12 +8,18 @@ package com.elinacn.subtrack.domain.model
  *
  * All four carry two minor digits, which is what [Money] assumes. A zero-decimal currency such as
  * JPY would mean revisiting [Money] first, not just adding a line here.
+ *
+ * [symbol] is the mark the amount is written with, and it is here rather than in `strings.xml`
+ * because it is not copy: a lira is a lira in every language, and a translation file is an
+ * invitation to change it. It is not read from the platform either - `java.util.Currency` answers
+ * with the ISO code whenever the reader's locale has no glyph for the currency, which is the exact
+ * behaviour phase 14b removed. See ARCHITECTURE section 6.
  */
-enum class Currency {
-    TRY,
-    USD,
-    EUR,
-    GBP;
+enum class Currency(val symbol: String) {
+    TRY("₺"),
+    USD("$"),
+    EUR("€"),
+    GBP("£");
 
     companion object {
 
