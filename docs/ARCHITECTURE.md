@@ -615,13 +615,43 @@ suspend fonksiyonu kullanılır — tek doğruluk kaynağı, yarış yok.
 ## 13. Navigation
 
 - Tek Activity, tek `NavHost` (`ui/navigation/SubTrackNavHost.kt`).
-- Hedefler: **ana ekran**, **ayarlar**, **kur ekranı**, **istatistik** (Faz 13a).
-  İstatistiğe giriş ana ekranın üst çubuğından, ayarlar ikonunun **solundan** —
-  ayarlar Faz 9'dan beri en sağda ve kullanıcının bildiği hedef yerinden
-  oynatılmadı.
-- Rotalar düz `String` sabiti (`ui/navigation/Destination.kt`). Type-safe rota
-  v1.0'da kullanılmıyor: argüman alan hedef yok, yani kazancı yok, ve AGP 9'da ek
-  derleyici plugin'i riski var (bkz. Faz 0, @Parcelize). Faz 15'te yeniden bakılacak.
+- Hedefler: **ana ekran**, **ayarlar**, **kur ekranı**, **istatistik** (Faz 13a),
+  **düzenleme** (Faz 15). İstatistiğe giriş ana ekranın üst çubuğından, ayarlar
+  ikonunun **solundan** — ayarlar Faz 9'dan beri en sağda ve kullanıcının bildiği
+  hedef yerinden oynatılmadı. Düzenlemeye giriş satırın kendisinden.
+- Rotalar düz `String` sabiti (`ui/navigation/Destination.kt`).
+
+### Type-safe rota — Faz 15'te bakıldı, yine kullanılmıyor
+
+§13 bu soruyu "argüman alan hedef yok, yani kazancı yok" diye ertelemişti. Faz
+15'te argüman alan bir hedef geldi ve soru yeniden soruldu. Cevap değişmedi:
+
+1. **Derleyici plugin'i gerekiyor.** Type-safe rotalar `@Serializable` sınıflar
+   demek, o da kotlinx.serialization plugin'i demek. Bu faz yeni bağımlılık
+   eklemiyor ve proje AGP 9'da bir derleyici plugin'ine bir kez yenildi
+   (`@Parcelize`, Faz 0).
+2. **Argüman zaten sınırda tipli.** Hedef argümanı `NavType.LongType` olarak
+   tanımlıyor; `SavedStateHandle`'dan `Long` olarak çıkıyor, `String` olarak
+   değil.
+3. **Tipsiz kalan tek adım rota metnini kurmak** ve o da tek bir fonksiyonda:
+   `Destination.editSubscription(id)`. Kayıtlı desen (`EDIT_SUBSCRIPTION`)
+   içinde yer tutucu taşıdığı için doğrudan navigasyona verilemez — yani
+   fonksiyonu atlamanın yolu yok.
+
+Serialization başka bir iş için build'e girerse bu yeniden değerlendirilir.
+
+### Argümanlı hedef nasıl kuruluyor
+
+```kotlin
+const val EDIT_SUBSCRIPTION_ARG = "subscriptionId"
+const val EDIT_SUBSCRIPTION = "edit_subscription/{$EDIT_SUBSCRIPTION_ARG}"
+fun editSubscription(id: Long): String = "edit_subscription/$id"
+```
+
+Graf tarafında `navArgument(EDIT_SUBSCRIPTION_ARG) { type = NavType.LongType }`.
+ViewModel argümanı `SavedStateHandle`'dan **nullable** okur: `!!` yasak (CLAUDE.md
+§4), `checkNotNull` de yalnızca daha iyi sözcüklerle fırlatır. Argümanı olmayan
+bir çağrı "bulunamayan abonelik" hâline düşer — ekranın zaten çizdiği bir durum.
 - `hiltViewModel()` yalnızca `composable` bloğunda çağrılır. Ekran composable'ları
   durumsuz kalır; preview'lar Hilt grafına ihtiyaç duymaz.
 - ViewModel ömrü `NavBackStackEntry`'ye bağlıdır — hedef geri yığınında durduğu
@@ -1464,5 +1494,116 @@ her kaynağı beklediği için `isLoading` trendi de kapsıyor ve ekran tek par�
 geliyor. Grafiğin üstüne ikinci bir gösterge koymak, tek veritabanından tek
 seferde yüklenen bir sayfaya iki dönen çember koymak olurdu. 8a'daki 300 ms
 gecikme sayesinde olağan okumada hiç gösterge çıkmıyor.
+
+---
+
+## 22. Düzenleme Ekranı ve Ortak Form
+
+Faz 15. Kaydedilmiş bir aboneliği değiştirmek, ve iki formun aynı kurallara
+uyması.
+
+### Sheet değil ekran
+
+Düzenleme **yarım kalabilir**. Bottom sheet'te kapatmanın üç yolu var —
+scrim'e dokunma, aşağı sürükleme, geri tuşu — ve hiçbiri "bu düzenleme
+hakkında bir karar" değil; üçü de sadece "kapat" demek. Bir hedefin tek çıkışı
+var ve sistem geri tuşu zaten onu söylüyor. Geri yığını da böylece belirsiz
+kalmıyor: ekran yığında, sheet ise yığının dışında bir durumdu.
+
+### Ortak form bileşenleri, tek doğrulama kaynağı
+
+İki form aynı tabloya yazıyor. Kural şu: **aynı şeyi iki yerde tarif etme.**
+
+| parça | nerede | neden orada |
+|---|---|---|
+| Altı alan (`SubscriptionFormFields`) | `ui/common/` | İki ekran birebir aynı formu çiziyor; ikinci bir kopya görünüm ve davranışın ayrışacağı ilk yer olurdu. |
+| Ne yazıldığı (`SubscriptionFormState`) | `ui/common/` | Altı `rememberSaveable` yerine tek tutucu ve tek `Saver`; §5 form alanlarını zaten composable'a bırakıyor. |
+| **Kurallar** (`SubscriptionInput`) | `domain/usecase/` | Sıfır fiyat hangi form yazarsa yazsın abonelik değil. Bu bir **ekran** değil **abonelik** gerçeği. |
+| **Sözcükler** (`FormErrors.kt`) | `ui/common/` | String kaynağı domain'e giremez (§1); kural bir *sebep* döndürür, ui onu cümleye çevirir. |
+
+Bölünme kasıtlı: `SubscriptionInput` `NameProblem`/`PriceProblem`/`DateProblem`
+döndürüyor, `UiText` değil. Domain androidx'siz kalıyor, mesaj değişince kural
+dosyası açılmıyor, kural değişince iki ekran birden değişiyor.
+
+**Refactor'ün kanıtı ölçümdür.** Çıkarma sonrası ekleme sheet'inin her
+koordinatı 13b'deki referansla **birebir aynı** çıktı (iki emülatörde de),
+klavye açıkken Kaydet hâlâ erişilebilir, döndürmede yazılan duruyor ve mevcut
+268 testin hepsi değişmeden geçti.
+
+### Fiyat alanına geri yazarken nokta kullanılıyor
+
+Saklanan tutar düzenleme formuna `159.99` diye dönüyor: alanın kendi etiketi
+iki dilde de örnek olarak `159.99` gösteriyor ve parser noktayı da virgülü de
+kabul ediyor. Yerelleştirilmiş para `MoneyFormatter`'dan geçer — o sembol ve
+binlik ayırıcı yazar, ikisini de parser geri alamaz.
+
+### Çıpa gösterilir, ilerletilmiş tarih değil
+
+Kart "25 gün kaldı" derken düzenleme ekranı kullanıcının girdiği **10 Eylül**'ü
+açıyor. İkisi farklı sorulara cevap veriyor (§17) ve ilerletilmiş tarihi forma
+koymak, kullanıcının hiç girmediği bir günü kaydetmeyi teklif etmek olurdu.
+İki emülatörde de ölçüldü.
+
+### Satır okunur, izlenmez
+
+Ekran satırı tek seferlik `getById` ile okuyor, Flow ile değil. Flow, bu ekranın
+**kendi** kaydı düştüğü anda yeniden yayın yapardı ve olmaması gereken tek şey
+bu: kullanıcı yazarken formun üzerine yazmak. Ana ekran tabloyu izlemeye devam
+ediyor; bu ekranın buna ihtiyacı yok.
+
+Kaydederken satır **kopyalanıyor**, yeniden kurulmuyor: `id`, `iconKey` ve
+`createdAt` olduğu gibi taşınıyor. `createdAt` listenin sıralama anahtarı —
+düzenlenen abonelik listenin başına sıçramamalı.
+
+### Bulunamayan abonelik bir hâldir, çökme değil
+
+Silinen bir satırın düzenleme ekranı açılabilir: kart kaydırılırken ekran
+açılıyor olabilir, ya da geri yığını satırdan uzun yaşayabilir. Ekran geri
+zıplasaydı dokunuş hiç işlememiş gibi görünür ve kullanıcı tekrar dokunurdu;
+bunun yerine ne olduğunu **söylüyor** ve çıkmak kullanıcının hamlesi oluyor.
+
+### Yarım kalan düzenleme sessizce atılır
+
+Geri tuşu "geri" demektir. Ekleme sheet'i de Faz 0'dan beri yarım kalan girişi
+kapanınca atıyor; aynı bileşenlerden kurulu iki formdan birinin soru sorması
+tutarsız olurdu. Onay diyaloğu, kullanıcının bilerek yaptığı bir jestin önüne
+modal koymak demek; kabul edilen bedel, kullanıcının gördüğü hâliyle
+kaydedilmemiş bir alanı yeniden yazması.
+
+**Kaydet her zaman yazar** — değişmemiş bir formla Kaydet'e basmak da yazar.
+Geri dönmek yazmaz; maddenin sorduğu da buydu.
+
+### Silme bu ekranda yok
+
+Kaydırarak silme zaten var ve kendi geri alma'sını taşıyor. İkinci bir kapı,
+"peki bunu geri alabilir miyim" sorusuna ikinci bir cevap gerektirirdi; tek bir
+eylem için iki geri alma davranışı, tek bir silme yolundan kötüdür.
+
+### Tıklama jesti sürüklemenin yanında durur
+
+`SwipeToDeleteRow`'un jest mantığına dokunulmadı (§12'deki offset birikmesi ve
+%50 mesafe şartı olduğu gibi). Tıklama `draggable`'ın **yanına** bir modifier
+olarak kondu. İkisi birden kazanamaz: sürükleme dokunma eşiğini geçer geçmez
+hareketi tüketiyor, tüketilmiş bir değişiklik de bekleyen tıklamayı iptal
+ediyor. Yani bir şey ifade edecek kadar uzun bir kaydırma asla aynı zamanda
+dokunma değil.
+
+**Eylem satırın kendi `semantics`'inde tanımlı**, `clickable`'a bırakılmadı:
+`clearAndSetSemantics` alt ağacı düşürüyor, dolayısıyla dokunma parmağa var,
+ekran okuyucuya yok olurdu. Satır hâlâ **tek düğüm** — iki emülatörde de
+ölçüldü — ve artık hem dokunma hem "Sil" eylemini taşıyor.
+
+### Bildirim ve anlık görüntü: yeni bağlantı gerekmedi
+
+İkisi de tabloyu okuyor, olayları değil:
+
+- `MonthlySnapshotRecorder` `subscriptions.observeAll()`'u topluyor; ekleme,
+  silme ve **güncelleme** aynı yayını tetikliyor. Cihazda doğrulandı:
+  düzenlemeden sonra `monthly_snapshots` tek satır kaldı ve toplamı yeni
+  değere döndü.
+- `PaymentReminderWorker` her koşuda `observeAll().first()` okuyup çıpaları
+  baştan ilerletiyor. Enstrümantasyonla koşuldu: bir ay ötedeki satır hiçbir
+  şey göstermezken, aynı satırın tarihi bugüne çekilince bildirim
+  `EditedRow — today` diyor.
 
 ---

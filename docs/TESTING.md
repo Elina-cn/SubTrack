@@ -147,6 +147,22 @@ etmeden bildirin; sonraki maddeler zaten bozuk bir durumun üstüne binebilir.
 | 93 | Geçen ayın kaydı yok | Karşılaştırma **hiç** gösterilmiyor — yer tutucu da, tire de yok | 13b |
 | 94 | Ana para birimini değiştir, istatistiğe gir | Grafik yalnızca **yeni** birimdeki ayları çiziyor; altında "Başka para biriminde kaydedilen N ay gösterilmiyor". Eski aylar **çevrilmiyor** | 13b |
 | 95 | TalkBack ile grafik | **Tek odak durağı**, bütün aylar tek cümlede: "Aylık trend: Nisan …, Mayıs …, Haziran kayıt yok, …" | 13b |
+| 96 | Bir karta dokun | **Düzenleme ekranı** açılıyor; alanlar kayıtlı değerlerle dolu geliyor (ad, fiyat, para birimi, periyot, kategori seçili) | 15 |
+| 97 | Geçmiş çıpalı bir aboneliğin kartına dokun | Tarih alanı **çıpayı** gösteriyor — kart "25 gün kaldı" derken ekran kullanıcının girdiği günü açıyor | 15 |
+| 98 | Bir alanı değiştir, Kaydet | Ana ekrana dönüyor, satır **yeni değeri** gösteriyor, toplam güncelleniyor, satır **yerinden oynamıyor** (sıralama `createdAt`'e göre) | 15 |
+| 99 | Hiçbir şey değiştirmeden geri dön | Hiçbir şey değişmiyor; saklanan satır aynı | 15 |
+| 100 | Bir alanı değiştirip geri dön | Değişiklik **sessizce atılıyor**, onay sorulmuyor, hiçbir şey yazılmıyor | 15 |
+| 101 | Düzenleme ekranında ekranı döndür | Yazılanlar ve seçilen tarih **korunuyor** | 15 |
+| 102 | Boş ad / geçersiz fiyat ile Kaydet | Ekran **açık kalıyor**, hata ilgili alanın altında — ekleme sheet'iyle **aynı** metinler (tek kural kaynağı) | 15 |
+| 103 | Bir satırı **hafifçe** kaydır | Ne siliyor ne de düzenleme ekranını açıyor — kaydırma dokunma sayılmıyor | 15 |
+| 104 | TalkBack ile bir satır | Hâlâ **tek odak durağı**; dokunma eylemi (Düzenle) ve "Sil" özel eylemi birlikte duruyor | 15 |
+| 105 | Düzenleme sonrası `monthly_snapshots` | Tek satır, toplamı **yeni** değer — kaydedici güncellemeyi de görüyor | 15 |
+
+**96-105 için not:** düzenleme maddeleri ekleme sheet'iyle **aynı** bileşenlerden
+kurulu bir formu sınıyor. #102 bilerek ikisini karşılaştırıyor: mesajlar
+ayrışırsa tek doğrulama kaynağı kuralı kırılmış demektir (`ARCHITECTURE.md` §22).
+#103 ve #104 bu fazın en riskli maddeleri — dokunma, kaydırarak silmenin jestine
+eklendi ve satırın tek odak durağı olması korunmalı.
 
 **86-95 için veri nasıl kurulur — ay dönümü cihazda üretilemiyor**
 

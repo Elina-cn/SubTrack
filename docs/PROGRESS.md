@@ -27,6 +27,255 @@ Her faz sonunda **en üste** yeni kayıt eklenir. Eski kayıtlar silinmez.
 
 ---
 
+## [Faz 15] Düzenleme Ekranı — 2026-09-15
+
+**Durum:** Tamamlandı. **Faz 15 KAPANDI.** `reminder/` yalnızca okundu,
+`MonthlySnapshotRecorder`'ın hesabına dokunulmadı, Room entity/dao/database ve
+`app/schemas/` değişmedi.
+
+### Görev 0 — ortak form, tek kural kaynağı
+
+Bir abonelik artık iki yerden yazılıyor. İkinci bir "fiyat nedir" kopyası,
+birinin değiştiği gün ayrışırdı. Bölünme şöyle:
+
+| parça | nerede |
+|---|---|
+| Altı alan (`SubscriptionFormFields`) | `ui/common/` |
+| Ne yazıldığı (`SubscriptionFormState` + tek `Saver`) | `ui/common/` |
+| **Kurallar** (`SubscriptionInput`) | `domain/usecase/` |
+| **Sözcükler** (`FormErrors.kt`) | `ui/common/` |
+
+Kural bir **sebep** döndürüyor (`NameProblem` / `PriceProblem` / `DateProblem`),
+`UiText` değil: domain androidx'siz kalıyor (§1), mesaj değişince kural dosyası
+açılmıyor. `HomeViewModel`'daki `parsePrice`, `validateDate`, `MAX_PRICE` ve
+`MAX_YEARS_AHEAD` oraya taşındı; ViewModel 383 → 306 satır.
+
+**Refactor'ün kanıtı ölçüm:** çıkarma sonrası ekleme sheet'inin **her
+koordinatı** 13b referansıyla birebir aynı çıktı, iki emülatörde de.
+
+```
+API 29   drag handle [328,92][392,100] · başlık [200,144][520,191]
+         ad [80,279][371,327] · fiyat [80,431][360,479] · Kaydet [329,1132][391,1172]
+API 34   drag handle [498,448][582,459] · başlık [334,517][746,579]
+         ad [105,695][486,758] · fiyat [105,895][474,958] · Kaydet [500,2143][580,2196]
+```
+
+Klavye açıkken (`mInputShown=true`) Kaydet erişilebilir kaldı (API 29
+`[329,634][391,674]`, API 34 `[500,1323][580,1376]`), döndürmede yazılan durdu,
+ve mevcut **268 testin hepsi değişmeden geçti.**
+
+### Görev 1 — dördüncü hedef, ve ilk argüman
+
+```kotlin
+const val EDIT_SUBSCRIPTION_ARG = "subscriptionId"
+const val EDIT_SUBSCRIPTION = "edit_subscription/{$EDIT_SUBSCRIPTION_ARG}"
+fun editSubscription(id: Long): String = "edit_subscription/$id"
+```
+
+Graf `navArgument(...) { type = NavType.LongType }` diyor, yani argüman sınırda
+tipli ve `SavedStateHandle`'dan `Long` çıkıyor. ViewModel onu yine de
+**nullable** okuyor: `!!` yasak (CLAUDE.md §4) ve `checkNotNull` sadece daha iyi
+sözcüklerle fırlatırdı.
+
+**Type-safe rota kararı — §13'ün bu faza bıraktığı soru cevaplandı: yine
+kullanılmıyor.** `@Serializable` rotalar kotlinx.serialization derleyici
+plugin'i ister; bu faz yeni bağımlılık eklemiyor ve proje AGP 9'da bir derleyici
+plugin'ine bir kez yenildi (`@Parcelize`, Faz 0). Tipsiz kalan tek adım rota
+metnini kurmak, o da tek fonksiyonda ve atlanamıyor — kayıtlı desen yer tutucu
+taşıdığı için doğrudan navigasyona verilemez.
+
+### Görev 2 — satırın tıklanabilir olması
+
+`SwipeToDeleteRow`'un jest mantığına **dokunulmadı**: offset işleme, %50 mesafe
+şartı, `onDragStarted`/`onDragStopped` olduğu gibi. Eklenen iki şey:
+`draggable`'ın yanında bir `clickable`, ve satırın kendi `clearAndSetSemantics`
+bloğunda bir `onClick` — `clearAndSetSemantics` alt ağacı düşürdüğü için aksi
+hâlde dokunma parmağa var, ekran okuyucuya yok olurdu.
+
+İkisi birden kazanamaz: sürükleme dokunma eşiğini geçer geçmez hareketi
+tüketiyor, tüketilmiş değişiklik de bekleyen tıklamayı iptal ediyor.
+
+### Görev 3 — ekran ve ViewModel
+
+Tek `UiState`, tek `onEvent` (§5). Satır **tek seferlik `getById`** ile okunuyor,
+Flow ile değil: Flow bu ekranın kendi kaydı düştüğü anda yeniden yayın yapar ve
+kullanıcı yazarken formun üzerine yazardı.
+
+- **Bulunamayan id → bir hâl, çökme değil.** Geri zıplasaydı dokunuş hiç
+  işlememiş gibi görünürdü; ekran ne olduğunu söylüyor, çıkmak kullanıcının
+  hamlesi.
+- **Yarım kalan düzenleme sessizce atılıyor.** Geri tuşu "geri" demektir; ekleme
+  sheet'i de Faz 0'dan beri böyle davranıyor ve aynı bileşenlerden kurulu iki
+  formdan birinin soru sorması tutarsız olurdu. Kabul edilen bedel: kullanıcı
+  kaydedilmemiş alanı yeniden yazar.
+- Kaydederken satır **kopyalanıyor**: `id`, `iconKey` ve `createdAt` taşınıyor.
+  `createdAt` listenin sıralama anahtarı — düzenlenen satır başa sıçramamalı.
+
+### Görev 4 ve 5 — okundu, yeni bağlantı gerekmedi
+
+`MonthlySnapshotRecorder` bir olaya değil `subscriptions.observeAll()`'a bağlı;
+güncelleme de aynı yayını tetikliyor. `PaymentReminderWorker` her koşuda
+`observeAll().first()` okuyup çıpaları baştan ilerletiyor. İkisi de cihazda
+doğrulandı (aşağıda), hiçbir şey bağlanmadı.
+
+### Testler
+
+268 → **298 birim testi** (17 `EditSubscriptionViewModelTest`, 13
+`SubscriptionInputTest`), 0 hata. Mevcut `HomeViewModel` doğrulama testlerinin
+hiçbiri kırılmadı — refactor'ün asıl sınavı buydu. `lintDebug` **0 hata, 24
+uyarı**; sayı 13b ile aynı, bu fazdan yeni uyarı çıkmadı.
+
+Enstrümantasyon iki emülatörde de geçti: **19 test** (1 yeni
+`EditedDateReminderTest`, 2 `PaymentReminderWorkerTest`, 16 DAO).
+
+### Cihaz doğrulaması (API 29 · 360dp, API 34 · 411dp)
+
+**(a) Refactor'ün davranışı değiştirmediği** yukarıda, koordinatlarla.
+
+**(b) Karta dokun → alanlar dolu.** Ham metin (API 29):
+
+```
+EditText text='Netflix' · EditText text='159.99'
+checked=true ['TRY'] · checked=true ['Monthly'] · checked=true ['Entertainment']
+Next Payment (optional), Sep 9, 2026
+```
+
+**(c) ÇIPA — bu maddenin kanıtı.** Geçmiş çıpalı abonelik, iki emülatörde de:
+
+| | API 29 | API 34 |
+|---|---|---|
+| Kart | `Netflix, TRY 159.99, Monthly, 25 days left, Entertainment` | aynı |
+| Düzenleme ekranı | `Next Payment (optional), Sep 9, 2026` | `… Sep 10, 2026` |
+
+Kart ilerletilmiş tarihe (Ekim) sayıyor, ekran kullanıcının girdiği Eylül gününü
+açıyor.
+
+**(d) Alanı değiştir, kaydet.** 159,99 → 200,00: ana ekran
+`Netflix, TRY 200.00`, toplam `TRY 259.90`, ve satır **yerinde** kaldı
+(API 34'te hâlâ `[0,1311]`).
+
+**(e) Değişiklik yapmadan geri.** Liste aynı, saklanan çıpa aynı
+(`stored=1788912000000 2026-09-09`).
+
+**(f) Alanı değiştirip geri.** Form `NetflixPremium` tutuyorken geri → liste
+hâlâ `Netflix`. Onay sorulmadı, hiçbir şey yazılmadı. İki emülatörde de.
+
+**(g) Kaydırarak silme — bu fazın en riskli maddesi.** Kaydırma yönü bileşenin
+**bitiş kenarına** (LTR'de sola). İki emülatörde de aynı:
+
+| madde | satır sayısı | düzenleme ekranı açıldı mı |
+|---|---|---|
+| #6 hafif kaydırma | 2 | **hayır** |
+| #7 on kez hafif | 2 | **hayır** |
+| #8 hızlı fiske | 2 | **hayır** |
+| #10 ters yön | 2 | **hayır** |
+| düz dokunma | 2 | **evet**, alanlar dolu |
+| #9 tam kaydırma | 1 + Undo | — |
+
+**(h) Düzenleme sonrası snapshot.** İki emülatörde de tek satır:
+`(202609, 25990, 'TRY')` — güncelleme kaydediciye kendiliğinden ulaştı.
+
+**(i) Bildirim.** Enstrümantasyonla, iki emülatörde de:
+
+```
+before the edit: state=SUCCEEDED, shown=[]
+moved the date of id=1 to 2026-09-15
+after the edit: state=SUCCEEDED, shown=[Payment reminder: 1 subscription
+EditedRow — today]
+```
+
+**(j) Döndürme.** Düzenlenen fiyat (`200.00`) ve çıpa tarihi döndürmeden sağ
+çıktı, iki emülatörde de.
+
+**(k) Bulunamayan id.** Düzenleme ekranı açıkken uygulama arka plana alındı,
+süreç `am kill` ile öldürüldü, satır silindi, uygulama geri getirildi — yani
+gerçek süreç ölümü yolu. İki emülatörde de ham metin:
+
+```
+This subscription is gone, It may have been deleted. Go back and check the list.
+```
+
+**(l) Erişilebilirlik.** Kart hâlâ **tek düğüm**, artık tıklanabilir:
+
+```
+class='android.view.View'
+content-desc='Netflix, TRY 159.99, Monthly, 25 days left, Entertainment'
+clickable='true'  long-clickable='false'  bounds='[0,950][720,1180]'
+nodes in region: 1
+```
+
+**Bilinen ölçüm sınırı:** `uiautomator dump` özel erişilebilirlik eylemlerini
+(custom action) hiç yazmıyor — "Sil" eylemi bu dökümde görünmez, tıklama ise
+`clickable='true'` olarak görünür. Aynı sınır Faz 1a'dan beri geçerli; "Sil"
+oradan beri TalkBack'le elle doğrulanıyor.
+
+### 105 maddelik sabit regresyon
+
+Liste 95 → **105** madde (Faz 15'in on maddesi). İki emülatörde de koşuldu.
+
+**Kayıtlı istisnalar** (öncekilerle aynı): **API 29** — #15 koyu tema
+(`cmd uimode night` bu imajda tutmuyor), #34-#37 ve #41-#45 API 33+ maddeleri.
+**API 34** — #40 ve #46 API < 33 maddeleri. **Her ikisi** — #39, kanal
+listelenmediği için hâlâ **doğrulanamıyor** (13b'de açılan istisna).
+
+`ui/home/` ve ekleme formu değiştiği için 1-19 ve 51-68 özellikle baştan
+koşuldu; hepsi geçti.
+
+### Değişen dosyalar
+
+- `domain/usecase/SubscriptionInput.kt` — yeni; kurallar ve iki tavan
+- `ui/common/FormErrors.kt` — yeni; sebep → cümle
+- `ui/common/SubscriptionFormState.kt`, `SubscriptionFormFields.kt` — yeni
+- `ui/home/components/AddSubscriptionSheet.kt` — ortak alanları kullanıyor
+- `ui/home/HomeViewModel.kt` — kural kopyaları çıktı
+- `ui/home/components/SwipeToDeleteRow.kt` — `onClick` + semantics eylemi
+- `ui/home/HomeScreen.kt`, `HomeScreenPreviews.kt` — `onEditSubscription`
+- `ui/edit/` — `EditSubscriptionScreen`, `EditSubscriptionUiState`,
+  `EditSubscriptionViewModel` (yeni)
+- `ui/navigation/Destination.kt`, `SubTrackNavHost.kt` — dördüncü hedef
+- `res/values/strings.xml`, `res/values-en/strings.xml`
+- `test/.../SubscriptionInputTest.kt`, `test/.../EditSubscriptionViewModelTest.kt`
+- `test/.../fake/FakeSubscriptionRepository.kt` — `updated`, `failOnWrite`
+- `androidTest/.../edit/EditedDateReminderTest.kt` — yeni
+- `docs/ARCHITECTURE.md` §13 ve yeni §22; `docs/ROADMAP.md`, `docs/TESTING.md`
+
+**Dokunulmayanlar:** `reminder/` (yalnızca okundu), `MonthlySnapshotRecorder`,
+`PaymentCountdown`, `NextPaymentDate`, `PaymentReminderSelection`, Room
+entity/dao/database, `app/schemas/`, `ui/statistics/`, `ui/settings/`, kur
+ekranı, `AndroidManifest.xml`, `Theme.kt`, `Color.kt`.
+
+### Karşılaşılan sorunlar
+
+- **`listSaver` null kabul etmiyor** (`Saveable : Any`). Tarihsiz bir form altı
+  string olarak saklanıyor; boş string "tarih yok" demek.
+- **API 34 emülatörü iki kez tıkandı** ("System UI isn't responding", "Process
+  system isn't responding"); biri `adb reboot` ile, diğeri force-stop ile
+  geçildi. Aynı build API 29'da akıcı; emülatör yükü, üründe karşılığı yok.
+- **Fikstür, uygulama bir kez açılmadan çalışmıyor:** `pm clear` veritabanı
+  dosyasını da siliyor, `run-as cat` boş dosya veriyor ve sqlite "file is not a
+  database" diyor. Sıra: `pm clear` → uygulamayı bir kez aç → fikstür.
+- **`input text` sonrası sheet kısalıyor** (IME penceresi), Kaydet dökümde
+  görünmüyor. Küçük adımlı `input swipe` ile içerik kaydırılıyor; `ESCAPE`
+  sheet'i kapatıyor, kullanılmamalı.
+
+### Commit'ler
+
+- `c564bae` refactor: give the six fields and the rules behind them one home each
+- `25c281f` feat: a screen for changing a subscription that is already stored
+- `d3bf127` feat: give the graph a fourth destination, and its first argument
+- `dce5433` feat: open a subscription by tapping its row
+- `8bc630a` test: pin the edit screen's refusals and the rules both forms now share
+- `9d8ed72` test: run the claim that an edited date reaches the reminder
+
+### Sonraki faz için not
+
+- #39 hâlâ doğrulanmamış; bildirim gönderen bir enstrümantasyon testi yazılırsa
+  aynı turda kapatılabilir.
+- Faz 14 (tema) ertelenmiş durumda: §12'nin tanımsız rol borcu ve 13b'de ölçülen
+  iz saydamlığı tavanı orada bekliyor.
+
+---
+
 ## [Faz 13b] Aylık Trend ve "Geçen Aya Göre" — 2026-09-14
 
 **Durum:** Tamamlandı. **Faz 13 KAPANDI.** Snapshot tablosuna yalnızca okuma

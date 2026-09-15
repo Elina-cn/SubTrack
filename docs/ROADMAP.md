@@ -407,14 +407,31 @@ Aylık toplamın zaman içindeki anlık görüntüleri. `PROJECT_SPEC.md` §1'de
 
 ---
 
-## ⬜ Faz 15 — Düzenleme Ekranı
+## ✅ Faz 15 — Düzenleme Ekranı
 
-- [ ] Karta tıklayınca düzenleme, Navigation ile ikinci ekran
-- [ ] Satır tıklanabilir olsun; şu an silme dışında eylem yok, TalkBack için
-      tek yol custom action
-- [ ] **Tarih alanı ÇIPAYI göstermeli**, karttaki ilerletilmiş tarihi değil.
-      Kart "23 gün kaldı" derken düzenleme ekranı kullanıcının girdiği günü
-      açar; ikisi farklı sorulara cevap veriyor (`ARCHITECTURE.md` §17).
+- [x] Karta tıklayınca düzenleme, Navigation ile **dördüncü hedef**. Sheet
+      değil ekran: yarım kalmış bir düzenlemede sheet'in scrim'i, sürüklemesi
+      ve geri tuşu üç ayrı "kapat" demek ve hiçbiri düzenleme hakkında bir
+      karar değil (`ARCHITECTURE.md` §13)
+- [x] Satır tıklanabilir; jest mantığına dokunulmadı. Tıklama `draggable`'ın
+      **yanında** bir modifier, ve eylem satırın kendi `semantics`'inde
+      tanımlı — `clearAndSetSemantics` alt ağacı düşürdüğü için aksi hâlde
+      dokunma parmağa var, ekran okuyucuya yok olurdu. Ölçüldü: satır hâlâ
+      **tek düğüm**, artık hem dokunma hem "Sil" eylemiyle
+- [x] **Tarih alanı ÇIPAYI gösteriyor**, karttaki ilerletilmiş tarihi değil.
+      İki emülatörde de ölçüldü: kart "25 gün kaldı" derken düzenleme ekranı
+      kullanıcının girdiği **10 Eylül**'ü açıyor (`ARCHITECTURE.md` §17).
+      12-2'nin bu fazı bekleyen notu **karşılandı**
+- [x] Ekleme sheet'i ile ortak form bileşenleri ve **tek doğrulama kaynağı**;
+      kural domain'de, sözcükler ui'da (§5)
+- [x] Silme bu ekranda **yok** — kaydırarak silme kendi geri alma'sıyla zaten
+      var, ikinci kapı ikinci bir geri alma davranışı demek olurdu
+
+> **Type-safe rota yine kullanılmadı** — §13'ün bu faza bıraktığı soru cevaplandı.
+> `@Serializable` rotalar kotlinx.serialization derleyici plugin'i istiyor, bu faz
+> yeni bağımlılık eklemiyor ve proje AGP 9'da bir derleyici plugin'ine (`@Parcelize`,
+> Faz 0) bir kez yenildi. Argüman zaten `NavType.LongType` ile sınırda tipli;
+> tipsiz kalan tek adım rota metnini kurmak ve o tek fonksiyonda. Gerekçe §13'te.
 
 ---
 
