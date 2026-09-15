@@ -13,8 +13,8 @@ import kotlinx.coroutines.flow.map
  * defined in domain, and a fake that actually stores rows lets a test assert on the resulting
  * list instead of on which methods were called.
  *
- * [inserted] and [deletedIds] record the arguments as they arrived, so a test can check that a
- * write was skipped entirely - which is the interesting case for validation.
+ * [inserted], [updated] and [deletedIds] record the arguments as they arrived, so a test can check
+ * that a write was skipped entirely - which is the interesting case for validation.
  */
 class FakeSubscriptionRepository : SubscriptionRepository {
 
@@ -22,6 +22,7 @@ class FakeSubscriptionRepository : SubscriptionRepository {
     private var nextId = 1L
 
     val inserted = mutableListOf<Subscription>()
+    val updated = mutableListOf<Subscription>()
     val deletedIds = mutableListOf<Long>()
 
     /**
@@ -45,6 +46,8 @@ class FakeSubscriptionRepository : SubscriptionRepository {
     }
 
     override suspend fun update(subscription: Subscription) {
+        failOnWrite?.let { throw it }
+        updated += subscription
         stored.value = stored.value.map { if (it.id == subscription.id) subscription else it }
     }
 
@@ -52,6 +55,9 @@ class FakeSubscriptionRepository : SubscriptionRepository {
         deletedIds += id
         stored.value = stored.value.filterNot { it.id == id }
     }
+
+    /** Thrown by [update] when set, so the failure path can be exercised. */
+    var failOnWrite: Exception? = null
 
     /** Seeds rows without going through insert, so the recorded calls stay meaningful. */
     fun setSubscriptions(subscriptions: List<Subscription>) {
