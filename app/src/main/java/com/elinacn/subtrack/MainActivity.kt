@@ -1,7 +1,6 @@
 package com.elinacn.subtrack
 
 import android.os.Bundle
-import android.os.SystemClock
 import android.view.View
 import android.view.ViewTreeObserver
 import androidx.activity.ComponentActivity
@@ -53,21 +52,34 @@ class MainActivity : ComponentActivity() {
      * The deadline is what keeps a held frame from becoming a blank app. If the preferences never
      * arrive - a failure the repository's IOException fallback does not cover - the gate opens
      * anyway and the app comes up in the default theme, which is what it did before this method
-     * existed. A wrong theme is recoverable; a window that never draws is not.
+     * existed. A wrong theme is recoverable; a window that never draws is not: the system reports
+     * it as "does not have a focused window" and kills the app for not responding.
+     *
+     * The release is **posted** rather than checked inside the listener, and that part is
+     * load-bearing. Cancelling a draw does not schedule another traversal, and a listener only
+     * runs when one happens - so a deadline tested inside it would only be read if something else
+     * asked to draw. On the ordinary path that is fine, because the emission being waited for is
+     * itself what triggers the next traversal. On the path where nothing ever arrives there is no
+     * next traversal, and a deadline that never gets read is not a deadline. A delayed message on
+     * the main looper runs either way.
      */
     private fun holdFirstFrameUntilThemeIsRead() {
         val content = findViewById<View>(android.R.id.content)
-        val deadline = SystemClock.uptimeMillis() + THEME_READ_TIMEOUT_MS
-        content.viewTreeObserver.addOnPreDrawListener(
-            object : ViewTreeObserver.OnPreDrawListener {
-                override fun onPreDraw(): Boolean {
-                    val ready = viewModel.themeState.value != null ||
-                        SystemClock.uptimeMillis() >= deadline
-                    if (!ready) return false
-                    content.viewTreeObserver.removeOnPreDrawListener(this)
-                    return true
-                }
+        val gate = object : ViewTreeObserver.OnPreDrawListener {
+            override fun onPreDraw(): Boolean {
+                if (viewModel.themeState.value == null) return false
+                content.viewTreeObserver.removeOnPreDrawListener(this)
+                return true
             }
+        }
+        content.viewTreeObserver.addOnPreDrawListener(gate)
+        content.postDelayed(
+            {
+                content.viewTreeObserver.removeOnPreDrawListener(gate)
+                // Asks for the traversal that the cancelled draws never scheduled.
+                content.invalidate()
+            },
+            THEME_READ_TIMEOUT_MS
         )
     }
 
