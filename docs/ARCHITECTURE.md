@@ -771,16 +771,16 @@ bir çağrı "bulunamayan abonelik" hâline düşer — ekranın zaten çizdiği
 - Son düzenleme zamanı epoch millis olarak saklanır ve kullanıcıya gösterilir.
   Hiç düzenlenmemişse varsayılanların tahmin olduğu söylenir.
 
-## 16. IME (Klavye) Insets
+## 16. Insets: Sistem Çubukları ve Klavye
 
-**Durum: ölçüldü, geçici bir çözümle kapatıldı.** Bu bölüm hem ölçümü hem de
-ondan çıkan kararı kaydeder; kalıcı çözüm Faz 16'ya bağlı.
+**Durum: Faz 16a'da edge-to-edge'e geçildi.** Bölüm iki katman kaydeder:
+edge-to-edge öncesi ölçüm (tarihsel, artık geçersiz) ve bugünkü düzen.
 
-### Ölçülen
+### Tarihsel kayıt — 9b-2'deki ölçüm ve neden geçersizleşti
 
-Faz 9b-2 hotfix'inde, kur ekranına geçici bir probe konup
-`WindowInsets.ime.getBottom(density)` ve `WindowInsets.navigationBars.getBottom(density)`
-okundu. Probe `Scaffold`'un dışında, composable gövdesinin en başındaydı.
+Faz 9b-2 hotfix'inde kur ekranına geçici bir probe konup
+`WindowInsets.ime.getBottom(density)` ve
+`WindowInsets.navigationBars.getBottom(density)` okundu:
 
 | Cihaz | Klavye | `WindowInsets.ime` | `WindowInsets.navigationBars` |
 |---|---|---|---|
@@ -789,74 +789,154 @@ okundu. Probe `Scaffold`'un dışında, composable gövdesinin en başındaydı.
 | API 34, 411dp | kapalı | 0 | 0 |
 | API 34, 411dp | **açık** (`mInputShown=true`) | **0** | 0 |
 
-Klavye açıkken tuşa basılarak **yeniden kompozisyon zorlandı** ve probe yeni
-satır yazdı — yani okunan değer bayat değil, gerçekten sıfır.
+Klavye açıkken tuşa basılarak yeniden kompozisyon zorlandı; okunan değer bayat
+değildi, gerçekten sıfırdı. O zamanki çıkarım — "uygulama
+`setDecorFitsSystemWindows(false)` çağırmadığı için insets'i decor tüketiyor,
+Compose'a hiç ulaşmıyor" — doğruydu ve `android:id/content`'in API 29'da
+`[0,48][720,1280]` okunması bunu doğruluyordu.
 
-### Neden sıfır
+**Bu tablo iki sebeple geçersizdir.**
 
-Beklenen, API 29'da `WindowInsets.ime`'in güvenilmez olması, API 34'te
-çalışmasıydı. **İkisinde de sıfır çıktı**, yani sebep API sürümü değil.
+1. **Faz 16a `enableEdgeToEdge()` çağırıyor.** Decor artık insets'i tüketmiyor;
+   üç cihazda da Compose gerçek değerleri görüyor.
+2. **`navigationBars = 0` okumasının ikinci bir sebebi vardı ve o sebep hâlâ
+   duruyor.** 9b-2 kaydı "bu iki emülatörde de gezinme çubuğu var" diyordu;
+   **`subtrack_narrow_api29` AVD'sinde gezinme çubuğu yok.** `dumpsys window
+   displays` `app=720x1280` diyor, yani uygulama alanı ekranın tamamı, ve alt
+   banttaki her piksel uygulamanın kendi arka planı (`#D3E2D8`). Bu AVD'de alt
+   insets edge-to-edge'den sonra da sıfır — ölçüm hatası değil, cihazın
+   gerçeği.
 
-Kanıt `navigationBars = 0`: bu iki emülatörde de gezinme çubuğu var, insets
-uygulamaya ulaşsaydı orada sıfırdan başka bir şey görünürdü. Uygulama
-`setDecorFitsSystemWindows(false)` / `enableEdgeToEdge` çağırmadığı için
-pencere eski moddadır: insets'i decor view tüketir, Compose'a **hiç**
-ulaşmaz. Aynı durum dump'ta da görünür — `android:id/content` API 29'da
-`[0,48][720,1280]`, yani durum çubuğu payı zaten decor tarafından uygulanmış.
+### Bugünkü ölçüm — üç cihaz, klavye açık ve kapalı
 
-**Sonuç: `Modifier.imePadding()` bu kod tabanında iki API'de de işe
-yaramaz — sıfır bir insets'e padding uygulamak hiçbir şey yapmaz.**
-Bu yüzden uygulanmadı.
+Değerler cihaz üstü koordinat ölçümünden geliyor (`uiautomator dump` + piksel
+taraması); API 36 satırındaki insets sayıları Faz 16-0'ın geçici probe'uyla
+alınmıştı.
 
-### Sheet'lerin neden sorunu yok
+| Cihaz | `statusBars.top` | `navigationBars.bottom` | `ime.bottom` kapalı | `ime.bottom` açık |
+|---|---|---|---|---|
+| API 29, 720x1280 @320 | 48 px | **0** (bu AVD'de çubuk yok) | 0 | **0** — API 30 altı raporlamıyor |
+| API 34, 1080x2400 @420 | 128 px | 63 px | 0 | 883 px |
+| API 36, 1080x2400 @420 | 128 px | 63 px | 0 | 883 px |
+
+`android:id/content`, 16a öncesi ve sonrası:
+
+| Cihaz | Önce | Sonra |
+|---|---|---|
+| API 29 | `[0,48][720,1280]` | `[0,0][720,1280]` |
+| API 34 | `[0,128][1080,2337]` | `[0,0][1080,2400]` |
+| API 36 | `[0,0][1080,2400]` | `[0,0][1080,2400]` — targetSdk 36 yüzünden zaten öyleydi |
+
+**Çift uygulama yok.** Aynı cihazda 16a öncesi ve sonrası derleme sırayla
+kurulup ölçüldü; `content` dışındaki **her koordinat aynı kaldı** — API 34'te
+uygulama çubuğu başlığı `[43,175][276,249]`, ilk kart `[42,338][1038,696]`,
+ilk liste satırı `[0,1157][1080,1458]`, en alt satır dinlenme konumunda alt
+kenardan 273 px; API 29'da başlık `[32,84][212,140]`, kart
+`[32,208][688,481]`, en alt satır alt kenardan 160 px. Decor'un uyguladığı pay
+uygulamaya geçti, üstüne binmedi.
+
+### Sistem çubuğu ikonları temayı takip eder, cihazı değil
+
+Edge-to-edge, çubukların arkasına uygulamanın kendi arka planını koyar; sistem
+altta ne olduğunu artık bilemez, söylenmesi gerekir. `MainActivity`
+`enableEdgeToEdge`'i `SystemBarStyle.auto(...) { darkTheme }` ile yeniden
+çağırır ve `darkTheme`, renk şemasının kurulduğu cevabın **aynısıdır**
+(`Theme.kt`'deki `isDarkTheme`, tam da iki kopyanın ayrışmaması için ayrı
+fonksiyon). Ayarlarda koyu tema zorlandığında cihazın gece ayarı ne derse desin
+çubuklar da kararır.
+
+Üst banttaki kontrast piksel sayısı (16-0'da açık temada **sıfırdı**):
+
+| | API 29 (48 px bant) | API 34 (128 px bant) | API 36 (128 px bant) |
+|---|---|---|---|
+| Tercih açık, sistem açık | 2491 | 3354 | 4319 |
+| **Tercih açık, sistem koyu** | 2503 | 3354 | 4301 |
+| Tercih koyu | 2503 (beyaz ikon) | 3224 (beyaz ikon) | 4286 (beyaz ikon) |
+
+**İki çubuk farklı stil alır, ve bu ölçümden çıktı.** API 29 altında androidx
+çubuğu kendisine verilen scrim'le **doldurur**, sisteme bırakmaz. API 24'te
+durum çubuğuna `background` rengi verildiğinde uygulama çubuğunun üstünde
+görünür bir dikiş oluştu. Durum çubuğunun scrim'e ihtiyacı yok — ikonları API
+23'ten beri kararabiliyor — bu yüzden şeffaf. Gezinme çubuğunun var: API 26
+altında ikonları her zaman beyazdır ve açık bir çubuk onları yutar; `scrim`
+rolü iki şemada da siyah, o sürümlerin kendi çubuğunun rengi. API 26-28 arası
+ikonlar temayı takip edebildiği için `background` çubuğu uygulamanın devamı
+yapar. API 29'dan itibaren ikisi de şeffaf, kontrastı sistem zorlar.
+
+**Açılıştaki ilk kare.** `onCreate`'teki ilk `enableEdgeToEdge` çağrısı durum
+çubuğunu bilerek `SystemBarStyle.light` ile kurar: o karelerde ekranda olan
+pencere `Theme.SubTrack`'in açık arka planıdır (`#FAFAFA`), cihaz ne olursa
+olsun. 14b'nin ilk-kare kapısıyla çakışmıyor, aynı kareler için cevap veriyor —
+kare kare taramayla doğrulandı: `#FAFAFA` boyunca ikonlar siyah (3078 px),
+tercih gelince `#1F3D2D` üstünde beyaz (3078 px), arada görünmez ikon yok.
+
+### Ekranların insets'i nasıl aldığı
+
+`Scaffold` çubuk paylarını `PaddingValues` olarak verir ama **tüketmez**
+(material3 1.4.0; `Scaffold.kt` KDoc'u `Modifier.padding` + `consumeWindowInsets`
+öneriyor). `TopAppBar` üst payı kendi alır, `Scaffold` da FAB ile Snackbar'ı
+alt payla birlikte yukarı taşır — ölçüldü, API 36'da FAB kutusu
+`[891,2148][1038,2295]`, alt kenara 105 px = 63 (gezinme) + 42 (16dp
+`FabSpacing`); Snackbar'ın alt kenarı 2148, yani 252 px = 147 (FAB) + 42 + 63.
+Geri kalan karar ekran başına verildi:
+
+- **Ana ekran** payları `contentPadding` olarak alır. `Modifier.padding` kaydırma
+  görünümünü kısaltır: liste jest çubuğunun üstünde biter, altında hiçbir şey
+  kaydırmayan ölü bir şerit kalır ve alt kenarı geçen satır çubuğun altına
+  kayacağına havada kesilir. `contentPadding` görünümü tam bırakır, yalnızca
+  içeriği iter. Ölçüldü (API 36 ve 34): kaydırırken satırlar çubuğun altına
+  giriyor, en alttaki satır `[0,1868][1080,2127]`'de duruyor — çubuğun üst
+  kenarından (2337) **210 px** yukarıda.
+- **Ayarlar, kur, düzenleme, istatistik** paylarını kaydırmanın **dışında**
+  tutar. Hepsi kullanılacak ya da okunacak bir şeyle biter; jest çubuğunun
+  altına kayan bir düğme yarı dokunulabilirdir.
+- **Kur ve düzenleme** ayrıca `consumeWindowInsets(paddingValues)` +
+  `imePadding()` alır. `consumeWindowInsets` olmadan `imePadding` klavyeyi
+  pencere kenarından ölçer ve zaten uygulanmış alt payı ikinci kez ekler.
+
+### Klavye: iki mekanizma, hiç çakışmadan
+
+`AndroidManifest.xml`'deki `windowSoftInputMode="adjustResize"` **duruyor**, ama
+artık 9b-2'deki geçici çözüm değil, işin API 30 altı yarısı.
+
+- **API 30 ve üstü:** `setDecorFitsSystemWindows(false)` platformun
+  `SOFT_INPUT_ADJUST_RESIZE`'ı yok saymasına yol açar; `WindowInsets.ime` gerçek
+  değer verir ve iş `Modifier.imePadding()`'e düşer.
+- **API 30 altı:** bayrak hâlâ geçerli ve tek çalışan şey o. `WindowInsets.ime`
+  o sürümlerde pencere küçülmediği sürece raporlanmaz.
+
+Bayrağın kaldırılması denendi ve **API 29'u kırdı**: kur ekranında Kaydet
+y=1044, Varsayılana dön y=1164, klavye y=784'ten başlıyor, ve fiske hiçbir şeyi
+oynatmıyor çünkü kaydırma görünümü hâlâ 1280 yüksekliğinde. Geri konduktan
+sonra tek fiskede Kaydet y=564, Varsayılana dön y=684. API 34 ve 36 pikseli
+pikseline aynı kaldı.
+
+### Klavye açıkken erişilebilirlik — üç ekran, üç cihaz
+
+| Ekran | Cihaz | Klavye kapalı | Klavye açık, tek fiske sonrası | Klavye üst kenarı |
+|---|---|---|---|---|
+| Kur | API 29 | `[329,1044][391,1084]` | `[329,564][391,604]` | 784 |
+| Kur | API 34 | `[500,1439][580,1492]` | `[500,1228][580,1281]` | 1517 |
+| Kur | API 36 | `[500,1439][580,1492]` | `[500,1228][580,1281]` | 1517 |
+| Düzenleme | API 29 | kaydırma gerekiyor (360dp) | `[329,630][391,670]` | 784 |
+| Düzenleme | API 34 | `[500,1807][580,1860]` | `[500,1323][580,1376]` | 1517 |
+| Düzenleme | API 36 | `[500,1807][580,1860]` | `[500,1323][580,1376]` | 1517 |
+| Ekleme sheet'i | API 29 | `[329,1132][391,1172]` | `[329,630][391,670]` (fiskesiz) | 784 |
+| Ekleme sheet'i | API 34 | `[500,2143][580,2196]` | `[500,1323][580,1376]` (fiskesiz) | 1517 |
+| Ekleme sheet'i | API 36 | `[500,2143][580,2196]` | `[500,1323][580,1376]` (fiskesiz) | 1517 |
+
+### Sheet'lerin neden etkilenmediği
 
 `ModalBottomSheet` içeriğini `Box(Modifier.fillMaxSize().imePadding())` içine
 koyar (material3 1.4.0, `ModalBottomSheet.kt:186`). Sheet kendi penceresinde
 (dialog) çizilir ve o pencere insets alır; bu yüzden ekleme sheet'i klavyeyle
-doğru davranır. **Bu bir tesadüftür, uygulamanın bir kararı değil:** aynı
-kütüphane kolaylığı normal ekranlarda yoktur.
+her zaman doğru davrandı. **Bu bir tesadüftür, uygulamanın bir kararı
+değil** — aynı kütüphane kolaylığı normal ekranlarda yoktur, ve 16a'nın bütün
+işi tam olarak o eksiği kapatmaktı.
 
-### Karardan önceki davranış
-
-`AndroidManifest.xml`'de `windowSoftInputMode` tanımlı değildi; platform
-`adjustPan` gibi davranıyordu. Pencere küçülmez, kayar. Kaydırma görünümü de
-küçülmediği için içerik klavyenin altında kalabilir ve kaydırarak
-kurtarılamaz. Ölçülen dört kombinasyon `PROGRESS.md`'deki 9b-2 kaydında.
-
-Kullanıcı için çıkış yolu var: geri tuşu klavyeyi kapatır, ekrandan çıkmaz.
-
-### Verilen karar: `windowSoftInputMode="adjustResize"`
-
-`MainActivity` manifestte `android:windowSoftInputMode="adjustResize"` alır.
-Pencere klavye kadar **küçülür**; kaydırma görünümü de onunla küçülür, yani
-altta kalan içerik kaydırılarak erişilebilir hâle gelir.
-
-**Neden bu, `enableEdgeToEdge` değil:** ikisi de sorunu çözer, ama
-`adjustResize` yalnızca pencere boyutlandırmasını değiştirir ve tek satırdır.
-`enableEdgeToEdge` insets modelini baştan değiştirir; durum ve gezinme çubuğu
-payları her ekranda elle uygulanmak zorunda kalır, yani her ekranın yeniden
-ölçülmesi gerekir. O iş Faz 16'daki `targetSdk` yükseltmesine ait — Android
-15'te edge-to-edge zaten zorunlu.
-
-**Bu bilinçli olarak geçici bir çözümdür.** `adjustResize`, uygulama
-edge-to-edge'e geçtiğinde sistem tarafından **yok sayılır**. Faz 16'da
-`enableEdgeToEdge` gelince bu satır kaldırılacak ve yerine `imePadding()`
-konacak; o noktada yukarıdaki ölçüm tekrarlanmalı, çünkü `WindowInsets.ime`
-o zaman sıfırdan farklı okunmaya başlayacak.
-
-### Uygulandıktan sonra ölçülen
-
-`adjustResize` ile kur ekranında kaydırma görünümü klavye üst kenarında
-kesiliyor ve butonlara **tek fiskede** ulaşılıyor; dört kombinasyonun
-hiçbirinde erişilemez buton kalmadı. Sayılar `PROGRESS.md`'deki hotfix
-kaydında.
-
-**Sheet'lerde çift uygulama yok.** Endişe, `ModalBottomSheet`'in kendi
-`imePadding()`'i ile pencere küçülmesinin üst üste binip fazladan boşluk
-yaratmasıydı. Ölçüldü: sheet'in klavyeli ve klavyesiz bütün koordinatları
-9b-1 hotfix'indeki değerlerle **birebir aynı** kaldı. Sebebi yapısal — sheet
-kendi dialog penceresinde çizilir ve `windowSoftInputMode` Activity'nin
-penceresine uygulanır, o pencereye değil. İki mekanizma birbirine değmiyor.
+Sheet 16a'da **dokunulmadı** ve ölçümle de değişmediği gösterildi: aynı
+cihazda 16a öncesi ve sonrası derlemelerde API 29 koordinatları
+`[329,1132][391,1172]` (kapalı) ve `[329,630][391,670]` (açık) — birebir aynı.
 
 ## 17. Tarih İşleme
 

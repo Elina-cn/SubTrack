@@ -471,14 +471,18 @@ Aylık toplamın zaman içindeki anlık görüntüleri. `PROJECT_SPEC.md` §1'de
 - [ ] Şablon testler kaldırılsın (`ExampleUnitTest`, `ExampleInstrumentedTest`
       — dolgu: `2+2=4` ve paket adı kontrolü)
 - [ ] `targetSdk` Play'in güncel zorunluluğuna yükseltilsin
-- [ ] **Edge-to-edge'e geçilsin** — `targetSdk` yükseltmesiyle aynı işin
-      parçası, Android 15'te zaten zorunlu. `enableEdgeToEdge()` eklenecek,
-      durum ve gezinme çubuğu payları her ekranda elle uygulanacak, klavye
-      için `Modifier.imePadding()` kullanılacak. Bugünkü geçici çözüm olan
-      manifestteki `windowSoftInputMode="adjustResize"` o zaman **kaldırılacak**
-      — edge-to-edge'de sistem onu zaten yok sayıyor. Geçişten sonra
-      `TESTING.md`'deki klavye tablosundaki her satır yeniden ölçülmeli;
-      gerekçe ve ölçümler `ARCHITECTURE.md` §16'da.
+- [x] **Edge-to-edge'e geçildi** — Faz 16a. `enableEdgeToEdge()` `setContent`
+      öncesinde çağrılıyor, sistem çubuğu ikonları tema tercihini takip ediyor,
+      paylar `Scaffold` üzerinden her ekranda uygulandı (ana ekranda
+      `contentPadding`, form ekranlarında kaydırmanın dışında), kur ve
+      düzenleme ekranlarına `imePadding()` geldi.
+      **`windowSoftInputMode="adjustResize"` kaldırılmadı.** Kaldırılması
+      denendi ve API 29'u kırdı: `WindowInsets.ime` API 30 altında pencere
+      küçülmediği sürece raporlanmıyor, yani `imePadding()` orada sıfıra
+      padding uyguluyor. Platform API 30'dan itibaren bayrağı zaten yok
+      sayıyor, bu yüzden ikisi çakışmıyor — bayrak API 24-29'un, `imePadding()`
+      API 30+'ın yarısı. Klavye tablosunun her satırı üç cihazda yeniden
+      ölçüldü (`TESTING.md`); ölçümler `ARCHITECTURE.md` §16'da.
 - [ ] Gizlilik politikası — v1.0 çevrimdışı, veri toplanmıyor. **v1.1'de ağ
       eklendiğinde politika ve Data Safety formu güncellenecek**
       (PROJECT_SPEC §4)

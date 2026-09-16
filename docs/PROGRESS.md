@@ -27,6 +27,173 @@ Her faz sonunda **en üste** yeni kayıt eklenir. Eski kayıtlar silinmez.
 
 ---
 
+## [Faz 16a] Edge-to-Edge Geçişi — 2026-09-16
+
+**Durum:** Tamamlandı. Renk, palet, `Dimens`, tipografi değişmedi — bu faz
+yalnızca insets. `Color.kt`, `Type.kt`, `Dimens.kt`, `domain/`, `data/`,
+`reminder/`, Room, DataStore, jest mantığı ve `SwipeToDeleteRow` **dokunulmadı**.
+Ekleme sheet'inin IME davranışına da dokunulmadı ve değişmediği ölçüldü.
+
+### `enableEdgeToEdge`, ve ikonların hangi cevabı takip ettiği
+
+`setContent`'ten **önce** çağrılıyor — decor'un insets'i tüketmesini bu durduruyor
+ve pencerenin ilk yerleşiminden önce bilmesi gerekiyor. targetSdk 36 yüzünden
+Android 16 bunu zaten dayatıyordu; çağrı, aynı düzeni her sürümde açık hale
+getiriyor ve asıl kazancı eski sürümlerde: insets ilk kez Compose'a ulaşıyor.
+
+Sistem çubuğu ikon rengi `SystemBarStyle.auto(...) { darkTheme }` ile kuruluyor
+ve `darkTheme`, renk şemasının kurulduğu cevabın **aynısı**. `Theme.kt`'deki
+`when (themeMode)` bloğu `isDarkTheme` olarak dışarı alındı; iki yere kopyalansa
+zamanla ayrışırdı. Sonuç: ayarlarda koyu tema zorlandığında cihazın gece ayarı
+ne derse desin çubuklar da kararıyor. Üst banttaki kontrast piksel sayısı
+(16-0'da açık temada **sıfırdı**):
+
+| | API 29 (48px bant) | API 34 (128px) | API 36 (128px) |
+|---|---|---|---|
+| Tercih açık, sistem açık | 2491 | 3354 | 4319 |
+| **Tercih açık, sistem koyu** | 2503 | 3354 | 4301 |
+| Tercih koyu | 2503 (beyaz ikon) | 3224 (beyaz ikon) | 4286 (beyaz ikon) |
+
+**İki çubuk farklı stil alıyor ve bu ölçümden çıktı.** İlk hâlde ikisine de aynı
+scrim çifti verilmişti; API 24'te durum çubuğu `background` rengiyle opak
+doldu ve uygulama çubuğunun üstünde görünür bir dikiş oluştu. Sebep: API 29
+altında androidx çubuğu kendisine verilen scrim'le dolduruyor, sisteme
+bırakmıyor. Durum çubuğunun scrim'e ihtiyacı yok (ikonları API 23'ten beri
+kararabiliyor) → şeffaf. Gezinme çubuğunun var (API 26 altında ikonları hep
+beyaz) → `scrim` rolü, iki şemada da siyah. İkisi de paletten geliyor, yeni
+renk sabiti yok.
+
+**Açılış göz kırpması geri gelmedi.** `onCreate`'teki ilk çağrı durum çubuğunu
+bilerek `SystemBarStyle.light` ile kuruyor: o karelerde ekranda olan pencere
+`Theme.SubTrack`'in açık arka planı (`#FAFAFA`), cihaz ne olursa olsun. 14b'nin
+ilk-kare kapısıyla çakışmıyor; kare kare tarandı — `#FAFAFA` boyunca ikonlar
+siyah (3078 px), tercih gelince `#1F3D2D` üstünde beyaz (3078 px), aralarında
+açık temalı uygulama karesi yok.
+
+### `adjustResize` kaldırılmadı — kaldırılması API 29'u kırdı
+
+Prompt bu satırın kaldırılmasını istiyordu ("edge-to-edge'de sistem onu zaten
+yok sayıyor"). Bu **API 30'dan itibaren** doğru, API 24-29'da değil. Kaldırıldı,
+ölçüldü, geri kondu:
+
+| API 29, kur ekranı, klavye açık (üst kenar y=784) | Kaydet | Varsayılana dön | Fiske işe yarıyor mu |
+|---|---|---|---|
+| `adjustResize` yokken | y=1044 | y=1164 | **hayır** — görünüm hâlâ 1280 |
+| `adjustResize` varken | y=564 | y=684 | evet, tek fiske |
+
+Sebep `WindowInsets.ime`: API 30 altında pencere küçülmediği sürece
+raporlanmıyor, yani `imePadding()` orada sıfıra padding uyguluyor — §16'nın 9b-2'de ölçtüğü
+sıfırın ta kendisi. İkisi çakışmıyor:
+`setDecorFitsSystemWindows(false)` platformun bayrağı API 30'dan itibaren yok
+saymasına yol açıyor, yani her sürümde **tam olarak biri** yürürlükte. API 34 ve
+36 geri koyduktan sonra pikseli pikseline aynı kaldı, `android:id/content` dahil.
+
+### Ekran başına karar: `contentPadding` mi `padding` mi
+
+`Scaffold` payları veriyor ama **tüketmiyor** (material3 1.4.0 KDoc'u
+`Modifier.padding` + `consumeWindowInsets` öneriyor). Karar ekrana göre değişti:
+
+- **Ana ekran** payları `contentPadding` olarak alıyor. `Modifier.padding`
+  kaydırma görünümünü kısaltır: liste jest çubuğunun üstünde biter, altında
+  hiçbir şeyi kaydırmayan ölü bir şerit kalır, ve alt kenarı geçen satır
+  çubuğun altına kayacağına havada kesilir. Ölçüldü (API 34 ve 36): kaydırırken
+  satırlar çubuğun altına giriyor, en alttaki satır `[0,1868][1080,2127]`'de
+  duruyor — çubuk üst kenarından (2337) **210 px** yukarıda.
+- **Ayarlar, kur, düzenleme, istatistik** payları kaydırmanın **dışında**
+  tutuyor. Hepsi kullanılacak ya da okunacak bir şeyle bitiyor; jest çubuğunun
+  altına kayan bir düğme yarı dokunulabilir.
+- **Kur ve düzenleme** ayrıca `consumeWindowInsets` + `imePadding()` alıyor.
+  `consumeWindowInsets` olmadan `imePadding` klavyeyi pencere kenarından ölçer
+  ve zaten uygulanmış 63 px'i ikinci kez ekler.
+
+**FAB ve Snackbar'ı `Scaffold` kendisi taşıyor** — ölçüldü, varsayılmadı.
+API 36'da FAB kutusu `[891,2148][1038,2295]`, alt kenara 105 px = 63 (gezinme)
++ 42 (16dp `FabSpacing`). Snackbar'ın alt kenarı y=2148, yani 252 px = 147
+(FAB) + 42 + 63. İkisi de gezinme çubuğunu hesaba katıyor.
+
+### 16-0'ın üç kırığı
+
+| | 16-0 | 16a |
+|---|---|---|
+| Kur ekranı "Varsayılana dön" | y=1623, klavyenin (1517) arkasında, kaydırma kurtarmıyor | tek fiskede y=1386 |
+| Düzenleme ekranı Kaydet | y=1833, tamamen arkada | tek fiskede y=1323 |
+| Açık temada durum çubuğu ikonları | 1080x128 bantta **sıfır** beyaz olmayan piksel | 4301-4319 piksel |
+
+### Geriye uyumluluk: çift padding yok, ölçüldü
+
+Aynı cihaza 16a öncesi ve sonrası derleme sırayla kuruldu.
+
+| | API 29 önce → sonra | API 34 önce → sonra |
+|---|---|---|
+| `android:id/content` | `[0,48][720,1280]` → `[0,0][720,1280]` | `[0,128][1080,2337]` → `[0,0][1080,2400]` |
+| Uygulama çubuğu başlığı | `[32,84][212,140]` → **aynı** | `[43,175][276,249]` → **aynı** |
+| Dashboard kartı | `[32,208][688,481]` → **aynı** | `[42,338][1038,696]` → **aynı** |
+| İlk liste satırı | — | `[0,1157][1080,1458]` → **aynı** |
+| FAB alt kenar boşluğu | 64 px → **aynı** | 147 px → **aynı** |
+| En alt satır, dinlenmede | 160 px → **aynı** | 273 px → **aynı** |
+| Ekleme sheet'i Kaydet | `[329,1132][391,1172]` / `[329,630][391,670]` → **aynı** | — |
+
+Decor'un uyguladığı pay uygulamaya geçti, üstüne binmedi. `content` dışında
+değişen tek bir koordinat yok.
+
+**fs 2.0'da insets bozulmuyor:** API 36 kur ekranında klavye kapalıyken Kaydet
+`[465,2268][615,2337]` — tam jest çubuğunun üst kenarında duruyor, altına
+geçmiyor; klavye açıkken tek fiskede `[465,1043][615,1141]`. API 29'da iki
+fiske gerekiyor ama ikisi de klavyenin üstüne geliyor.
+
+**Değişen dosyalar**
+- `MainActivity.kt` — `enableEdgeToEdge()` `setContent` öncesinde; `SystemBarsFollowTheTheme` **yeni**, tema bilindiğinde çubuk stillerini yeniden uyguluyor
+- `ui/theme/Theme.kt` — `isDarkTheme` dışarı alındı ve public yapıldı; renk tanımlarına dokunulmadı
+- `AndroidManifest.xml` — `adjustResize`'ın yorumu değişti, bayrak kaldı
+- `ui/home/HomeScreen.kt` — liste payları `contentPadding`'e taşındı
+- `ui/settings/rates/ExchangeRatesScreen.kt`, `ui/edit/EditSubscriptionScreen.kt` — `consumeWindowInsets` + `imePadding`
+- `ui/settings/SettingsScreen.kt`, `ui/statistics/StatisticsScreen.kt` — pay sırası netleştirildi ve gerekçelendirildi
+- `docs/ARCHITECTURE.md` §16 — yeniden yazıldı, eski tablo tarihsel kayıt olarak duruyor
+- `docs/TESTING.md` — klavye tablosu üç ekran × üç cihaz; #26'nın gerekçesi; klavye üst kenarının artık nasıl okunacağı
+- `docs/ROADMAP.md` — edge-to-edge maddesi işaretlendi, `adjustResize` notuyla
+- `docs/screenshots/phase-16a/` — 30 görüntü
+
+**Testler:** birim testi yazılmadı; bu bir layout değişikliği ve `Scaffold` ile
+insets davranışı JVM'de gözlemlenemez. Mevcut **331 test yeşil**, `lintDebug`
+**0 bulgu**, `assembleDebug` yeni uyarı vermiyor.
+
+**Commit'ler**
+- `d6c2325` feat: go edge-to-edge and let the system bars follow the theme
+- `3600a33` fix: apply the window insets on each full screen
+- `7a56e21` fix: keep adjustResize for the releases that still honour it
+
+**Karşılaşılan sorunlar**
+- **Promptun `adjustResize` kaldırma talimatı API 29'da yanlıştı.** Yukarıda
+  ölçümle. Talimatın dayandığı cümle ("sistem onu zaten yok sayıyor") minSdk 24
+  için değil, Android 15+ için doğru.
+- **İlk scrim seçimi API 24'te dikiş bıraktı.** Tek bir stil çiftini iki çubuğa
+  da vermek, API 29 altında durum çubuğunu opak dolduruyor. İkiye ayrıldı.
+- **§16'nın "iki emülatörde de gezinme çubuğu var" cümlesi yanlış.**
+  `subtrack_narrow_api29` AVD'sinde gezinme çubuğu **yok**: `dumpsys window
+  displays` `app=720x1280` diyor ve alt banttaki her piksel uygulamanın arka
+  planı. O ölçümdeki `navigationBars = 0`'ın ikinci ve hâlâ geçerli sebebi bu.
+  Düzeltildi.
+- **`uiautomator dump` yeniden kurulumdan hemen sonra bayat ağaç veriyor.**
+  API 34'te bir kez `android:id/content`'i `[0,128][1080,2337]` okuttu; aynı
+  ölçüm tekrarlandığında `[0,0][1080,2400]` çıktı. TESTING.md'de zaten yazılı
+  olan tuzak, ölçüm sırasında bir kez daha yakalandı.
+- **Ekran görüntüsü uygulama yeniden başlatılırken alınırsa geçiş
+  animasyonunu yakalıyor.** Bir kare yarı saydam çıktı; yakalamadan önceki
+  bekleme uzatıldı ve set yeniden alındı.
+
+**Sonraki faz için not**
+- Tam 117 maddelik regresyon turu bu fazda **koşulmadı** — promptun kapsamı
+  dışındaydı, 16b'de üç cihazda eksiksiz koşulacak. Bu fazda sürülen maddeler:
+  #26 (üç cihaz) ve klavye tablosunun her satırı.
+- Ekran görüntüleri açık temada üç cihazda, koyu temada API 34 ve 36'da alındı.
+  API 29'un koyu teması bu fazda görüntülenmedi; piksel ölçümü yapıldı
+  (`#1F3D2D` üstünde 2503 beyaz ikon pikseli), görüntü yok.
+- `subtrack_min_api24`'te edge-to-edge kurulum sonrası kabaca doğrulandı
+  (durum çubuğu şeffaf + koyu ikon, gezinme çubuğu siyah + beyaz ikon, çökme
+  yok) ama koordinat turu yapılmadı; DOĞRULAMA listesi üç cihaz istiyordu.
+
+---
+
 ## [Faz 14b] Dynamic Color, Tema Tercihi ve Para Birimi Gösterimi — 2026-09-16
 
 **Durum:** Tamamlandı. **Faz 14 KAPANDI.** `Color.kt` değişmedi — bu faz palet

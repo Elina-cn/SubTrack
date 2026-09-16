@@ -69,7 +69,7 @@ etmeden bildirin; sonraki maddeler zaten bozuk bir durumun üstüne binebilir.
 | 23 | Kur ekranında `0`, `-5`, `1,23456`, `1000,0001` gir ve kaydet | Dördü de **alan altında** hata veriyor, hiçbiri kaydedilmiyor, **çökme yok** | 9b-2 |
 | 24 | Kur değiştir, uygulamayı tamamen kapat, yeniden aç | Kur **duruyor**, "Son düzenleme" tarihi görünüyor | 9b-2 |
 | 25 | Kur ekranında "Varsayılana dön" → Sıfırla | Alanlar 42,85 / 46,2 / 53,9'a dönüyor, tarih yerine **"hiç düzenlenmedi"** yazısı geliyor | 9b-2 |
-| 26 | Kur alanına yazarken klavye açıkken Kaydet ve "Varsayılana dön"e ulaş | Pencere klavye kadar küçülüyor, **tek fiskede** ikisine de ulaşılıyor | 9b-2 · `adjustResize` hotfix |
+| 26 | Kur alanına yazarken klavye açıkken Kaydet ve "Varsayılana dön"e ulaş | **Tek fiskede** ikisine de ulaşılıyor. API 30+ bunu `imePadding()` ile yapar, altında pencere küçülerek | 9b-2 · 16a edge-to-edge |
 | 27 | Ekleme formunda tarih seç, kaydet | Kartta doğru gün sayısı: cihaz tarihi ile seçilen tarih arasındaki **takvim günü** farkı | 10a |
 | 28 | Tarih **seçmeden** kaydet | Kayıt oluşuyor, kartta gösterge **yok**, yer tutucu da yok, çökme yok | 10a |
 | 29 | Geçmiş bir tarih seç | Kart **bir sonraki ödeme tarihine** göre gün sayısı gösteriyor, "gecikmiş" **demiyor**, çıpa değişmiyor | 10a · 12-2 hotfix |
@@ -207,30 +207,53 @@ en boş hâl "tek ay"dır.
 **Klavye açıkken buton erişilebilirliği — her fazda kontrol edilecek**
 
 Metin alanı olan **her** ekranda, klavye açıkken ekranın alt kısmındaki
-eylemlerin erişilebilir olup olmadığı ölçülür. Bugün bu ekranlar:
+eylemlerin erişilebilir olup olmadığı ölçülür. Faz 16a'da tablo üç ekrana ve üç
+cihaza çıktı; eski değerler referans olarak sağda duruyor.
 
-| Ekran | Kontrol edilecek | Bugünkü durum |
-|---|---|---|
-| Ekleme sheet'i | Kaydet tam görünür, kaydırınca sabit | **Geçiyor** — `ModalBottomSheet` kendi `imePadding()`'ini uyguluyor (Faz 9b-1 hotfix) |
-| Kur ekranı | Kaydet ve "Varsayılana dön" | **Geçiyor** — `adjustResize` ile pencere küçülüyor, butonlara tek fiskede ulaşılıyor |
-| Ayarlar ekranı | — | Metin alanı yok, konu dışı |
-| Faz 10 tarih seçici, Faz 15 düzenleme ekranı | eklenince buraya yazılacak | henüz yok |
+| Ekran | Cihaz | Klavye kapalı | Klavye açık, tek fiske sonrası | Klavye üstü | 16a öncesi referans |
+|---|---|---|---|---|---|
+| Ekleme sheet'i | API 29 | `[329,1132][391,1172]` | `[329,630][391,670]` (fiskesiz) | 784 | aynı — 16a öncesi derlemeyle de ölçüldü |
+| Ekleme sheet'i | API 34 | `[500,2143][580,2196]` | `[500,1323][580,1376]` (fiskesiz) | 1517 | 13b'deki değerle **birebir aynı** |
+| Ekleme sheet'i | API 36 | `[500,2143][580,2196]` | `[500,1323][580,1376]` (fiskesiz) | 1517 | 13b'deki değerle **birebir aynı** |
+| Kur ekranı — Kaydet | API 29 | `[329,1044][391,1084]` | `[329,564][391,604]` | 784 | `adjustResize` ile tek fiske (9b-2) |
+| Kur ekranı — Kaydet | API 34 | `[500,1439][580,1492]` | `[500,1228][580,1281]` | 1517 | `adjustResize` ile tek fiske (9b-2) |
+| Kur ekranı — Kaydet | API 36 | `[500,1439][580,1492]` | `[500,1228][580,1281]` | 1517 | **16-0'da düşüyordu** — y=1623, erişilemez |
+| Kur ekranı — Varsayılana dön | API 29 | `[254,1164][466,1204]` | `[254,684][466,724]` | 784 | — |
+| Kur ekranı — Varsayılana dön | API 34 | `[401,1597][679,1650]` | `[401,1386][679,1439]` | 1517 | — |
+| Kur ekranı — Varsayılana dön | API 36 | `[401,1597][679,1650]` | `[401,1386][679,1439]` | 1517 | **16-0'da düşüyordu** |
+| Düzenleme ekranı — Kaydet | API 29 | kaydırma gerekiyor (360dp) | `[329,630][391,670]` | 784 | tabloda yoktu |
+| Düzenleme ekranı — Kaydet | API 34 | `[500,1807][580,1860]` | `[500,1323][580,1376]` | 1517 | tabloda yoktu |
+| Düzenleme ekranı — Kaydet | API 36 | `[500,1807][580,1860]` | `[500,1323][580,1376]` | 1517 | **16-0'da y=1833, tamamen klavyenin arkasında** |
+| Ayarlar ekranı | üçü de | — | — | — | Metin alanı yok, konu dışı |
+| İstatistik ekranı | üçü de | — | — | — | Metin alanı yok, konu dışı |
+
+`fs 2.0`'da da ölçüldü: API 36 kur ekranında tek fiskede Kaydet `[465,1043]
+[615,1141]`, Varsayılana dön `[277,1215][803,1305]`; API 29'da iki fiske
+gerekiyor, Kaydet `[303,524][417,599]`, Varsayılana dön `[163,655][557,730]`.
+İkisinde de klavyenin üstünde.
 
 Ölçüm `show_ime_with_hard_keyboard 1` ile yapılır (aşağıdaki bölüm), yoksa
-emülatörde klavye hiç çizilmez ve test sessizce yanlış sonuç verir. Klavyenin
-üst kenarı, kaydırma düğümünün (`android.widget.ScrollView`) alt sınırından
-okunur — pencere `adjustResize` ile küçüldüğü için ikisi aynı çizgidir.
+emülatörde klavye hiç çizilmez ve test sessizce yanlış sonuç verir.
+
+**Klavyenin üst kenarı artık kaydırma düğümünden okunmaz.** Edge-to-edge'den
+sonra API 30+ cihazlarda pencere küçülmüyor, `android:id/content` klavye açıkken
+de tam ekran okunuyor (`[0,0][1080,2400]`). Üst kenar `ekran yüksekliği -
+ime.bottom` ile bulunur (API 34/36: 2400 - 883 = 1517) ya da ekran görüntüsünden
+sayılır. API 29'da pencere hâlâ küçülüyor, orada eski yöntem geçerli.
 
 **Sheet için ayrıca çift uygulama kontrolü:** `ModalBottomSheet` kendi
-`imePadding()`'ini uyguluyor, pencere de küçülüyor. Bunlar üst üste binerse
-sheet gereğinden çok kısalır. Kontrol: klavye kapalıyken sheet koordinatları
+`imePadding()`'ini uyguluyor. Kontrol: klavye kapalıyken sheet koordinatları
 önceki ölçümle aynı mı, klavye açıkken Kaydet'in alt kenarı ile sheet'in alt
-kenarı arasındaki boşluk `SheetBottomPadding` (40dp = 80px @320dpi) mu.
+kenarı arasındaki boşluk `SheetBottomPadding` (40dp) mu. 16a'da aynı cihaza
+16a öncesi ve sonrası derleme sırayla kurulup ölçüldü — API 29'da dört
+koordinatın dördü de aynı çıktı.
 
-**Faz 16 uyarısı:** `adjustResize` geçici bir çözümdür ve uygulama
-edge-to-edge'e geçtiğinde sistem tarafından yok sayılır. `enableEdgeToEdge`
-eklendiği gün bu tablodaki her satır yeniden ölçülmelidir. Gerekçe
-`ARCHITECTURE.md` §16'da.
+**Faz 16a'da ne değişti:** `enableEdgeToEdge()` geldi, `adjustResize` **kaldı**.
+İkisi çakışmıyor çünkü platform API 30'dan itibaren `adjustResize`'ı yok
+sayıyor; o sürümlerde işi `Modifier.imePadding()` yapıyor, altında bayrak
+yapıyor. Bayrağın kaldırılması denendi ve API 29'u kırdı (kayıt
+`ARCHITECTURE.md` §16'da). **Her yeni metin alanlı ekran bu tabloya üç cihazda
+da eklenir.**
 
 **Not — beklenen davranışlar, hata değil:**
 - İlk kurulumda liste **boş** başlar. Seed veri yok; bu durumda **boş durum ekranı**
@@ -337,9 +360,12 @@ adb shell settings put secure show_ime_with_hard_keyboard 1   # ölçümden önc
 adb shell settings put secure show_ime_with_hard_keyboard 0   # ölçümden sonra
 ```
 
-Klavyenin üst kenarı, uygulama penceresi `adjustResize` ile küçüldüğü için
-en dıştaki kaydırma düğümünün (`android.widget.ScrollView`) alt sınırından
-okunabilir; ayrı bir piksel taramasına gerek yok.
+Klavyenin üst kenarı **API 29'da** kaydırma düğümünün
+(`android.widget.ScrollView`) alt sınırından okunabilir — pencere orada hâlâ
+`adjustResize` ile küçülüyor. **API 30 ve üstünde okunamaz:** edge-to-edge'den
+sonra pencere küçülmüyor, `android:id/content` klavye açıkken de tam ekran
+veriyor. Orada üst kenar `ekran yüksekliği - ime.bottom` ile bulunur
+(API 34/36'da 2400 - 883 = 1517).
 
 ### Kaydırma testleri ekranın kenarından başlatılmaz — API 34 tuzağı
 
