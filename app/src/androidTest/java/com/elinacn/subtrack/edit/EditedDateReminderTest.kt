@@ -18,12 +18,15 @@ import com.elinacn.subtrack.domain.model.Money
 import com.elinacn.subtrack.domain.model.Subscription
 import com.elinacn.subtrack.domain.model.SubscriptionCategory
 import com.elinacn.subtrack.reminder.PaymentReminderWorker
+import com.elinacn.subtrack.testsupport.clearReminderDayRecord
+import com.elinacn.subtrack.testsupport.grantNotificationPermission
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
+import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.time.LocalDate
@@ -40,9 +43,10 @@ import java.util.concurrent.TimeUnit
  * The row is changed with the same `update` the edit screen's repository performs, through a
  * second Room instance over the app's own file - the way the reminder suite already seeds.
  *
- * **Run against freshly cleared app data.** The worker notifies at most once a day and records the
- * day it did, so a suite that has already notified today leaves nothing for this to observe. Run
- * it on its own, not alongside the reminder suite.
+ * **The precondition is set up in [reset], not by whoever starts the run.** The worker notifies at
+ * most once a day and records the day it did, so this used to need freshly cleared app data and a
+ * run of its own: the reminder suite notified first and left nothing here to observe. That was the
+ * suite's one order dependency and this is where it was removed.
  */
 @RunWith(AndroidJUnit4::class)
 class EditedDateReminderTest {
@@ -50,6 +54,18 @@ class EditedDateReminderTest {
     private val context = InstrumentationRegistry.getInstrumentation().targetContext
 
     private val notificationManager = context.getSystemService(NotificationManager::class.java)
+
+    /**
+     * Forgets today's reminder and takes back the permission a reinstall drops.
+     *
+     * Both are this class's own business: it reads the shade, so it needs a worker that will
+     * still notify today and a permission that lets the notification through.
+     */
+    @Before
+    fun reset() {
+        clearReminderDayRecord(context)
+        grantNotificationPermission()
+    }
 
     @Test
     fun editingTheDateToToday_bringsTheSubscriptionIntoTheReminder() {

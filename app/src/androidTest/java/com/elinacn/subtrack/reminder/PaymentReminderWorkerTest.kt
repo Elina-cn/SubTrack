@@ -18,12 +18,15 @@ import com.elinacn.subtrack.domain.model.Currency
 import com.elinacn.subtrack.domain.model.Money
 import com.elinacn.subtrack.domain.model.Subscription
 import com.elinacn.subtrack.domain.model.SubscriptionCategory
+import com.elinacn.subtrack.testsupport.clearReminderDayRecord
+import com.elinacn.subtrack.testsupport.grantNotificationPermission
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeFalse
+import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.time.LocalDate
@@ -40,13 +43,14 @@ import java.util.concurrent.TimeUnit
  * scheduled time, which is what makes the daily job impossible to trigger early from adb; that
  * check does not apply to work with nothing to wait for.
  *
- * **Run this against freshly cleared app data** (`adb shell pm clear com.elinacn.subtrack`). The
- * worker notifies at most once a day and records the day it did, so a second suite run on the
- * same day finds the day already marked and posts nothing.
+ * **Every precondition this needs is set up in [reset].** The worker notifies at most once a day
+ * and records the day it did, so until phase 16b the class needed app data cleared from outside
+ * and had to be run on its own. Clearing the record here instead is what lets it run inside a
+ * suite, in any position, twice in a row, with nobody preparing the device first.
  *
  * The methods are order-independent: only a reminder that actually reached the shade marks the
  * day, so the disabled-notifications case leaves the record untouched whichever way round they
- * run.
+ * run - and the record is cleared before each of them in any case.
  */
 @RunWith(AndroidJUnit4::class)
 class PaymentReminderWorkerTest {
@@ -56,8 +60,21 @@ class PaymentReminderWorkerTest {
     private val notificationManager =
         context.getSystemService(NotificationManager::class.java)
 
+    /**
+     * Undoes whatever has already notified today, this class's own earlier method included.
+     *
+     * The notification permission is deliberately not granted here:
+     * [reminderWorker_notificationsDisabled_succeedsWithoutNotifying] is the one case that wants
+     * it off, so granting is left to the method that needs it on.
+     */
+    @Before
+    fun reset() {
+        clearReminderDayRecord(context)
+    }
+
     @Test
     fun reminderWorker_datedSubscriptions_notifiesOnlyTheOnesInsideTheWindow() {
+        grantNotificationPermission()
         notificationManager.cancelAll()
         seedSubscriptions()
 
