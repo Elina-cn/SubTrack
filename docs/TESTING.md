@@ -250,8 +250,10 @@ yapılır.
 
 | AVD | Çözünürlük | Yoğunluk | Efektif genişlik | API | Ne için |
 |---|---|---|---|---|---|
+| `subtrack_min_api24` | 720x1280 | 320 dpi | **360dp** | 24 | **minSdk'nın kendisi.** Desugaring'li `java.time`, Room, DataStore, Compose ve WorkManager'ın taban sürümde koştuğunun kanıtı (Faz 16-0) |
 | `subtrack_narrow_api29` | 720x1280 | 320 dpi | **360dp** | 29 | Dar ekran, sığma/sarma testleri. Test cihazıyla aynı Android sürümü. |
 | `subtrack_wide_api34` | 1080x2400 | 420 dpi | 411dp | 34 | Güncel Android davranışları, koyu tema, dynamic color |
+| `subtrack_edge_api36` | 1080x2400 | 420 dpi | 411dp | 36 | **Zorunlu edge-to-edge.** targetSdk 36 + Android 16; gezinme modu GESTURAL (Faz 16-0) |
 
 360dp keyfi değil: Compose bileşenlerinin sığıp sığmadığı bu eşiğe göre
 hesaplanıyor, ve yaygın bütçe telefonlarının genişliği bu. Fiziksel cihaz
@@ -262,7 +264,41 @@ Oluşturma (yalnızca bir kez gerekir):
 ```bash
 avdmanager create avd -n subtrack_narrow_api29 -k "system-images;android-29;google_apis_playstore;x86_64" --abi x86_64
 avdmanager create avd -n subtrack_wide_api34 -k "system-images;android-34;google_apis_playstore;x86_64" -d pixel_6 --abi x86_64
+
+# Faz 16-0'da eklenenler
+avdmanager create avd -n subtrack_edge_api36 -k "system-images;android-36.1;google_apis_playstore;x86_64" -d pixel_6
+avdmanager create avd -n subtrack_min_api24  -k "system-images;android-24;google_apis;x86_64" -d "Nexus 5"
 ```
+
+**API 24 imajı `google_apis`, `google_apis_playstore` değil.** O aralıkta Play
+Store imajı yalnızca 32-bit `x86` olarak yayınlanmış; 64-bit olanı `google_apis`.
+İndirme:
+
+```bash
+android sdk install "system-images/android-24/google_apis/x86_64"
+```
+
+`sdkmanager` artık bir kabuk üzerinden `android` CLI'ya yönleniyor ve
+`"paket;adı"` biçimini noktalı virgülden bölüp "Package not found" diyor —
+indirmede yukarıdaki eğik çizgili biçimi kullanın. `avdmanager` noktalı
+virgülü doğru anlıyor, orada değişiklik gerekmiyor.
+
+**API 36 gezinme modu GESTURAL olmalı** — edge-to-edge davranışı API'ye değil
+gezinme moduna bağlı (13b bulgusu). İmajda varsayılan zaten gestural, doğrulamak
+için:
+
+```bash
+adb shell cmd overlay list | grep navbar     # [x] ...navbar.gestural olmalı
+adb shell cmd overlay enable com.android.internal.systemui.navbar.gestural
+```
+
+**Çözünürlük seçimi kasıtlı:** `subtrack_edge_api36` `pixel_6` profiliyle
+kuruluyor, yani `subtrack_wide_api34` ile **birebir aynı piksel ızgarası**
+(1080x2400 @420). Böylece iki cihazın ekran görüntüleri piksel piksel
+karşılaştırılabiliyor ve aradaki fark ekrana değil platforma yazılabiliyor.
+`subtrack_min_api24` ise `subtrack_narrow_api29` ile aynı ızgaraya (720x1280
+@320 = 360dp) elle ayarlanıyor; `Nexus 5` profili 1080x1920 @480 ile geliyor,
+`config.ini`'de `hw.lcd.width/height/density` değiştiriliyor.
 
 `avdmanager` dar profili varsayılan 320x640 @ 160dpi ile kurar; sonra
 `~/.android/avd/subtrack_narrow_api29.avd/config.ini` içinde
