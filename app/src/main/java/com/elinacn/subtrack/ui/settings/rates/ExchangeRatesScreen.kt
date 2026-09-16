@@ -2,7 +2,9 @@ package com.elinacn.subtrack.ui.settings.rates
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -88,8 +90,20 @@ fun ExchangeRatesScreen(
     ) { paddingValues ->
         Column(
             modifier = Modifier
-                .padding(paddingValues)
                 .fillMaxSize()
+                // Outside the scroll on purpose, unlike the home list. This screen ends in two
+                // buttons, and a button that slides under the gesture bar is only half tappable -
+                // there is nothing to gain here from letting content run past the edge.
+                .padding(paddingValues)
+                // Says the bar insets above are already spent, so imePadding below measures the
+                // keyboard from where this column actually ends rather than from the window edge.
+                // Without it the two stack and the keyboard leaves a dead strip above it.
+                .consumeWindowInsets(paddingValues)
+                // Before verticalScroll, so the keyboard shrinks the scrolling viewport instead of
+                // covering it. This is the line ARCHITECTURE section 16 could not use: with the
+                // window still fitting the decor, WindowInsets.ime read zero on every device, and
+                // padding by zero does nothing. Edge-to-edge is what makes it a real number.
+                .imePadding()
                 // The three fields plus the keyboard do not fit a short screen at a large font
                 // scale; scrolling is what keeps the save button reachable.
                 .verticalScroll(rememberScrollState())

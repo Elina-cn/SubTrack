@@ -4,6 +4,8 @@ import android.Manifest
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -30,6 +32,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
 import com.elinacn.subtrack.R
 import com.elinacn.subtrack.ui.common.DelayedLoadingIndicator
@@ -65,6 +68,9 @@ fun HomeScreen(
     modifier: Modifier = Modifier
 ) {
     val moneyFormatter = rememberMoneyFormatter()
+    // Read once here: the Scaffold reports its horizontal insets as start/end, and turning those
+    // back into a PaddingValues needs to know which physical edge each one is.
+    val layoutDirection = LocalLayoutDirection.current
     val snackbarHostState = remember { SnackbarHostState() }
     // skipPartiallyExpanded: half-open, the sheet cut the save button off below a 640dp-tall
     // screen and nothing on screen said it was there to be dragged up. Opening expanded shows the
@@ -178,11 +184,26 @@ fun HomeScreen(
         }
     ) { paddingValues ->
         // LazyColumn rather than Column so long lists only compose what is on screen.
+        //
+        // The Scaffold's insets go in as contentPadding, not as Modifier.padding, and on a
+        // scrolling list that is the whole difference between the two. Padding shrinks the
+        // viewport: the list would stop short of the gesture bar, leaving a strip of background
+        // that scrolls nothing, and a row passing the bottom edge would be cut off in mid-air
+        // rather than slide under the bar. contentPadding leaves the viewport the full window and
+        // only offsets the content, so rows travel under the bar on the way past and the last one
+        // still comes to rest clear of it.
+        //
+        // The FAB's own clearance is added to the bottom inset rather than replacing it: the
+        // Scaffold has already lifted the FAB by that same inset, so the room the list has to
+        // leave is both.
         LazyColumn(
-            modifier = Modifier
-                .padding(paddingValues)
-                .fillMaxSize(),
-            contentPadding = PaddingValues(bottom = Dimens.ListBottomSpacing) // room for the FAB
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(
+                start = paddingValues.calculateStartPadding(layoutDirection),
+                top = paddingValues.calculateTopPadding(),
+                end = paddingValues.calculateEndPadding(layoutDirection),
+                bottom = paddingValues.calculateBottomPadding() + Dimens.ListBottomSpacing
+            )
         ) {
             item {
                 DashboardCard(

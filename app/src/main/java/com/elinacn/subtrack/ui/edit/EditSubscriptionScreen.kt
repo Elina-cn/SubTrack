@@ -1,7 +1,9 @@
 package com.elinacn.subtrack.ui.edit
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -102,8 +104,17 @@ fun EditSubscriptionScreen(
     ) { paddingValues ->
         Column(
             modifier = Modifier
-                .padding(paddingValues)
                 .fillMaxSize()
+                // Same arrangement as the rates screen, and for the same reason: the bar insets
+                // frame the scroll rather than travel inside it, because this screen ends in a
+                // save button and a button under the gesture bar is only half tappable.
+                .padding(paddingValues)
+                .consumeWindowInsets(paddingValues)
+                // Phase 16-0 measured the save button at y=1833 with the keyboard starting at
+                // y=1517 on API 36 - completely behind it, and unreachable because the window no
+                // longer resized. This is what brings it back: the viewport shrinks to the
+                // keyboard and the scroll carries the button up.
+                .imePadding()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = Dimens.SheetPadding),
             horizontalAlignment = Alignment.CenterHorizontally

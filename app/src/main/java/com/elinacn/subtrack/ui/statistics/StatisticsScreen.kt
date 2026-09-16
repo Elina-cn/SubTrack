@@ -71,10 +71,14 @@ fun StatisticsScreen(
             )
         }
     ) { paddingValues ->
+        // Read-only and nothing here is tappable, so the bottom inset could have travelled inside
+        // the scroll. It stays outside so the last row settles clear of the gesture bar instead of
+        // resting half under it - the trend chart's bottom axis labels are the last thing on this
+        // screen and they are meant to be read, not just passed.
         Column(
             modifier = Modifier
-                .padding(paddingValues)
                 .fillMaxSize()
+                .padding(paddingValues)
                 .verticalScroll(rememberScrollState())
         ) {
             DelayedLoadingIndicator(isLoading = uiState.isLoading)

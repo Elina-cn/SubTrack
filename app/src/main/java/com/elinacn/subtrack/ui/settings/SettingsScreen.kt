@@ -132,10 +132,15 @@ fun SettingsScreen(
         }
     ) { paddingValues ->
         // Scrollable so a scaled-up font cannot push the selector off a short screen.
+        //
+        // The bar insets stay outside the scroll: every row here is a target, and a row sliding
+        // under the gesture bar would be half tappable. No imePadding, because nothing on this
+        // screen opens a keyboard - the currency is chosen from chips and the theme from a dialog,
+        // which brings its own insets.
         Column(
             modifier = Modifier
-                .padding(paddingValues)
                 .fillMaxSize()
+                .padding(paddingValues)
                 .verticalScroll(rememberScrollState())
                 .padding(Dimens.ScreenPadding)
         ) {
