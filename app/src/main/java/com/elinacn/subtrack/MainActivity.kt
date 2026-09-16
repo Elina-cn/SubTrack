@@ -1,15 +1,24 @@
 package com.elinacn.subtrack
 
+import android.graphics.Color
 import android.os.Bundle
 import android.view.View
 import android.view.ViewTreeObserver
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
+import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.graphics.toArgb
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.elinacn.subtrack.ui.navigation.SubTrackNavHost
 import com.elinacn.subtrack.ui.theme.SubTrackTheme
+import com.elinacn.subtrack.ui.theme.isDarkTheme
 import dagger.hilt.android.AndroidEntryPoint
 
 /**
@@ -23,12 +32,30 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Before setContent, because this is what stops the decor view fitting the system windows
+        // and the window has to know before it is first laid out. Since phase 16 the app targets
+        // SDK 36 and Android 15 forces edge-to-edge anyway; calling it makes the same arrangement
+        // explicit on every release, and is what finally lets the insets reach Compose. See
+        // ARCHITECTURE section 16.
+        //
+        // The status bar style here is provisional and deliberately not `auto`: the window on
+        // screen for these few frames is the launch window, whose background comes from
+        // Theme.SubTrack and is light whatever the device is set to. `light` means "the background
+        // behind me is light", so the icons are drawn dark and stay readable during the hold. The
+        // effect inside the composition replaces this as soon as the stored theme arrives.
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT)
+        )
         setContent {
             val themeState by viewModel.themeState.collectAsStateWithLifecycle()
             // Composed with the defaults while the read is still out. Those frames are real, and
             // they are the ones the gate above keeps off the screen.
             val theme = themeState ?: ThemeState()
             SubTrackTheme(themeMode = theme.mode, dynamicColor = theme.dynamicColor) {
+                SystemBarsFollowTheTheme(
+                    darkTheme = isDarkTheme(theme.mode),
+                    isThemeKnown = themeState != null
+                )
                 SubTrackNavHost()
             }
         }
@@ -91,5 +118,51 @@ class MainActivity : ComponentActivity() {
          * cold start the user is already waiting through.
          */
         const val THEME_READ_TIMEOUT_MS = 1_000L
+    }
+}
+
+/**
+ * Keeps the status and navigation bar icons readable against whatever the app is drawing.
+ *
+ * Edge-to-edge puts the app's own background behind both bars, so the system no longer knows what
+ * is under its icons - it has to be told. [darkTheme] is the same answer the colour scheme was
+ * built from, which is the point: when the user forces dark, the bars follow the *preference*, not
+ * the device's night setting. Phase 16-0 measured what happens without this - in the light theme
+ * the top 1080x128 band held zero non-white pixels, because the icons were still being drawn white
+ * over a white surface.
+ *
+ * Nothing is applied until [isThemeKnown], and that matters: the first composition runs against the
+ * defaults while the preference is still being read, and applying those defaults would set the bars
+ * from a value the app is about to discard. The launch window's own style, set in `onCreate`,
+ * covers that gap - the same gap the first-frame gate holds the app's own drawing across, so the
+ * two are answering for the same frames rather than fighting over them.
+ *
+ * The two bars get different styles, and that is measured rather than tidy. Below API 29 androidx
+ * fills a bar with the scrim it was handed instead of leaving it to the system, so a scrim is not
+ * free - on API 24 an opaque status bar in `background` drew a visible seam across the top of the
+ * app bar. The status bar does not need one: its icons have been able to go dark since API 23, so
+ * transparent is safe on every release this app supports. The navigation bar does need one, because
+ * below API 26 its icons are always white and would vanish over a light background; `scrim` is
+ * black in both schemes, which is exactly the bar those releases shipped with. Between API 26 and
+ * 28 the icons can follow the theme, so `background` lets the bar continue the app. From API 29
+ * both are transparent and the system enforces its own contrast.
+ */
+@Composable
+private fun SystemBarsFollowTheTheme(darkTheme: Boolean, isThemeKnown: Boolean) {
+    val activity = LocalActivity.current as? ComponentActivity ?: return
+    val lightScrim = MaterialTheme.colorScheme.background.toArgb()
+    val darkScrim = MaterialTheme.colorScheme.scrim.toArgb()
+
+    DisposableEffect(activity, darkTheme, isThemeKnown, lightScrim, darkScrim) {
+        if (isThemeKnown) {
+            activity.enableEdgeToEdge(
+                statusBarStyle = SystemBarStyle.auto(
+                    Color.TRANSPARENT,
+                    Color.TRANSPARENT
+                ) { darkTheme },
+                navigationBarStyle = SystemBarStyle.auto(lightScrim, darkScrim) { darkTheme }
+            )
+        }
+        onDispose { }
     }
 }

@@ -133,6 +133,23 @@ private val LightColorScheme by lazy {
 }
 
 /**
+ * Whether [themeMode] means a dark scheme on this device right now.
+ *
+ * Public because the colour scheme is not the only thing that has to answer this question: since
+ * phase 16a the activity also tells the system what colour to draw the status and navigation bar
+ * icons in, and that answer has to be the same one. A forced dark theme has to darken the bars too,
+ * whatever the device's own setting says - which is exactly what would drift if the `when` below
+ * were written out twice.
+ */
+@Composable
+fun isDarkTheme(themeMode: ThemeMode): Boolean = when (themeMode) {
+    // Read only in this branch, so a forced theme does not recompose when the system flips.
+    ThemeMode.SYSTEM -> isSystemInDarkTheme()
+    ThemeMode.LIGHT -> false
+    ThemeMode.DARK -> true
+}
+
+/**
  * Wraps [content] in the app's colours.
  *
  * [themeMode] decides light or dark and [dynamicColor] decides whose hues those are; the two are
@@ -149,12 +166,7 @@ fun SubTrackTheme(
     dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
-    val darkTheme = when (themeMode) {
-        // Read only in this branch, so a forced theme does not recompose when the system flips.
-        ThemeMode.SYSTEM -> isSystemInDarkTheme()
-        ThemeMode.LIGHT -> false
-        ThemeMode.DARK -> true
-    }
+    val darkTheme = isDarkTheme(themeMode)
     val context = LocalContext.current
     val colorScheme = when {
         // Material You arrived in API 31. Below it there is nothing to read the wallpaper with,
