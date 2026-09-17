@@ -1281,10 +1281,54 @@ ayarlarından bildirimleri açıp geri döndüğünde satır hâlâ "kapalı" de
 Emülatörde ölçüldü: süreç kimliği değişmeden (aynı pid) satır "Açık"a
 dönüyor.
 
-`ACTION_APP_NOTIFICATION_SETTINGS` bulunamazsa
-`ACTION_APPLICATION_DETAILS_SETTINGS`'e düşülür. Bu **açık** bir fallback'tir,
-kodda `ActivityNotFoundException` yakalanıp gerekçesiyle yazılmıştır — §9'un
-yasakladığı sessiz `try/catch` değil.
+### Hangi ayar ekranına gidildiği sürüme bağlıdır
+
+`ACTION_APP_NOTIFICATION_SETTINGS` **API 26'da geldi.** API 26 ve üstünde
+uygulamanın kendi bildirim ekranı açılır; altında doğrudan
+`ACTION_APPLICATION_DETAILS_SETTINGS` — uygulamanın Ayarlar'daki sayfası —
+açılır. Dal `Build.VERSION.SDK_INT` ile açıkça yazılmıştır; bunun bir Compat
+karşılığı yok.
+
+**Neden exception yedeği bunu yakalayamıyor — 16b'de ölçüldü.** Önceki hâl
+"eylemi dene, `ActivityNotFoundException` gelirse detay sayfasına düş" idi ve
+Android 7.0'da **hiç çalışmadı**: o sürümün Ayarlar'ı eylemi karşılıyor, yani
+`startActivity` başarılı oluyor ve exception atılmıyor. Ekran açılıyor, kendi
+istediği `app_uid` ekstrasını bulamayıp kapanıyor, kullanıcıya satır hiçbir şey
+yapmamış gibi görünüyor:
+
+```
+W NotifiSettingsBase: Missing extras: app_package was com.elinacn.subtrack, app_uid was -1
+```
+
+Bir eylemin **adının** var olması, o sürümde **çalışacağı** anlamına gelmiyor;
+exception yalnızca eylemi hiç kimsenin karşılamadığı durumu yakalar. Aradaki
+farkı ancak sürüm kontrolü kapatır.
+
+**`app_uid` gönderilmedi.** Desteklenmeyen bir ekrana ikinci bir ekstra ile
+girmek belgelenmemiş davranışa bağlanmaktır; o ekran API 26 öncesinde
+belgelenmiş bir giriş noktası değil.
+
+**Satır devre dışı bırakılmadı.** Kullanıcının bildirimleri açmak için tek yolu
+o. Detay sayfası bildirim ayarlarına bir dokunuş uzak ("Notifications" satırı) —
+bedel bu, ve ölü bir satırdan iyi.
+
+Exception yedeği **duruyor**: API 26+ dalında, kendi bildirim ekranını
+taşımayan bir yapıda yine detay sayfasına düşülür. İki dal da aynı yerde
+buluşuyor. Bu **açık** bir fallback'tir, kodda yakalanıp gerekçesiyle
+yazılmıştır — §9'un yasakladığı sessiz `try/catch` değil.
+
+Ölçüm (16b hotfix, dört cihaz, `mResumedActivity`):
+
+| Cihaz | Açılan ekran |
+|---|---|
+| API 24 | `com.android.settings/.applications.InstalledAppDetails` |
+| API 29 | `com.android.settings/.Settings$AppNotificationSettingsActivity` |
+| API 34 | `com.android.settings/.Settings$AppNotificationSettingsActivity` |
+| API 36 | `com.android.settings/.Settings$AppNotificationSettingsActivity` |
+
+Lint'in `InlinedApi` uyarıları (`ACTION_APP_NOTIFICATION_SETTINGS` ve
+`EXTRA_APP_PACKAGE`) bu sürüm dalıyla **kapandı**: 24 uyarı 22'ye indi,
+`@SuppressLint` kullanılmadı.
 
 ### `POST_NOTIFICATIONS`
 

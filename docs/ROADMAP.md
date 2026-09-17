@@ -490,14 +490,15 @@ Aylık toplamın zaman içindeki anlık görüntüleri. `PROJECT_SPEC.md` §1'de
       geçiyor; 117 maddelik liste dört cihazda eksiksiz sürüldü (468 hücre).
       Ön koşullar artık testin içinde kuruluyor, `pm clear`/`pm grant` gerekmiyor.
       Ayrıntı ve tablo `PROGRESS.md`'de.
-- [ ] **API 24-25'te bildirim ayarları kısayolu çalışmıyor (16b'de bulundu).**
-      Ayarlar'daki "Ödeme hatırlatmaları" satırına dokunmak Android 7.x'te
-      hiçbir şey yapmıyor: o sürümlerin Ayarlar'ı
-      `APP_NOTIFICATION_SETTINGS`'i karşılıyor (yani yedek yol tetiklenmiyor)
-      ama `app_uid` ekstrasını da istiyor ve göndermediğimiz için ekran kendini
-      kapatıyor. Çökme ve veri kaybı yok. Karar gerekiyor: `app_uid` de
-      gönderilsin mi, API 26 altında doğrudan uygulama detay sayfasına mı
-      gidilsin, yoksa satır o sürümlerde dokunulabilir olmasın mı.
+- [x] **API 24-25'te bildirim ayarları kısayolu düzeltildi** — 16b'de bulundu,
+      16b hotfix'inde kapandı. Android 7.x'te satıra dokunmak hiçbir şey
+      yapmıyordu: o sürümlerin Ayarlar'ı `APP_NOTIFICATION_SETTINGS`'i
+      karşıladığı için `ActivityNotFoundException` atılmıyor ve yedek yol hiç
+      tetiklenmiyordu, ama ekran `app_uid` ekstrasını da istediği için kendini
+      kapatıyordu. Artık API 26 altında **doğrudan uygulama detay sayfasına**
+      gidiliyor; `app_uid` gönderilmiyor (belgelenmemiş davranış) ve satır
+      devre dışı bırakılmıyor (bildirimleri açmanın tek yolu o). API 26+
+      davranışı aynen kaldı. Lint'in iki `InlinedApi` uyarısı da kapandı.
 - [ ] Gizlilik politikası — v1.0 çevrimdışı, veri toplanmıyor. **v1.1'de ağ
       eklendiğinde politika ve Data Safety formu güncellenecek**
       (PROJECT_SPEC §4)

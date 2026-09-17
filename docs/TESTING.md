@@ -84,7 +84,7 @@ etmeden bildirin; sonraki maddeler zaten bozuk bir durumun üstüne binebilir.
 | 37 | Kalıcı reddedildikten sonra satıra dokun | **Sistem bildirim ayarları** açılıyor, izin diyaloğu çıkmıyor | 10c-1 |
 | 38 | Sistem ayarlarından bildirimleri aç, geri dön | Satır **uygulama yeniden başlatılmadan** güncelleniyor | 10c-1 |
 | 39 | Sistem ayarlarından **yalnızca kanalı** kapat, geri dön | Satır **kapalı** diyor (uygulama izni hâlâ verili olsa bile) | 10c-1 |
-| 40 | (API < 33) Satıra dokun | Sistem bildirim ayarları açılıyor, izin diyaloğu **hiç** çıkmıyor | 10c-1 |
+| 40 | (API < 33) Satıra dokun | Bir ayar ekranı açılıyor, izin diyaloğu **hiç** çıkmıyor. **Hangi ekran sürüme bağlı:** API 26+ uygulamanın bildirim ekranı, **API 24-25 uygulama detay sayfası** ("App info"), oradan "Notifications" bir dokunuş uzakta | 10c-1 · 16b hotfix |
 
 | 41 | Temiz kurulumda **tarihli** ilk aboneliği kaydet | Sheet kapandıktan **sonra** sistem izin diyaloğu çıkıyor; ikisi üst üste binmiyor | 10c-2 |
 | 42 | Temiz kurulumda **tarihsiz** abonelik kaydet | Diyalog **çıkmıyor** | 10c-2 |
@@ -191,7 +191,7 @@ yazıldı. İki ayrı şey var ve karıştırılmamalı:
 | Madde | API 24 | API 29 | API 34 | API 36 | Sebep |
 |---|---|---|---|---|---|
 | #34–#37, #41–#45 | geçerli değil | geçerli değil | ölçülür | ölçülür | Çalışma zamanı bildirim izni API 33+. API 24/29'da bu yolu #46 ve #40 kapsıyor |
-| #40, #46 | **#40 düştü**, #46 ölçülür | ölçülür | geçerli değil | geçerli değil | Karşı yön: API 33+ cihazda izin diyaloğu çıkar, bu iki madde API < 33 içindir |
+| #40, #46 | ölçülür | ölçülür | geçerli değil | geçerli değil | Karşı yön: API 33+ cihazda izin diyaloğu çıkar, bu iki madde API < 33 içindir. **#40 API 24'te 16b'de düşmüştü, 16b hotfix'inde düzeltildi** — açılan ekran orada uygulama detay sayfasıdır, bildirim ekranı değil |
 | #39 | geçerli değil | ölçülür | ölçülür | ölçülür | Bildirim kanalları API 26+; Android 7.0'da kanal kavramı yok |
 | #107, #109 | **ölçülemedi** | **ölçülemedi** | ölçülür | ölçülür | Sistem koyu teması: API 24'te `cmd uimode` "No shell command implementation" der; API 29'da komut çalışır ama "Night mode: no" döndürüp değeri yazmaz, `settings put secure ui_night_mode 2` de tutmaz |
 | #111, #112, #113 | geçerli değil | geçerli değil | ölçülür | ölçülür | Duvar kâğıdı renkleri API 31+ |

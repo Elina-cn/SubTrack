@@ -27,6 +27,104 @@ Her faz sonunda **en üste** yeni kayıt eklenir. Eski kayıtlar silinmez.
 
 ---
 
+## [Faz 16b hotfix] API 26 Altında Bildirim Ayarlarına Doğru Yoldan Gidiliyor — 2026-09-17
+
+**Durum:** Tamamlandı. 16b turunda API 24'te düşen #40 kapandı. Tek bir dal
+değişti; izin akışının geri kalanına, `reminder/` altına, domain'e, veriye,
+manifeste ve temaya dokunulmadı.
+
+### Ne düzeltildi
+
+Ayarlar'daki "Ödeme hatırlatmaları" satırına dokunmak Android 7.x'te hiçbir şey
+yapmıyordu. Artık API 26 altında **doğrudan uygulama detay sayfası**
+(`ACTION_APPLICATION_DETAILS_SETTINGS`) açılıyor; API 26 ve üstünde bugünkü
+davranış **aynen** duruyor.
+
+### Neden exception yedeği yetmiyordu
+
+Önceki kod "eylemi dene, `ActivityNotFoundException` gelirse detay sayfasına
+düş" diyordu. Android 7.0'ın Ayarlar'ı `ACTION_APP_NOTIFICATION_SETTINGS`
+eylemini **karşılıyor**, yani `startActivity` başarılı oluyor ve exception hiç
+atılmıyor — yedek bu yüzden hiç devreye girmiyordu. Ekran açılıyor, API 24'te
+istediği `app_uid` ekstrasını bulamayıp kendini kapatıyor:
+
+```
+W NotifiSettingsBase: Missing extras: app_package was com.elinacn.subtrack, app_uid was -1
+```
+
+Bir eylemin **adının** var olması o sürümde **çalışacağı** anlamına gelmiyor.
+Exception yalnızca eylemi kimsenin karşılamadığı durumu yakalar; aradaki farkı
+ancak `Build.VERSION.SDK_INT` kontrolü kapatır.
+
+**`app_uid` gönderilmedi** — desteklenmeyen bir ekrana ikinci bir ekstra ile
+girmek belgelenmemiş davranışa bağlanmak olurdu. **Satır devre dışı
+bırakılmadı** — kullanıcının bildirimleri açmak için tek yolu o. Exception
+yedeği **kaldı**; API 26+ dalında kendi bildirim ekranını taşımayan bir yapıda
+yine detay sayfasına düşülüyor, yani iki dal aynı yerde buluşuyor.
+
+### Ölçüm — dört cihaz, `mResumedActivity`
+
+| Cihaz | Açılan ekran | Değişti mi |
+|---|---|---|
+| API 24 | `com.android.settings/.applications.InstalledAppDetails` | **evet — eskiden hiçbir şey açılmıyordu** |
+| API 29 | `com.android.settings/.Settings$AppNotificationSettingsActivity` | hayır |
+| API 34 | `com.android.settings/.Settings$AppNotificationSettingsActivity` | hayır |
+| API 36 | `com.android.settings/.Settings$AppNotificationSettingsActivity` | hayır |
+
+Dört cihazda da `logcat -s AndroidRuntime:E` boş — çökme yok.
+
+**API 24'te yol uçtan uca sürüldü.** Detay sayfasında "Notifications" satırı var
+ve oradan gerçek bildirim anahtarlarına ("Block all") ulaşılıyor. Kapatıp
+uygulamaya dönünce satır "Off — turn on in system settings", tekrar açıp dönünce
+"On" dedi; süreç kimliği değişmedi (aynı pid 3570). Yani #38'in tazeleme yolu da
+bu yeni rotadan çalışıyor.
+
+API 34 ve 36'da değişen dalın gerçekten koşması için izin **kalıcı olarak
+reddedilip** (`USER_FIXED`) satıra dokunuldu; #34'ün temiz kurulum yolu
+(doğrudan sistem izin diyaloğu, `GrantPermissionsActivity`) ayrıca doğrulandı ve
+değişmedi.
+
+### Lint
+
+`ReminderPermissionActions.kt:41` ve `:42`'deki `InlinedApi` uyarıları
+(`ACTION_APP_NOTIFICATION_SETTINGS`, `EXTRA_APP_PACKAGE`) **kapandı**.
+**24 uyarı → 22.** `@SuppressLint` kullanılmadı.
+
+Dosyada kalan tek `InlinedApi`, `canShowNotificationRationale` içindeki
+`Manifest.permission.POST_NOTIFICATIONS` (satır 37). O başka bir sabit ve bu
+maddeyle ilgisi yok: her sürümde güvenli bir izin adı dizesi, ve ARCHITECTURE
+§18 runtime kontrolünün neden ayrıca sürüme bağlandığını zaten açıklıyor.
+
+### Ek olarak sürülen maddeler
+
+#20 (ayarlar gidiş-dönüş) ve #106-#117 dört cihazda da sürüldü, hepsi geçti:
+tema diyaloğu, açık/koyu direnci, sistemi takip etme, yeniden açılışta kalıcılık,
+duvar kâğıdı renkleri (API 34/36), devre dışı satır (API 24/29), para birimi
+sembolleri ve sayı biçimi. Ölçülen renkler 16b'dekiyle birebir aynı:
+`#0D1A14` / `#1F3D2D`, açık temada `#D3E2D8`, duvar kâğıdı açıkken API 34
+`#1E100F` ve API 36 `#24020A`.
+
+Tam 117 maddelik tur tekrarlanmadı — 16b'de eksiksiz sürülmüştü ve bu değişiklik
+tek bir Intent dalına dokunuyor.
+
+**Değişen dosyalar**
+- `app/src/main/java/com/elinacn/subtrack/ui/settings/ReminderPermissionActions.kt` —
+  `openNotificationSettings` sürüm dalına ayrıldı, ortak `startAppDetails` çıkarıldı
+- `docs/ARCHITECTURE.md` — §18'e "Hangi ayar ekranına gidildiği sürüme bağlıdır"
+- `docs/TESTING.md` — #40'ın beklentisi sürüme göre ayrıldı; ölçülemez tablosundaki
+  "düştü" kaydı düzeltildi
+- `docs/PROGRESS.md` — bu kayıt
+
+**Commit'ler**
+- `fix:` send API 24-25 straight to the app details page
+- `docs:` explain why the exception fallback could not catch this
+
+**Sonraki faz için not**
+- ROADMAP'teki "API 24-25'te bildirim ayarları kısayolu çalışmıyor" maddesi
+  kapandı; işaretlenebilir.
+
+---
+
 ## [Faz 16b] Test Paketinin Sıra Bağımsızlığı ve Tam Regresyon Turu — 2026-09-16
 
 **Durum:** Kısmen. Sıra bağımlılığı çözüldü ve dört cihazda kanıtlandı, şablon
