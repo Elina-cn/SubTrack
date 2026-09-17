@@ -1,9 +1,27 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt)
 }
+
+// Signing material lives outside the repository. local.properties is the primary source: it is
+// already git-ignored, Gradle already reads it for sdk.dir, and Android Studio and the command line
+// see the same values without a shell profile. Environment variables are the fallback so a future
+// CI machine, which has no local.properties, can supply the same four values unchanged.
+val signingProperties = Properties().apply {
+    val file = rootProject.file("local.properties")
+    if (file.exists()) {
+        file.inputStream().use { load(it) }
+    }
+}
+
+/** Reads one piece of signing material from local.properties, falling back to the environment. */
+fun signingSecret(propertyKey: String, environmentKey: String): String? =
+    signingProperties.getProperty(propertyKey)?.takeIf { it.isNotBlank() }
+        ?: System.getenv(environmentKey)?.takeIf { it.isNotBlank() }
 
 android {
     namespace = "com.elinacn.subtrack"
@@ -23,8 +41,34 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        // Created only when all four values are present and the keystore really exists. Without it
+        // the release build stays unsigned instead of failing, and the debug build is untouched
+        // because it keeps using the SDK's own debug key.
+        val storeFilePath = signingSecret("subtrack.storeFile", "SUBTRACK_STORE_FILE")
+        val storePasswordValue = signingSecret("subtrack.storePassword", "SUBTRACK_STORE_PASSWORD")
+        val keyAliasValue = signingSecret("subtrack.keyAlias", "SUBTRACK_KEY_ALIAS")
+        val keyPasswordValue = signingSecret("subtrack.keyPassword", "SUBTRACK_KEY_PASSWORD")
+        val keystore = storeFilePath?.let(::file)
+        if (keystore?.exists() == true &&
+            storePasswordValue != null &&
+            keyAliasValue != null &&
+            keyPasswordValue != null
+        ) {
+            create("release") {
+                storeFile = keystore
+                storePassword = storePasswordValue
+                keyAlias = keyAliasValue
+                keyPassword = keyPasswordValue
+            }
+        }
+    }
+
     buildTypes {
         release {
+            // Null when the keystore is absent; the APK then comes out unsigned rather than signed
+            // with the debug key, so an unsigned artifact can never be mistaken for a shippable one.
+            signingConfig = signingConfigs.findByName("release")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
