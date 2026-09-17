@@ -177,6 +177,35 @@ ayrışırsa tek doğrulama kaynağı kuralı kırılmış demektir (`ARCHITECTU
 #103 ve #104 bu fazın en riskli maddeleri — dokunma, kaydırarak silmenin jestine
 eklendi ve satırın tek odak durağı olması korunmalı.
 
+---
+
+## Hangi madde hangi cihazda ölçülemiyor
+
+Faz 16b'de dört cihazda tam tur atıldı ve **bir daha keşfedilmesin diye** buraya
+yazıldı. İki ayrı şey var ve karıştırılmamalı:
+
+- **Geçerli değil:** madde o API'de anlamsız. Boş bırakılmaz, "geçerli değil"
+  yazılır — atlanmadı, orada yok.
+- **Ölçülemedi:** madde geçerli ama o imajda gözlemlenemiyor. Sebebi yazılır.
+
+| Madde | API 24 | API 29 | API 34 | API 36 | Sebep |
+|---|---|---|---|---|---|
+| #34–#37, #41–#45 | geçerli değil | geçerli değil | ölçülür | ölçülür | Çalışma zamanı bildirim izni API 33+. API 24/29'da bu yolu #46 ve #40 kapsıyor |
+| #40, #46 | **#40 düştü**, #46 ölçülür | ölçülür | geçerli değil | geçerli değil | Karşı yön: API 33+ cihazda izin diyaloğu çıkar, bu iki madde API < 33 içindir |
+| #39 | geçerli değil | ölçülür | ölçülür | ölçülür | Bildirim kanalları API 26+; Android 7.0'da kanal kavramı yok |
+| #107, #109 | **ölçülemedi** | **ölçülemedi** | ölçülür | ölçülür | Sistem koyu teması: API 24'te `cmd uimode` "No shell command implementation" der; API 29'da komut çalışır ama "Night mode: no" döndürüp değeri yazmaz, `settings put secure ui_night_mode 2` de tutmaz |
+| #111, #112, #113 | geçerli değil | geçerli değil | ölçülür | ölçülür | Duvar kâğıdı renkleri API 31+ |
+| #114 | ölçülür | ölçülür | geçerli değil | geçerli değil | Karşı yön: satırın devre dışı hâli yalnızca API < 31'de görülür |
+| #84, #95, #104 | kısmen | kısmen | kısmen | kısmen | Erişilebilirlik **ağacı** okunabiliyor ve maddelerin "tek odak durağı" yarısı böyle ölçülüyor. TalkBack hiçbir imajda kurulu değil; #104'ün "Sil" özel eylemi `uiautomator dump` biçiminde hiç taşınmıyor |
+| #50 | kısmen | kısmen | kısmen | kısmen | "Veri varken boş durum **yükleme sırasında da** görünmüyor": kararlı hâl ölçülüyor, açılış karesi ölçülemiyor — en hızlı gözlem aracı 3,3 sn süren `uiautomator dump` |
+| #15 | ölçülür ama sistemden değil | ölçülür ama sistemden değil | ölçülür | ölçülür | API 24/29'da sistem teması koyuya alınamadığı için renkler uygulamanın kendi **Koyu** seçeneğiyle ölçülür; ölçülen değer aynı (`#0D1A14` / `#1F3D2D` = 1,50:1) |
+| #16 | ölçülür (Diller ekranı) | ölçülür (Diller ekranı) | ölçülür (`cmd locale`) | ölçülür (`cmd locale`) | Aşağıdaki "Cihaz dili" bölümü |
+| #69–#75 | ölçülür | ölçülür | ölçülür | ölçülür | **Artık ölçülemez değil** — aşağıdaki "Çıpa tarihi metinle girilir" bölümü |
+
+**#39 ve #69–#75 bu turda "ölçülemez" olmaktan çıktı.** İkisi de yıllarca öyle
+yazılmıştı; 16b'de ikisinin de yolu bulundu ve aşağıya yazıldı. Bir maddenin
+"ölçülemez" kalması, kimsenin bir daha bakmayacağı anlamına gelmesin.
+
 **86-95 için veri nasıl kurulur — ay dönümü cihazda üretilemiyor**
 
 12a'nın bulgusu burada da geçerli: `google_apis_playstore` imajlarında root
@@ -208,24 +237,47 @@ en boş hâl "tek ay"dır.
 
 Metin alanı olan **her** ekranda, klavye açıkken ekranın alt kısmındaki
 eylemlerin erişilebilir olup olmadığı ölçülür. Faz 16a'da tablo üç ekrana ve üç
-cihaza çıktı; eski değerler referans olarak sağda duruyor.
+cihaza çıktı; **Faz 16b'de API 24 eklendi ve bütün satırlar yeniden ölçüldü.**
 
-| Ekran | Cihaz | Klavye kapalı | Klavye açık, tek fiske sonrası | Klavye üstü | 16a öncesi referans |
-|---|---|---|---|---|---|
-| Ekleme sheet'i | API 29 | `[329,1132][391,1172]` | `[329,630][391,670]` (fiskesiz) | 784 | aynı — 16a öncesi derlemeyle de ölçüldü |
-| Ekleme sheet'i | API 34 | `[500,2143][580,2196]` | `[500,1323][580,1376]` (fiskesiz) | 1517 | 13b'deki değerle **birebir aynı** |
-| Ekleme sheet'i | API 36 | `[500,2143][580,2196]` | `[500,1323][580,1376]` (fiskesiz) | 1517 | 13b'deki değerle **birebir aynı** |
-| Kur ekranı — Kaydet | API 29 | `[329,1044][391,1084]` | `[329,564][391,604]` | 784 | `adjustResize` ile tek fiske (9b-2) |
-| Kur ekranı — Kaydet | API 34 | `[500,1439][580,1492]` | `[500,1228][580,1281]` | 1517 | `adjustResize` ile tek fiske (9b-2) |
-| Kur ekranı — Kaydet | API 36 | `[500,1439][580,1492]` | `[500,1228][580,1281]` | 1517 | **16-0'da düşüyordu** — y=1623, erişilemez |
-| Kur ekranı — Varsayılana dön | API 29 | `[254,1164][466,1204]` | `[254,684][466,724]` | 784 | — |
-| Kur ekranı — Varsayılana dön | API 34 | `[401,1597][679,1650]` | `[401,1386][679,1439]` | 1517 | — |
-| Kur ekranı — Varsayılana dön | API 36 | `[401,1597][679,1650]` | `[401,1386][679,1439]` | 1517 | **16-0'da düşüyordu** |
-| Düzenleme ekranı — Kaydet | API 29 | kaydırma gerekiyor (360dp) | `[329,630][391,670]` | 784 | tabloda yoktu |
-| Düzenleme ekranı — Kaydet | API 34 | `[500,1807][580,1860]` | `[500,1323][580,1376]` | 1517 | tabloda yoktu |
-| Düzenleme ekranı — Kaydet | API 36 | `[500,1807][580,1860]` | `[500,1323][580,1376]` | 1517 | **16-0'da y=1833, tamamen klavyenin arkasında** |
-| Ayarlar ekranı | üçü de | — | — | — | Metin alanı yok, konu dışı |
-| İstatistik ekranı | üçü de | — | — | — | Metin alanı yok, konu dışı |
+| Ekran | Cihaz | Klavye kapalı | Klavye açık, tek fiske sonrası | Klavye üstü |
+|---|---|---|---|---|
+| Ekleme sheet'i | API 24 | `[316,1036][404,1076]` | ölçülmedi (pencere 1184 px) | — |
+| Ekleme sheet'i | API 29 | `[316,1132][404,1172]` | `[316,630][404,670]` (fiskesiz) | 784 |
+| Ekleme sheet'i | API 34 | `[483,2143][597,2196]` | `[483,1323][597,1376]` (fiskesiz) | 1517 |
+| Ekleme sheet'i | API 36 | `[484,2143][597,2196]` | `[484,1323][597,1376]` (fiskesiz) | 1517 |
+| Kur ekranı — Kaydet | API 24 | `[316,1044][404,1084]` | `[316,521][404,561]` | 658 |
+| Kur ekranı — Kaydet | API 29 | `[316,1044][404,1084]` | `[316,631][404,671]` | 778 |
+| Kur ekranı — Kaydet | API 34 | `[483,1344][597,1397]` | `[483,1228][597,1281]` | 1517 |
+| Kur ekranı — Kaydet | API 36 | `[484,1344][597,1397]` | `[484,1228][597,1281]` | 1517 |
+| Kur ekranı — Varsayılana dön | API 24 | `[260,1164][461,1184]` | `[260,641][461,658]` | 658 |
+| Kur ekranı — Varsayılana dön | API 29 | `[260,1164][461,1204]` | `[260,751][461,778]` | 778 |
+| Kur ekranı — Varsayılana dön | API 34 | `[410,1502][670,1555]` | `[410,1386][670,1439]` | 1517 |
+| Kur ekranı — Varsayılana dön | API 36 | `[410,1502][670,1555]` | `[410,1386][670,1439]` | 1517 |
+| Düzenleme ekranı — Kaydet | API 24 | kaydırma gerekiyor (360dp) | ölçülmedi | — |
+| Düzenleme ekranı — Kaydet | API 29 | kaydırma gerekiyor (360dp) | `[316,630][404,670]` | 784 |
+| Düzenleme ekranı — Kaydet | API 34 | `[483,1660][597,1713]` | `[483,1323][597,1376]` | 1517 |
+| Düzenleme ekranı — Kaydet | API 36 | `[483,1660][597,1713]` | `[483,1323][597,1376]` | 1517 |
+| Ayarlar ekranı | dördü de | — | — | — |
+| İstatistik ekranı | dördü de | — | — | — |
+
+**16a tablosunun kur ekranı satırları 95 px yanlıştı ve sebebi bulundu.** Orada
+API 34/36 için klavye **kapalı** değer `[500,1439][580,1492]` yazıyordu; 16b'de
+aynı cihazda `[483,1344][597,1397]` ölçüldü. Fark 95 px ve bu, o cihazlardaki
+durum çubuğu payının ta kendisi: o iki satır **16a öncesinden**, yani pencere
+hâlâ durum çubuğunun altından başlarken kalmış. Klavye **açık** değerler aynı
+tabloda 16a'da yeniden ölçülmüştü ve 16b ölçümüyle piksel piksel tuttu — düzeltme
+yalnızca kapalı sütununa ait. Ders: edge-to-edge gibi pencerenin başlangıcını
+kaydıran bir değişiklikten sonra tablonun **her** sütunu yeniden ölçülür.
+
+x değerleri metin düğümünün genişliğidir ve yazı tipi ölçüsüyle birkaç piksel
+oynar; **maddenin ölçütü y'dir** — düğmenin alt kenarı "klavye üstü" değerinin
+altında kalıyorsa madde düşer.
+
+**API 24'te klavye penceresi farklı davranıyor.** Orada uygulama penceresi zaten
+`[0,0][720,1184]` (gezinme çubuğu ayrı ve opak, edge-to-edge yok); klavye açılınca
+kaydırma düğümü `[0,176][720,658]`e daralıyor. Yani klavyenin üst kenarı 658, ve
+"Varsayılana dön" fiskeden sonra tam o sınırda duruyor (`[260,641][461,658]`) —
+erişilebilir ama payı yok. Yeni bir alt eylem eklenirse önce burası ölçülmeli.
 
 `fs 2.0`'da da ölçüldü: API 36 kur ekranında tek fiskede Kaydet `[465,1043]
 [615,1141]`, Varsayılana dön `[277,1215][803,1305]`; API 29'da iki fiske
@@ -281,6 +333,28 @@ yapılır.
 360dp keyfi değil: Compose bileşenlerinin sığıp sığmadığı bu eşiğe göre
 hesaplanıyor, ve yaygın bütçe telefonlarının genişliği bu. Fiziksel cihaz
 423dp olduğu için dar durumu hiç göstermiyor.
+
+**Faz 16b'de dördü de sürüldü ve ölçülen özellikleri şunlar.** Bunlar imajların
+kendi ayarları; bir tur başlamadan önce doğrulanır, çünkü her biri bir ölçümü
+sessizce değiştirebiliyor.
+
+| AVD | Gezinme | Saat dilimi | Uygulama penceresi | Ekleme sheet'inde periyot sırası |
+|---|---|---|---|---|
+| `subtrack_min_api24` | üç tuşlu | GMT | `[0,0][720,1184]` — **edge-to-edge yok**, çubuk ayrı ve opak | tek satır |
+| `subtrack_narrow_api29` | üç tuşlu | America/New_York | `[0,0][720,1280]` | tek satır |
+| `subtrack_wide_api34` | gestural | GMT | `[0,0][1080,2400]` | tek satır |
+| `subtrack_edge_api36` | gestural | GMT | `[0,0][1080,2400]` | tek satır |
+
+**Saat dilimi tarih maddelerini doğrudan etkiliyor.** `subtrack_narrow_api29`
+America/New_York'ta; host'la arasında yedi saat var, yani gece yarısına yakın
+saatlerde cihaz ile host **farklı günde** olur. Tarih fikstürü kurarken çıpa,
+cihazın kendi saat diliminde gece yarısına yazılır — host'unkinde değil.
+16b'de bir fikstür bu yüzden bir gün geriye düştü ve kart "25 gün" yerine
+"24 gün" dedi; hata üründe değil ölçümdeydi.
+
+**API 24'ün gezinme çubuğu opak ve pencerenin dışında.** `enableEdgeToEdge()`
+orada pencereyi çubukların altına taşımıyor; FAB API 29'dakinden 96 px yukarıda
+duruyor. Koordinat bekleyen hiçbir ölçüm API 29'unkiyle aynı sayıyı vermez.
 
 Oluşturma (yalnızca bir kez gerekir):
 
@@ -426,6 +500,57 @@ devam eder. Faz 12-1 doğrulamasında bu oldu: 29. madde "kart yok" dedi, sebep
 Kural: diyalogda Kaydet'e bastıktan sonra **"Select date" başlığının
 kaybolmasını bekle**, sonra yeniden dump al.
 
+### Çıpa tarihi takvimden değil, metin girişinden verilir
+
+**#69-#75 bu yüzden artık "ölçülemez" değil.** O maddeler geçmiş ve çok eski
+çıpalar istiyor; takvimden aya aya geri gitmek hem uzun hem kırılgan. Seçicinin
+kendi **metin giriş modu** her tarihi tek seferde alıyor:
+
+1. Tarih alanına dokun → seçici açılır
+2. **"Metin giriş moduna geç"** (klavye ikonu, sağ üst)
+3. Alana dokun, `KEYCODE_MOVE_END` + yeterince `KEYCODE_DEL`, sonra rakamları
+   ayraçsız yaz: `25092037`
+4. Diyaloğun Kaydet'ine bas, **"Tarih seç" başlığı kaybolana kadar bekle**
+5. Sonra sheet'in Kaydet'ine bas
+
+Böyle kurulup 16b'de dört cihazda ölçülen çıpalar: `11.09.2026` (geçmiş aylık →
+"25 gün kaldı"), `11.09.2026` haftalık → "2 gün kaldı", `11.09.2025` yıllık →
+"360 gün kaldı", `01.01.2024` haftalık → "5 gün kaldı", `31.01.2026` aylık →
+"14 gün kaldı".
+
+**#72'nin asıl sınavı `31.01.2026` çıpası.** İlerletme çıpadan sayılırsa 31 Ocak
++ 8 ay = **30 Eylül** ("14 gün kaldı"); adım adım kırpılarak sayılsaydı 28 Şubat
+üzerinden **28 Eylül** ("12 gün kaldı") çıkardı. İki yol farklı sayı veriyor,
+yani madde gerçekten ayırt ediyor. Maddenin "Mart'ta bak" yazan hâli cihaz
+saatini ileri almayı gerektirir ve o hâlâ yapılamıyor; ölçtüğü özellik bu
+çıpayla ölçülüyor.
+
+**Metin maskesi API 24'te farklı.** Orada ipucu `DDMM/YYYY`, diğerlerinde
+`DD.MM.YYYY`; alan yazarken `250/9/2037` gibi tuhaf görünüyor ama ayrıştırma
+doğru ("Girilen tarih: 25 Eylül 2037 Cuma"). Maskeye değil, seçicinin başlığında
+yazan ayrıştırılmış tarihe bakılır.
+
+### "Geri al"a dokunmak: dump'la yetişilmez, tek shell satırıyla yapılır
+
+Snackbar `Short` süreyle (≈4 sn) duruyor. `uiautomator dump` + `exec-out cat`
+çifti ise **3,3 saniye** sürüyor (16b'de ölçüldü). Yani "dump al, düğmeyi bul,
+dokun" döngüsü tam da snackbar kapanırken varıyor: 16b'de #19 arka arkaya iki kez
+"geri alma çalışmıyor" diye düştü, sonra ürünün değil ölçümün yavaş olduğu
+anlaşıldı.
+
+Kural: silme ile dokunuş **tek `adb shell` satırında** gider, aradan dump
+geçmez. Düğmenin koordinatı bir önceki turdan bilinir:
+
+```bash
+adb shell "input swipe 900 1202 100 1202 700; sleep 1; input tap 942 2053"
+```
+
+| Cihaz | "Geri al" (tıklanabilir düğüm) merkezi |
+|---|---|
+| API 24 | `615,968` |
+| API 29 | `615,1064` |
+| API 34 / API 36 | `942,2053` |
+
 ### Yüklü emülatörde "bayat ağaç" — durum kalmış gibi görünür
 
 12-2 hotfix koşusunda üç madde (#60 filtre, #68 yıllık görünüm, #14 yazılmış
@@ -505,6 +630,46 @@ adb shell settings put system font_scale 1.0
 Değiştirdikten sonra Activity yeniden başlatılır. **Test bitince 1.0'a geri
 alın** — unutulursa sonraki tüm ölçümler yanlış çıkar.
 
+### Cihaz dili — iki yol, API'ye göre
+
+`setprop persist.sys.locale tr-TR` **root ister ve bu imajlarda çalışmaz**
+("Failed to set property"). Onun yerine:
+
+**API 33+ (`subtrack_wide_api34`, `subtrack_edge_api36`)** — uygulamaya özel dil:
+
+```bash
+adb shell cmd locale set-app-locales com.elinacn.subtrack --locales tr-TR
+adb shell cmd locale get-app-locales com.elinacn.subtrack
+adb shell cmd locale set-app-locales com.elinacn.subtrack --locales ""   # geri al
+```
+
+Hızlı ve tekrarlanabilir, ama **cihazın dili değil uygulamanınki** değişir.
+`pm clear` bu ayarı da siler, sonra yeniden verilmeli.
+
+**API 24/29 (`cmd locale` yok: "Can't find service: locale")** — Ayarlar
+arayüzünden, gerçek cihaz dili:
+
+```bash
+adb shell am start -a android.settings.LOCALE_SETTINGS
+```
+
+Sonra: **Dil ekle** → arama → `Türkçe` → `Türkiye`. Yeni dil **2. sıraya** girer;
+1. sıraya taşımak için sürüklemek yerine **Diğer seçenekler → Kaldır** ile
+İngilizce'yi silmek daha güvenilir (tek dil kalınca o birinci olur). Doğrulama:
+
+```bash
+adb shell getprop persist.sys.locale      # tr-TR
+```
+
+Geri almak aynı yol, ters yönde. #16 bu yolla ölçüldüğünde **gerçekten cihaz
+dili** ölçülmüş olur; API 33+ tarafında ölçülen şey uygulama dilidir ve tur
+raporunda böyle yazılır.
+
+**API 24'ün locale verisi farklı.** Aynı tr-TR'de saat 12 saatlik biçimde
+yazılıyor ("Son düzenleme: 16 Eyl 2026 ÖS 9:57"), API 29/34/36'da 24 saatlik
+("... 19:24"). Uygulamanın değil platformun biçimlendiricisi; madde metni saat
+biçimi istemiyor, sayı ve para birimi istiyor.
+
 ### Koyu tema
 
 ```bash
@@ -513,8 +678,20 @@ adb shell cmd uimode night no
 ```
 
 **API 29'da çalışmıyor** — komut "Night mode: no" döndürüp değeri yazmıyor,
-`settings put secure ui_night_mode 2` de tutmuyor. Koyu tema testleri
-`subtrack_wide_api34` üzerinde yapılır.
+`settings put secure ui_night_mode 2` de tutmuyor.
+
+**API 24'te komut hiç yok** — `cmd uimode night yes` "No shell command
+implementation" der (servis kayıtlı, kabuk arayüzü yok). Sistem geneli koyu tema
+zaten Android 10 ile geldi, yani Android 7.0'da böyle bir ayar **yoktur**.
+
+Sonuç: *sistem temasını değiştirmeyi* gerektiren maddeler (#107, #109) yalnızca
+`subtrack_wide_api34` ve `subtrack_edge_api36` üzerinde ölçülür.
+
+**Ama koyu temanın kendisi dört cihazda da ölçülebilir.** Faz 14b'den sonra
+uygulamanın kendi **Ayarlar → Tema → Koyu** seçeneği sistemden bağımsız çalışıyor;
+API 24 ve 29'da renkler böyle ölçülür ve aynı değerleri verir (`#0D1A14` /
+`#1F3D2D` = 1,50:1, çubuk `#D4AF37` / iz `#3A5A48` = 3,65:1). Sistemden
+gelmeyen tek şey "uygulama sistemi takip ediyor mu" sorusudur.
 
 **Faz 14a'dan sonra koyu temada ne aranır.** İki şema aynı rolleri farklı hue'lara
 veriyor (`ARCHITECTURE.md` §12), o yüzden "koyu tema açık temanın koyusu" değil:
@@ -625,47 +802,105 @@ adb exec-out cat /sdcard/frame.raw > ekran.raw
 
 ### Otomatik testler
 
-Bugün **19 enstrümantasyon testi** var: 8 abonelik DAO'su + **8 aylık anlık görüntü
-DAO'su (Faz 12a)** + 1 şablon + 2 hatırlatma worker'ı.
+Bugün **330 birim testi** ve **19 enstrümantasyon testi** var. Enstrümantasyon:
+8 abonelik DAO'su + **8 aylık anlık görüntü DAO'su (Faz 12a)** + 2 hatırlatma
+worker'ı + 1 düzenlenen tarih (Faz 15). Şablon testler Faz 16b'de silindi.
+
+İkisi de iki yoldan koşar ve **iki yol da geçmek zorundadır**:
 
 ```bash
 ANDROID_SERIAL=emulator-5554 ./gradlew :app:connectedDebugAndroidTest
+
+./gradlew :app:installDebug :app:installDebugAndroidTest
+adb shell am instrument -w com.elinacn.subtrack.test/androidx.test.runner.AndroidJUnitRunner
 ```
 
-`connectedDebugAndroidTest` bitince uygulamayı **kaldırıyor**. Ekran
-görüntüsü veya elle test yapılacaksa testten sonra yeniden kurun.
+**Hazırlık gerekmez.** Faz 16b'ye kadar bu paket `pm clear` ve `pm grant`
+istiyordu; artık istemiyor. İki hatırlatma sınıfı da ön koşulunu `@Before`
+içinde kendisi kuruyor: günün "bildirildi" kaydını siliyor ve API 33+ cihazda
+bildirim iznini kendisi veriyor. Ayrıntısı bir alttaki bölümde.
+
+`connectedDebugAndroidTest` bitince uygulamayı **kaldırıyor**. Ekran görüntüsü
+veya elle test yapılacaksa testten sonra yeniden kurun.
 
 **Bildirim gözlemlenecekse bu görevi kullanmayın** — uygulama kaldırıldığı için
-bildirim de ekrandan gider. Onun yerine iki APK'yı kurup testi doğrudan
-çalıştırın:
+bildirim de ekrandan gider. Onun yerine iki APK kurulup test doğrudan
+çalıştırılır:
 
 ```bash
-adb shell pm clear com.elinacn.subtrack
-./gradlew :app:installDebug :app:installDebugAndroidTest
-adb shell pm list instrumentation                      # tam adı buradan al
 adb shell am instrument -w -e class com.elinacn.subtrack.reminder.PaymentReminderWorkerTest   com.elinacn.subtrack.test/androidx.test.runner.AndroidJUnitRunner
 adb logcat -d -s ReminderWorkerTest:V
 ```
-
-API 33+ cihazda önce izin verilmeli, yoksa bildirim hiç gönderilmez — ve
-**`pm clear`'dan SONRA**, çünkü clear izni de geri alır:
-
-```bash
-adb shell pm grant com.elinacn.subtrack android.permission.POST_NOTIFICATIONS
-```
-
-Bu sırayı ters çevirmek "no notification was posted" diye düşen bir koşu
-verir; hata testte değil, hazırlıktadır.
 
 **Bildirim metni okunacaksa uygulamayı açmadan önce okuyun.** `am force-stop`
 (ve dolayısıyla `restart_app`) uygulamanın bildirimlerini siler; önce
 `dumpsys notification --noredact`, sonra ekran.
 
-**`pm clear` şart.** Worker günde en fazla bir bildirim gönderir ve
-**gönderebildiği** günü kaydeder; aynı gün ikinci koşu tasarım gereği hiçbir
-şey yapmaz. Metodların sırası önemsizdir ve sabitlenmemiştir: gün yalnızca
-bildirim gerçekten gösterildiğinde işaretlendiği için "bildirimler kapalı"
-durumu kaydı kirletmez (ARCHITECTURE §18).
+**Bildirim kanalını bu test yaratır.** `payment_reminders` kanalı ilk bildirim
+gönderilene kadar **yoktur** — sistem ayarlarında "Bu uygulama herhangi bir
+bildirim yayınlamadı" yazar. #39'u ölçmek için önce
+`PaymentReminderWorkerTest` bir kez koşturulur, sonra kanal kapatılır:
+
+```bash
+adb shell "am start -a android.settings.CHANNEL_NOTIFICATION_SETTINGS   --es android.provider.extra.APP_PACKAGE com.elinacn.subtrack   --es android.provider.extra.CHANNEL_ID payment_reminders"
+```
+
+Açılan ekranda "Bildirim göster" kapatılır; uygulama izni `granted=true` kalır
+ve ayarlardaki satır "Kapalı — sistem ayarlarından açılmalı" demelidir. Bu yol
+API 26+ içindir; API 24'te kanal kavramı yok.
+
+### Paketin sıra bağımsızlığı — neye dayanıyor, nasıl kanıtlanır
+
+Faz 16-0'da paket **sırayla koşunca** düşüyordu. İki sınıf da günde-bir
+hatırlatma worker'ını sürüyor; hangisi önce koşarsa günü işaretliyor, öteki
+erken dönen bir worker buluyor ve gözleyecek bir şey bulamıyordu. Kural doğru,
+bozuk olan testlerin birbirinin ön koşuluna yaslanmasıydı.
+
+**Çözüm sıra sabitlemek değil.** `@FixMethodOrder` bağımlılığı gizler, kaldırmaz
+— 12-2 hotfix'inde aynı çözüm denenip gerçek sebep bulununca geri alınmıştı.
+16b'de her sınıf ön koşulunu kendisi kuruyor:
+`androidTest/.../testsupport/ReminderPreconditions.kt`.
+
+**Kaydı neden dosyadan silmek yetmiyor.** DataStore okumayı bellekteki
+önbellekten karşılıyor ve dosyayı yalnızca yazma kilidini tutarken yeniden
+okuyor. Ölçüldü (DataStore 1.1.7): değer yazıldıktan sonra dosya silinip
+okunduğunda **eski değer** geliyor, ancak bir sonraki yazma diskteki yokluğu
+görüyor. Worker ise önce okuyor. Yani `settings.preferences_pb` dosyasını silmek
+çalışan bir uygulamada hiçbir şey değiştirmez; aynı dosya üzerine ikinci bir
+DataStore açmak da çalışma zamanı hatasıdır. Kayda ulaşmanın tek yolu **örneğin
+kendisine** ulaşmak, o da Hilt grafiğinde.
+
+Bunun için `app/src/debug/` altında bir `@EntryPoint` var
+(`PreferencesStoreEntryPoint`). Debug'da duruyor çünkü bir entry point'in
+işlenmesi gerekiyor ve KSP yalnızca app modülünde koşuyor; release derlemesine
+girmiyor ve `app/src/main/` değişmedi.
+
+**İzin de aynı yerde veriliyor.** `connectedDebugAndroidTest` koşumdan hemen
+önce iki APK'yı yeniden kuruyor ve API 33+ sürümlerde kurulum çalışma zamanı
+iznini düşürüyor — elle `pm grant` yapılmış bir cihazda paket geçip Gradle'dan
+koşunca "no notification was posted" diye düşüyordu. Test, izni
+`UiAutomation.executeShellCommand("pm grant …")` ile kendisi veriyor; o komut
+kabuk kullanıcısı olarak koşar, `pm revoke`'un aksine süreci öldürmez ve
+CI'da da çalışır.
+
+**Kanıt nasıl alınır.** Paketin tamamı, sırayla ve tek seferde, **iki koşum
+yöntemiyle** ve **arka arkaya iki kez** (aradan temizlik geçirmeden) koşturulur:
+
+```bash
+ANDROID_SERIAL=emulator-5554 ./gradlew :app:connectedDebugAndroidTest
+ANDROID_SERIAL=emulator-5554 ./gradlew :app:connectedDebugAndroidTest   # temizlik yok
+
+./gradlew :app:installDebug :app:installDebugAndroidTest
+adb shell am instrument -w com.elinacn.subtrack.test/androidx.test.runner.AndroidJUnitRunner
+adb shell am instrument -w com.elinacn.subtrack.test/androidx.test.runner.AndroidJUnitRunner
+```
+
+İkinci koşum da geçmiyorsa ön koşul kurulumu eksiktir — sıraya bakılmaz.
+
+`reminderWorker_notificationsDisabled_succeedsWithoutNotifying` bildirimler
+açıkken `assumeFalse` ile atlanır; "19 test, 1 atlandı" beklenen çıktıdır.
+O metodu gerçekten koşturmak için önce
+`adb shell pm revoke com.elinacn.subtrack android.permission.POST_NOTIFICATIONS`.
 
 ### Periyodik WorkManager işi — gövdesi gecikmesiz bir `OneTimeWorkRequest` ile koşturulur
 

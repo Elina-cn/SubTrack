@@ -27,6 +27,349 @@ Her faz sonunda **en üste** yeni kayıt eklenir. Eski kayıtlar silinmez.
 
 ---
 
+## [Faz 16b] Test Paketinin Sıra Bağımsızlığı ve Tam Regresyon Turu — 2026-09-16
+
+**Durum:** Kısmen. Sıra bağımlılığı çözüldü ve dört cihazda kanıtlandı, şablon
+testler silindi, 117 maddelik liste dört cihazda eksiksiz sürüldü — **bir madde
+düştü:** API 24'te #40. Düzeltme yazılmadı; bu faz test ve doğrulama fazıydı.
+Ürün kodu (`app/src/main/`) değişmedi.
+
+### Sıra bağımlılığı: ürün doğru, testler birbirine yaslanıyordu
+
+16-0'da paket sırayla koşunca düşüyordu. `PaymentReminderWorkerTest` ve
+`EditedDateReminderTest` ikisi de günde-bir hatırlatma worker'ını sürüyor; hangisi
+önce koşarsa günü işaretliyor, öteki erken dönen bir worker buluyordu. "Günde bir
+bildirim" kuralı doğru çalışıyor (§18) — bozuk olan, her iki sınıfın da dışarıdan
+`pm clear` yapılmış bir cihaza yaslanmasıydı.
+
+**`@FixMethodOrder` kullanılmadı.** Sıra sabitlemek bağımlılığı gizler, kaldırmaz;
+12-2 hotfix'inde aynı çözüm denenip gerçek sebep bulununca geri alınmıştı. Bunun
+yerine her sınıf ön koşulunu `@Before` içinde kendisi kuruyor.
+
+**Kaydı dosyadan silmek neden yetmiyor — ölçüldü.** DataStore 1.1.7 üzerinde
+atılabilir bir JVM testiyle:
+
+```
+yazdıktan sonra okuma   = 42
+dosya silindi
+silmeden sonra okuma    = 42     <- okuma bellekteki önbellekten geliyor
+sonraki yazmadan sonra  = null   <- yazma diskten yeniden okuyor, kayıt gitmiş
+```
+
+Yani `SingleProcessCoordinator` sürümü bellekte tutuyor, `dataStore.data.first()`
+diskle hiç konuşmuyor; worker da **önce okuyor**, yazmaya hiç gelmiyor. Aynı dosya
+üzerine ikinci bir DataStore açmak zaten çalışma zamanı hatası
+(`DataStoreModule`'ün `@Singleton`'ı bunun için var). Kayda ulaşmanın tek yolu
+**örneğin kendisine** ulaşmak, o da Hilt grafiğinde.
+
+Çözüm, **kullanıcıya sorulup onaylandıktan sonra**, `app/src/debug/` altında bir
+`@EntryPoint` oldu (`PreferencesStoreEntryPoint`). Neden orada: bir entry point'in
+annotation ile işlenmesi gerekiyor ve KSP yalnızca app modülünde koşuyor, yani
+androidTest'te duramaz; `kspAndroidTest` eklemek yasaklıydı ve yeni bağımlılık
+istiyordu. `src/debug` ikisinin de dışında kalıyor — release derlemesine girmiyor,
+`app/src/main/` değişmiyor, `build.gradle.kts` ve `libs.versions.toml` değişmiyor.
+
+### API 34'teki izin düşmesi: `pm grant` testin içinde
+
+`connectedDebugAndroidTest` koşumdan hemen önce iki APK'yı yeniden kuruyor ve
+API 33+ sürümlerde kurulum çalışma zamanı iznini düşürüyor. Elle `pm grant`
+yapılmış cihazda paket geçiyor, aynı paket Gradle'dan koşunca "no notification was
+posted" diye düşüyordu — ölçüldü: kurulumdan sonra `granted=false`.
+
+İki yol vardı: paketi hep `am instrument` ile koşturmak, ya da izni test içinde
+yeniden vermek. **İkincisi seçildi**, çünkü ilki koşum yöntemini hazırlığa bağlar
+ve `connectedDebugAndroidTest`'i kalıcı olarak kullanılmaz kılardı.
+`UiAutomation.executeShellCommand("pm grant …")` kabuk kullanıcısı olarak koşar
+(izni veren hesap odur), `pm revoke`'un aksine süreci öldürmez, API 33 altında
+sessizce atlanır ve **CI'da da çalışır** — kimsenin cihazı elle hazırlaması
+gerekmiyor. "Elle `pm grant`" kabul edilebilir bir cevap değildi ve seçilmedi.
+
+### Kanıt — dört cihaz, iki koşum yöntemi, arka arkaya iki kez
+
+| Cihaz | `connectedDebugAndroidTest` | `am instrument` |
+|---|---|---|
+| `subtrack_min_api24` | 2/2 koşum: 19 test, 0 hata, 1 atlandı | 2/2 koşum: OK (19 test) |
+| `subtrack_narrow_api29` | 3/4 koşum: 19 test, 0 hata, 1 atlandı — **1 koşum emülatör çökmesiyle kesildi** | 2/2 koşum: OK (19 test) |
+| `subtrack_wide_api34` | 2/2 koşum: 19 test, 0 hata, 1 atlandı | 2/2 koşum: OK (19 test) |
+| `subtrack_edge_api36` | 2/2 koşum: 19 test, 0 hata, 1 atlandı | 2/2 koşum: OK (19 test) |
+
+İkinci koşumlar aradan **hiçbir temizlik geçirmeden** yapıldı; `pm clear` da
+`pm grant` da yok. API 34'te koşumdan önce izin `granted=false` olarak ölçüldü ve
+paket yine geçti.
+
+**API 29'daki tek kesinti test hatası değil.** Gradle çıktısı
+`INSTRUMENTATION_ABORTED: System has crashed` + `DeadSystemException: The system
+died`; emülatörün system server'ı koşum ortasında çöktü. Aynı cihazda sonraki üç
+`connectedDebugAndroidTest` koşumu ve iki `am instrument` koşumu temiz geçti.
+
+Atlanan tek test her cihazda aynı:
+`reminderWorker_notificationsDisabled_succeedsWithoutNotifying`, bildirimler
+açıkken `assumeFalse` ile atlıyor — beklenen davranış.
+
+### Şablon testler silindi
+
+`ExampleUnitTest` (`2+2=4`) ve `ExampleInstrumentedTest` (paket adı kontrolü)
+kaldırıldı. **331 birim testi → 330**, **20 enstrümantasyon metodu → 19.**
+Silme sonrası `testDebugUnitTest` ve dört cihazdaki enstrümantasyon koşumları
+yeniden alındı.
+
+### Tam regresyon turu — 117 madde × 4 cihaz
+
+468 hücre: **428 geçti, 1 düştü, 4 ölçülemedi, 4 kısmen, 31 geçerli değil.**
+"Dokunmadım" hiçbir hücrede sebep değil.
+
+| # | Madde | API 24 | API 29 | API 34 | API 36 |
+|---|---|---|---|---|---|
+| 1 | Uygulamayı aç | geçti | geçti | geçti | geçti |
+| 2 | FAB'a bas | geçti | geçti | geçti | geçti |
+| 3 | Ad + fiyat gir, Kaydet | geçti | geçti | geçti | geçti |
+| 4 | FAB'a tekrar bas | geçti | geçti | geçti | geçti |
+| 5 | Sheet'i scrim'e dokunarak / geri tuşuyla kapat | geçti | geçti | geçti | geçti |
+| 6 | Bir kartı hafifçe kaydır (~1/5) bırak | geçti | geçti | geçti | geçti |
+| 7 | Aynı satırda 8-10 kez ardışık hafif kaydır | geçti | geçti | geçti | geçti |
+| 8 | Hızlı kısa fiske | geçti | geçti | geçti | geçti |
+| 9 | Tam kaydır | geçti | geçti | geçti | geçti |
+| 10 | Ters yöne sürükle | geçti | geçti | geçti | geçti |
+| 11 | 159,99 ve 59,90 ekle | geçti | geçti | geçti | geçti |
+| 12 | Uygulamayı tamamen kapat, yeniden aç | geçti | geçti | geçti | geçti |
+| 13 | Ekran döndür | geçti | geçti | geçti | geçti |
+| 14 | Sheet açık ve metin yazılıyken ekran döndür | geçti | geçti | geçti | geçti |
+| 15 | Sistem temasını koyuya al | geçti¹ | geçti¹ | geçti | geçti |
+| 16 | Cihaz dilini İngilizceye al | geçti² | geçti² | geçti³ | geçti³ |
+| 17 | Boş ad veya geçersiz fiyatla Kaydet'e bas | geçti | geçti | geçti | geçti |
+| 18 | Bir satırı sil, Snackbar'a dokunma | geçti | geçti | geçti | geçti |
+| 19 | Sil, sonra "Geri al"a bas | geçti | geçti | geçti | geçti |
+| 20 | Ayarlar ikonuna bas, geri oku ve sistem geri t… | geçti | geçti | geçti | geçti |
+| 21 | Ayarlarda başka bir para birimi seç, uygulamay… | geçti | geçti | geçti | geçti |
+| 22 | Ayarlar → Döviz Kurları, USD kurunu değiştir, … | geçti | geçti | geçti | geçti |
+| 23 | Kur ekranında 0, -5, 1,23456, 1000,0001 gir ve… | geçti | geçti | geçti | geçti |
+| 24 | Kur değiştir, uygulamayı tamamen kapat, yenide… | geçti | geçti | geçti | geçti |
+| 25 | Kur ekranında "Varsayılana dön" → Sıfırla | geçti | geçti | geçti | geçti |
+| 26 | Kur alanına yazarken klavye açıkken Kaydet ve … | geçti | geçti | geçti | geçti |
+| 27 | Ekleme formunda tarih seç, kaydet | geçti | geçti | geçti | geçti |
+| 28 | Tarih seçmeden kaydet | geçti | geçti | geçti | geçti |
+| 29 | Geçmiş bir tarih seç | geçti | geçti | geçti | geçti |
+| 30 | Bugünün tarihini seç | geçti | geçti | geçti | geçti |
+| 31 | Seçicinin metin girişinden 10 yıldan uzak bir … | geçti | geçti | geçti | geçti |
+| 32 | Tarih seçili haldeyken sheet açıkken döndür | geçti | geçti | geçti | geçti |
+| 33 | Ayarlarda "Ödeme hatırlatmaları" satırı | geçti | geçti | geçti | geçti |
+| 34 | (API 33+) Temiz kurulumda satıra dokun | — | — | geçti | geçti |
+| 35 | İzni verip satıra bak | — | — | geçti | geçti |
+| 36 | Bir kez reddettikten sonra satıra dokun | — | — | geçti | geçti |
+| 37 | Kalıcı reddedildikten sonra satıra dokun | — | — | geçti | geçti |
+| 38 | Sistem ayarlarından bildirimleri aç, geri dön | geçti | geçti | geçti | geçti |
+| 39 | Sistem ayarlarından yalnızca kanalı kapat, ger… | — | geçti | geçti | geçti |
+| 40 | (API < 33) Satıra dokun | düştü | geçti | — | — |
+| 41 | Temiz kurulumda tarihli ilk aboneliği kaydet | — | — | geçti | geçti |
+| 42 | Temiz kurulumda tarihsiz abonelik kaydet | — | — | geçti | geçti |
+| 43 | Reddettikten sonra ikinci tarihli aboneliği ka… | — | — | geçti | geçti |
+| 44 | İzin verilmişken tarihli abonelik kaydet | — | — | geçti | geçti |
+| 45 | Diyalog açıkken ekranı döndür | — | — | geçti | geçti |
+| 46 | (API < 33) Tarihli ilk aboneliği kaydet | geçti | geçti | — | — |
+| 47 | Temiz kurulumda uygulamayı aç | geçti | geçti | geçti | geçti |
+| 48 | Bir abonelik ekle | geçti | geçti | geçti | geçti |
+| 49 | Tek aboneliği sil | geçti | geçti | geçti | geçti |
+| 50 | Veri varken uygulamayı aç | geçti⁴ | geçti⁴ | geçti⁴ | geçti⁴ |
+| 51 | Ekleme formunda kategori seçici | geçti | geçti | geçti | geçti |
+| 52 | Kategori seçip kaydet | geçti | geçti | geçti | geçti |
+| 53 | Kategoriye dokunmadan kaydet | geçti | geçti | geçti | geçti |
+| 54 | Kaydettikten sonra FAB'a tekrar bas | geçti | geçti | geçti | geçti |
+| 55 | Kategori seçili haldeyken sheet açıkken döndür | geçti | geçti | geçti | geçti |
+| 56 | Liste üstündeki filtre çubuğu | geçti | geçti | geçti | geçti |
+| 57 | Bir kategori seç | geçti | geçti | geçti | geçti |
+| 58 | Hiçbir aboneliği olmayan bir kategoriyi seç | geçti | geçti | geçti | geçti |
+| 59 | Filtre açıkken bir satırı sil, sonra "Geri al" | geçti | geçti | geçti | geçti |
+| 60 | Filtre seçiliyken döndür, sonra uygulamayı tam… | geçti | geçti | geçti | geçti |
+| 61 | Filtre çubuğunu yatay kaydır | geçti | geçti | geçti | geçti |
+| 62 | Ekleme formunda periyot seçici | geçti | geçti | geçti | geçti |
+| 63 | Aylık 100,00 + yıllık 1.200,00 + haftalık 10,0… | geçti | geçti | geçti | geçti |
+| 64 | Dashboard'ın altındaki Yıllık chip'ine bas | geçti | geçti | geçti | geçti |
+| 65 | Bir kategori filtresi seçip iki görünüme de bak | geçti | geçti | geçti | geçti |
+| 66 | Periyot seçip kaydettikten sonra FAB'a tekrar … | geçti | geçti | geçti | geçti |
+| 67 | Periyot seçili haldeyken sheet açıkken döndür | geçti | geçti | geçti | geçti |
+| 68 | Yıllık görünümdeyken uygulamayı tamamen kapat … | geçti | geçti | geçti | geçti |
+| 69 | Geçmiş tarihli aylık abonelik ekle | geçti | geçti | geçti | geçti |
+| 70 | Geçmiş tarihli haftalık ve yıllık abonelik ekle | geçti | geçti | geçti | geçti |
+| 71 | Çok eski tarih (2+ yıl önce, haftalık) | geçti | geçti | geçti | geçti |
+| 72 | 31 Ocak çıpalı aylık abonelik, Mart'ta bak | geçti | geçti | geçti | geçti |
+| 73 | Gelecek tarihli abonelik | geçti | geçti | geçti | geçti |
+| 74 | Bugünün tarihi | geçti | geçti | geçti | geçti |
+| 75 | Geçmiş tarihli bir aboneliği kaydettikten sonr… | geçti | geçti | geçti | geçti |
+| 76 | Ana ekran üst çubuğundaki grafik ikonuna bas | geçti | geçti | geçti | geçti |
+| 77 | Geri oku, sonra sistem geri tuşu | geçti | geçti | geçti | geçti |
+| 78 | Dört kategoriye yayılmış, karışık para birimli… | geçti | geçti | geçti | geçti |
+| 79 | Ekrandaki yüzdeleri topla | geçti | geçti | geçti | geçti |
+| 80 | En pahalı listesi | geçti | geçti | geçti | geçti |
+| 81 | Ana ekranda kategori filtresi açıkken istatist… | geçti | geçti | geçti | geçti |
+| 82 | Hiç abonelik yokken istatistiğe gir | geçti | geçti | geçti | geçti |
+| 83 | Tutarı sıfır olan kategori | geçti | geçti | geçti | geçti |
+| 84 | TalkBack ile dağılım satırı | geçti⁵ | geçti⁵ | geçti⁵ | geçti⁵ |
+| 85 | Koyu tema (API 34) | geçti | geçti | geçti | geçti |
+| 86 | Tabloda tek ay varken istatistiğe gir | geçti | geçti | geçti | geçti |
+| 87 | İki ay kayıtlıyken | geçti | geçti | geçti | geçti |
+| 88 | Altıdan çok ay kayıtlıyken | geçti | geçti | geçti | geçti |
+| 89 | Aralarda kaydı olmayan bir ay | geçti | geçti | geçti | geçti |
+| 90 | Sıfır kaydedilmiş bir ay | geçti | geçti | geçti | geçti |
+| 91 | Bu ay geçen aydan farklı | geçti | geçti | geçti | geçti |
+| 92 | Bu ay geçen ayla aynı | geçti | geçti | geçti | geçti |
+| 93 | Geçen ayın kaydı yok | geçti | geçti | geçti | geçti |
+| 94 | Ana para birimini değiştir, istatistiğe gir | geçti | geçti | geçti | geçti |
+| 95 | TalkBack ile grafik | geçti⁵ | geçti⁵ | geçti⁵ | geçti⁵ |
+| 96 | Bir karta dokun | geçti | geçti | geçti | geçti |
+| 97 | Geçmiş çıpalı bir aboneliğin kartına dokun | geçti | geçti | geçti | geçti |
+| 98 | Bir alanı değiştir, Kaydet | geçti | geçti | geçti | geçti |
+| 99 | Hiçbir şey değiştirmeden geri dön | geçti | geçti | geçti | geçti |
+| 100 | Bir alanı değiştirip geri dön | geçti | geçti | geçti | geçti |
+| 101 | Düzenleme ekranında ekranı döndür | geçti | geçti | geçti | geçti |
+| 102 | Boş ad / geçersiz fiyat ile Kaydet | geçti | geçti | geçti | geçti |
+| 103 | Bir satırı hafifçe kaydır | geçti | geçti | geçti | geçti |
+| 104 | TalkBack ile bir satır | kısmen⁶ | kısmen⁶ | kısmen⁶ | kısmen⁶ |
+| 105 | Düzenleme sonrası monthly_snapshots | geçti | geçti | geçti | geçti |
+| 106 | Ayarlar → Tema | geçti | geçti | geçti | geçti |
+| 107 | Açık'ı seç, sistem temasını koyuya al | ölçülemedi⁷ | ölçülemedi⁷ | geçti | geçti |
+| 108 | Koyu'yu seç, sistem temasını açığa al | geçti | geçti | geçti | geçti |
+| 109 | Sistemi takip et'i seç, sistem temasını değişt… | ölçülemedi⁷ | ölçülemedi⁷ | geçti | geçti |
+| 110 | Tema seç, uygulamayı tamamen kapat, yeniden aç | geçti | geçti | geçti | geçti |
+| 111 | (API 31+) Ayarlar → Duvar kâğıdı renkleri | — | — | geçti | geçti |
+| 112 | Duvar kâğıdı renkleri açıkken koyu temayı zorla | — | — | geçti | geçti |
+| 113 | Duvar kâğıdı renkleri açıkken istatistik | — | — | geçti | geçti |
+| 114 | (API < 31) Duvar kâğıdı renkleri satırı | geçti | geçti | — | — |
+| 115 | Dashboard, kart, istatistik, trend, karşılaştı… | geçti | geçti | geçti | geçti |
+| 116 | Cihaz dilini İngilizceye al | geçti | geçti | geçti | geçti |
+| 117 | (API 29) ₺ karakteri | geçti | geçti | geçti | geçti |
+
+Toplam hücre: 468 | geçti: 428 | düştü: 1 | ölçülemedi: 4 | geçerli değil: 31 | kısmen: 4
+
+**Dipnotlar**
+
+- ¹ Sistem teması bu imajlarda koyuya alınamıyor (API 24'te `cmd uimode` "No shell
+  command implementation", API 29'da komut "Night mode: no" döndürüp yazmıyor).
+  Renkler uygulamanın kendi **Koyu** seçeneğiyle ölçüldü ve dört cihazda aynı
+  çıktı: arka plan `#0D1A14`, kart `#1F3D2D` → **1,50:1**; vurgu altın `#D4AF37`;
+  hiçbir yerde mor yok.
+- ² Gerçek **cihaz dili** değişimi (Ayarlar → Diller; `persist.sys.locale` ile
+  doğrulandı).
+- ³ Uygulamaya özel dil (`cmd locale set-app-locales`). Cihaz geneli locale root
+  istiyor, bu imajlarda yapılamıyor — ölçülen şey uygulamanın locale'i takip
+  etmesi, cihaz ayarının kendisi değil.
+- ⁴ Kararlı hâl ölçüldü: veri varken boş durum hiç görünmüyor. Maddenin "yükleme
+  sırasında da" yarısı ölçülemedi — eldeki en hızlı gözlem aracı 3,3 saniye süren
+  `uiautomator dump`, açılış karesi o pencereye sığmıyor.
+- ⁵ Erişilebilirlik **ağacından** ölçüldü ve ağaç, ekran okuyucunun okuduğu şeyin
+  ta kendisi: satırlar tek odak durağı ve beklenen cümleyi veriyor
+  ("Eğlence, ₺100,00, yüzde 34" / "Aylık trend: Nisan ₺200,00, Mayıs kayıt yok,
+  …"). TalkBack hiçbir imajda kurulu değil, sesli okunuş doğrulanamadı.
+- ⁶ #104'ün "tek odak durağı" yarısı ağaçtan geçti; **"Sil" özel eylemi**
+  `uiautomator dump` biçiminde hiç taşınmadığı için ne doğrulanabildi ne çürütüldü.
+- ⁷ Sistem koyu teması yok veya değiştirilemiyor (yukarıdaki ¹).
+- "—" o API'de **geçerli değil**: #34-#37 ve #41-#45 çalışma zamanı bildirim izni
+  API 33+ olduğu için, #40 ve #46 tam tersi yönde API < 33 için, #39 bildirim
+  kanalları API 26+ olduğu için, #111-#113 duvar kâğıdı renkleri API 31+ olduğu
+  için, #114 satırın devre dışı hâli yalnızca API < 31'de görüldüğü için.
+
+### Düşen madde: API 24 / #40
+
+**Beklenen:** "(API < 33) Satıra dokun → Sistem bildirim ayarları açılıyor, izin
+diyaloğu hiç çıkmıyor."
+
+**Ölçülen:** Android 7.0'da satıra dokunmak **hiçbir şey yapmıyor.** Dokunuştan
+sonra `mResumedActivity` hâlâ `com.elinacn.subtrack/.MainActivity`,
+`logcat -s AndroidRuntime:E` boş (çökme yok), ne sistem bildirim ekranı ne de
+uygulama detay sayfası açılıyor.
+
+**Sebep (ölçüldü, tahmin değil):** Android 7.0'ın Ayarlar uygulaması
+`android.settings.APP_NOTIFICATION_SETTINGS` eylemini **karşılıyor**, yani
+`startActivity` başarılı oluyor ve `ActivityNotFoundException` atılmıyor —
+`openNotificationSettings` içindeki uygulama-detay yedeği bu yüzden hiç devreye
+girmiyor. Ama o ekran API 24'te **iki** ekstra istiyor ve ikincisi gönderilmiyor:
+
+```
+W NotifiSettingsBase: Missing extras: app_package was com.elinacn.subtrack, app_uid was -1
+```
+
+Aynı satır elle `am start -a android.settings.APP_NOTIFICATION_SETTINGS
+--es app_package com.elinacn.subtrack` çalıştırıldığında da çıkıyor, yani
+`app_uid` de zorunlu. Uygulama yalnızca `Settings.EXTRA_APP_PACKAGE`
+("android.provider.extra.APP_PACKAGE", **API 26 adı**) gönderiyor.
+
+Lint bunu zaten işaret ediyor ve uyarı fazlardır duruyor:
+`ReminderPermissionActions.kt:41` ve `:42` — *"Field requires API level 26
+(current min is 24) … [InlinedApi]"*.
+
+**Kapsamı:** yalnızca API 24-25. Aynı madde API 29'da geçiyor
+(`AppNotificationSettingsActivity` açılıyor). Uygulama çökmüyor, veri kaybı yok;
+minSdk cihazında bir ayar kısayolu sessizce çalışmıyor.
+
+**Düzeltme yazılmadı** — bu faz test ve doğrulama fazıydı ve prompt düzeltmeyi
+açıkça yasakladı. Turun geri kalanı yine de tamamlandı: bu madde tek yönlü bir
+Ayarlar geçişi ve açılmadığı için sonraki maddelerin ön koşulunu kirletmesi
+mümkün değil; durup 60 maddeyi ölçmeden bırakmak kazanç getirmezdi.
+
+### Turda ortaya çıkan ölçüm bulguları
+
+- **"Geri al"a dump'la yetişilemiyor.** Snackbar ≈4 sn duruyor,
+  `uiautomator dump` + `cat` çifti 3,3 sn sürüyor. #19 iki kez "geri alma
+  çalışmıyor" diye düştü, sonra ürünün değil ölçümün yavaş olduğu anlaşıldı.
+  Silme ve dokunuş artık tek `adb shell` satırında gidiyor.
+- **#69-#75 artık ölçülebiliyor.** Seçicinin **metin giriş modu** her çıpayı tek
+  seferde alıyor; ay dönümü beklemeye gerek kalmadı. #72'nin asıl sınavı
+  `31.01.2026` çıpası: çıpadan sayılırsa 30 Eylül ("14 gün kaldı"), adım adım
+  kırpılsaydı 28 Eylül ("12 gün kaldı") olurdu — dört cihazda da 14 gün.
+- **#39 artık ölçülebiliyor.** Kanal ilk bildirimden önce yok; önce
+  `PaymentReminderWorkerTest` bir kez koşturulup kanal yaratılıyor, sonra
+  `CHANNEL_NOTIFICATION_SETTINGS` ile yalnız kanal kapatılıyor. Uygulama izni
+  `granted=true` iken satır "Kapalı — sistem ayarlarından açılmalı" dedi (API 29,
+  34, 36).
+- **16a klavye tablosunun kur ekranı satırları 95 px yanlıştı.** API 34/36 için
+  klavye **kapalı** değerler 16a öncesinden kalmış; 95 px, o cihazlardaki durum
+  çubuğu payı. Klavye **açık** değerler 16a'da yeniden ölçülmüştü ve 16b ölçümüyle
+  piksel piksel tuttu. Tablo düzeltildi ve API 24 satırları eklendi.
+- **API 24'te edge-to-edge yok.** Uygulama penceresi `[0,0][720,1184]`, gezinme
+  çubuğu ayrı ve opak; FAB API 29'dakinden 96 px yukarıda. Klavye açılınca
+  kaydırma düğümü `[0,176][720,658]`e daralıyor ve "Varsayılana dön" fiskeden
+  sonra tam 658'de, yani sınırda duruyor.
+- **API 24'ün locale verisi farklı.** Tarih seçicinin metin maskesi `DDMM/YYYY`
+  (diğerlerinde `DD.MM.YYYY`) ve saat 12 saatlik biçimde yazılıyor
+  ("ÖS 9:57"). İkisi de platformun, uygulamanın değil; ayrıştırma doğru.
+- **API 29'un saat dilimi America/New_York.** Host'la arasında yedi saat var;
+  tarih fikstürü cihazın kendi saat diliminde gece yarısına yazılmazsa çıpa bir
+  gün kayıyor. 16b'de bir ölçüm bu yüzden "24 gün" dedi, hata üründe değildi.
+
+**Değişen dosyalar**
+- `app/src/debug/java/com/elinacn/subtrack/debug/PreferencesStoreEntryPoint.kt` —
+  yeni; uygulamanın canlı `DataStore<Preferences>` örneğini teste veren debug-only
+  entry point
+- `app/src/androidTest/java/com/elinacn/subtrack/testsupport/ReminderPreconditions.kt` —
+  yeni; günün "bildirildi" kaydını temizleyen ve API 33+ bildirim iznini veren
+  ortak ön koşul
+- `app/src/androidTest/java/com/elinacn/subtrack/reminder/PaymentReminderWorkerTest.kt` —
+  `@Before reset()`, izin verme, KDoc'tan "önce `pm clear` yap" talimatı kalktı
+- `app/src/androidTest/java/com/elinacn/subtrack/edit/EditedDateReminderTest.kt` —
+  aynısı; "tek başına koştur" talimatı kalktı
+- `app/src/test/java/com/elinacn/subtrack/ExampleUnitTest.kt` — silindi
+- `app/src/androidTest/java/com/elinacn/subtrack/ExampleInstrumentedTest.kt` — silindi
+- `docs/TESTING.md` — AVD tablosuna ölçülen cihaz özellikleri, "hangi madde hangi
+  cihazda ölçülemiyor" tablosu, sıra bağımsızlığının koşum yöntemi, çıpayı metinle
+  girme, "Geri al"a dump'la yetişilememesi, cihaz dili, düzeltilmiş klavye tablosu
+- `docs/PROGRESS.md` — bu kayıt
+- `docs/ROADMAP.md` — şablon test maddesi işaretlendi
+
+**Commit'ler**
+- `297eb54` test: let the reminder classes set up their own preconditions
+- `0e5d71a` test: drop the two tests the project template generated
+- `docs:` record the 16b regression tour and the order-independence method
+
+**Sonraki faz için not**
+- **API 24 / #40 açık.** Bildirim ayarları kısayolu Android 7.0-7.1'de çalışmıyor.
+  Karar verilmesi gereken şey davranış: ya `app_uid` da gönderilecek, ya API 26
+  altında doğrudan uygulama detay sayfasına gidilecek, ya da satır o sürümlerde
+  hiç dokunulabilir olmayacak. Üçü de ürün kararı; 16b yazmadı.
+- `#50`'nin "yükleme karesi" yarısı ve `#84/#95/#104`'ün TalkBack yarısı hâlâ
+  ölçülemiyor. İlki araç meselesi (daha hızlı kare yakalama), ikincisi imaj
+  meselesi (Accessibility Suite kurulu bir imaj).
+
+---
+
 ## [Faz 16a] Edge-to-Edge Geçişi — 2026-09-16
 
 **Durum:** Tamamlandı. Renk, palet, `Dimens`, tipografi değişmedi — bu faz

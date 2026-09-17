@@ -468,8 +468,10 @@ Aylık toplamın zaman içindeki anlık görüntüleri. `PROJECT_SPEC.md` §1'de
 - [ ] `isMinifyEnabled = true` (R8) — APK boyutu ve açılış süresi düşer
 - [ ] `material-icons-extended` kaldırılsın veya daraltılsın: binlerce ikon
       getiriyor, **beş** tanesi kullanılıyor
-- [ ] Şablon testler kaldırılsın (`ExampleUnitTest`, `ExampleInstrumentedTest`
-      — dolgu: `2+2=4` ve paket adı kontrolü)
+- [x] **Şablon testler kaldırıldı** — Faz 16b. `ExampleUnitTest` (`2+2=4`) ve
+      `ExampleInstrumentedTest` (paket adı kontrolü) silindi; **331 birim testi
+      → 330**, **20 enstrümantasyon metodu → 19**. İkincisi her pakette bir cihaz
+      kurulumu ve koşumu maliyeti getiriyordu.
 - [ ] `targetSdk` Play'in güncel zorunluluğuna yükseltilsin
 - [x] **Edge-to-edge'e geçildi** — Faz 16a. `enableEdgeToEdge()` `setContent`
       öncesinde çağrılıyor, sistem çubuğu ikonları tema tercihini takip ediyor,
@@ -483,6 +485,19 @@ Aylık toplamın zaman içindeki anlık görüntüleri. `PROJECT_SPEC.md` §1'de
       sayıyor, bu yüzden ikisi çakışmıyor — bayrak API 24-29'un, `imePadding()`
       API 30+'ın yarısı. Klavye tablosunun her satırı üç cihazda yeniden
       ölçüldü (`TESTING.md`); ölçümler `ARCHITECTURE.md` §16'da.
+- [x] **Test paketi sıra bağımsız hâle geldi ve tam regresyon turu atıldı** —
+      Faz 16b. Paket dört cihazda, iki koşum yöntemiyle, arka arkaya iki kez
+      geçiyor; 117 maddelik liste dört cihazda eksiksiz sürüldü (468 hücre).
+      Ön koşullar artık testin içinde kuruluyor, `pm clear`/`pm grant` gerekmiyor.
+      Ayrıntı ve tablo `PROGRESS.md`'de.
+- [ ] **API 24-25'te bildirim ayarları kısayolu çalışmıyor (16b'de bulundu).**
+      Ayarlar'daki "Ödeme hatırlatmaları" satırına dokunmak Android 7.x'te
+      hiçbir şey yapmıyor: o sürümlerin Ayarlar'ı
+      `APP_NOTIFICATION_SETTINGS`'i karşılıyor (yani yedek yol tetiklenmiyor)
+      ama `app_uid` ekstrasını da istiyor ve göndermediğimiz için ekran kendini
+      kapatıyor. Çökme ve veri kaybı yok. Karar gerekiyor: `app_uid` de
+      gönderilsin mi, API 26 altında doğrudan uygulama detay sayfasına mı
+      gidilsin, yoksa satır o sürümlerde dokunulabilir olmasın mı.
 - [ ] Gizlilik politikası — v1.0 çevrimdışı, veri toplanmıyor. **v1.1'de ağ
       eklendiğinde politika ve Data Safety formu güncellenecek**
       (PROJECT_SPEC §4)
