@@ -27,6 +27,238 @@ Her faz sonunda **en üste** yeni kayıt eklenir. Eski kayıtlar silinmez.
 
 ---
 
+## [Faz 16c] R8, İmzalama Yapılandırması ve İkon Ölçümü — 2026-09-17
+
+**Durum:** Tamamlandı. Release derlemesi artık daraltılıyor ve imzalama
+yapılandırması yerinde. **Keystore dosyası oluşturulmadı** — o kullanıcının
+işi ve fazın kapsamı dışında bırakıldı. Ürün davranışı değişmedi: `app/src`
+altında **tek satır** kod değişmedi, değişen yalnızca derleme yapılandırması.
+
+### Boyut tablosu
+
+Aynı kaynak ağacı, üç derleme:
+
+| Derleme | APK | dex (sıkıştırılmamış) | dex (APK içinde) | dex dosyası | `resources.arsc` |
+|---|---|---|---|---|---|
+| debug | 21.262.638 B — 20,28 MiB | 66.828.336 B — 63,73 MiB | 20.476.262 B — 19,53 MiB | 18 | 533.880 B |
+| release, minify **kapalı** | 13.695.885 B — 13,06 MiB | 47.659.940 B — 45,45 MiB | 12.906.420 B — 12,31 MiB | 5 | 529.616 B |
+| release, minify **açık** | **2.114.862 B — 2,02 MiB** | **3.235.112 B — 3,09 MiB** | **1.574.191 B — 1,50 MiB** | **2** | **306.388 B** |
+
+APK **%84,6** küçüldü (13,06 → 2,02 MiB). 16-0'da "APK'nın %98,3'ü dex" diye
+ölçülen oran artık **%74,4** (1,50 / 2,02 MiB) — dex hâlâ en büyük parça ama
+artık tek başına APK değil.
+
+### Görev 1 — İkon daraltması: ölçüldü, değişiklik YOK
+
+16-0 envanterindeki 12 ikon `material-icons-core`'un içeriğiyle karşılaştırıldı
+(AAR'ın `classes.jar`'ı açılıp sınıf listesi okundu):
+
+| Core'da var (8) | Yalnızca extended'da (4) |
+|---|---|
+| `Add`, `AutoMirrored.Filled.ArrowBack`, `AutoMirrored.Filled.List`, `DateRange`, `Delete`, `PlayArrow`, `Settings`, `Star` | `BarChart`, `Cloud`, `ArrowUpward`, `ArrowDownward` |
+
+Core'da bu dördünün karşılığı yok. `BarChart` istatistiğin tek işareti, `Cloud`
+bulut aboneliklerini ayıran şey, ok çiftinin core'daki komşusu chevron ve
+chevron yön değil açılır/kapanır anlatıyor. Dördü birden karşılanmadığı için
+bağımlılık kalkamıyor; ikisini değiştirip diğer ikisi için kütüphaneyi tutmak
+**sıfır bayt** kazandırırdı.
+
+Bedel iki kez ölçüldü — `-extended` yerine `-core` konup derlenerek, sonra
+değişiklik geri alınarak:
+
+| | minify kapalı | minify açık |
+|---|---|---|
+| `-extended` ile | 13.695.885 B | 2.114.862 B |
+| yalnızca `-core` ile | 9.550.517 B | 2.114.646 B |
+| fark | **4.145.368 B (~3,95 MiB)** | **216 B** |
+
+**Sonuç: R8 açıkken bedeli yok.** Son APK'da o kütüphaneden **beş sınıf**
+kalıyor (`DateRange`, `Delete`, `PlayArrow`, `Settings`, `Star`); kalan yedisi
+çağıranın içine gömülmüş. Bu yüzden ikon daraltması için ayrı bir commit
+atılmadı — atılacak bir değişiklik çıkmadı.
+
+Yolda çıkan ve kayda değer bir şey: **`material3` 1.4.0 `material-icons-core`'u
+getirmiyor.** `-extended` çıkarılınca `androidx.compose.material.icons` paketi
+tamamen kayboluyor (`Unresolved reference 'icons'`), çünkü core ağaca yalnızca
+extended'ın bağımlılığı olarak giriyor.
+
+### Görev 2 — R8
+
+`isMinifyEnabled = true` ve `isShrinkResources = true` açıldı.
+**`proguard-rules.pro` boş kaldı.** Sıra kasıtlı olarak şuydu: kural yazmadan
+derle → release APK'yı dört cihazda sür → kırılanı ölç. Kırılan olmadı.
+
+Kütüphaneler kurallarını kendileri getiriyor:
+`build/outputs/mapping/release/configuration.txt` **70'in üzerinde** kural
+kaynağı listeliyor — `room-runtime`, `room-ktx`, `hilt-android`, `hilt-work`,
+`hilt-navigation-compose`, `datastore-preferences-core`, `work-runtime`,
+`navigation-*`, `material3`, `ui-*`, `lifecycle-*` ve R8'in kendi
+`coroutines.pro`'su. `missing_rules.txt` hiç oluşmadı.
+
+Dosyanın eski şablon içeriği (WebView/JS arayüzü örneği, yorum satırına alınmış
+`-keepattributes`) silindi; yerine neyin neden **yazılmadığı** yazıldı.
+
+### Görev 3 — İmzalama yapılandırması
+
+Dört değer `local.properties`'ten, yoksa ortam değişkeninden okunuyor.
+`local.properties` seçildi: zaten `.gitignore`'da, Gradle onu `sdk.dir` için
+zaten okuyor, Android Studio ile komut satırı aynı değerleri görüyor. Ortam
+değişkeni yedeği ileride `local.properties` bulunmayan bir CI makinesi için.
+
+Keystore yokken ölçülen davranış:
+
+| | Sonuç |
+|---|---|
+| `assembleRelease` | **Geçiyor**, `app-release-unsigned.apk` üretiyor |
+| `apksigner verify` (o dosya) | `DOES NOT VERIFY — Missing META-INF/MANIFEST.MF` |
+| `assembleDebug` | **Etkilenmiyor**, 21.262.638 B, debug anahtarıyla imzalı |
+
+Debug anahtarına düşülmüyor: imzasız kalmak, imzasız bir çıktının
+yayınlanabilir sanılmasından iyidir.
+
+`.gitignore` doğrulandı: `local.properties`, `*.jks`, `*.keystore`, `*.apk`,
+`*.aab` Faz 1a'dan beri içeride.
+
+### Görev 4 — Şablon dosya temizliği
+
+- `android.disallowKotlinSourceSets=false` **hâlâ gerekli.** Satır silinip
+  `assembleDebug --rerun-tasks` denendi: *"Kotlin source set 'debug' contains:
+  …generated/ksp/debug/kotlin… To suppress this error, set
+  android.disallowKotlinSourceSets=false"* diyerek derleme durdu. Geri kondu.
+- Kullanılmayan kaynak yok: daraltıcının erişilebilir listesi projenin 125
+  metninden 124'ünü içeriyor, kalan `app_name` manifest üzerinden tutuluyor ve
+  cihazda uygulama adı olarak göründü.
+- `res/xml/backup_rules.xml` ve `data_extraction_rules.xml` hâlâ şablon içerikli
+  (hepsi yorum), ama **manifest'ten referans veriliyor** ve bu faz manifest'e
+  dokunmuyor. Yedekleme politikası ayrıca karar isteyen bir konu; aşağıya not
+  bırakıldı.
+
+### Görev 5 — Release APK dört cihazda
+
+Minify açık release APK, SDK'nın debug anahtarıyla imzalanıp **API 24 / 29 /
+34 / 36** emülatörlerine kuruldu ve sürüldü. Sekiz riskli yerin hepsi:
+
+| Yer | API 24 | API 29 | API 34 | API 36 |
+|---|---|---|---|---|
+| Hilt grafı (açılış) | ✅ | ✅ | ✅ | ✅ |
+| Room (liste/ekle/düzenle/sil/geri al) | ✅ | ✅ | ✅ | ✅ |
+| Room şema kimliği | ✅ | ✅ | ✅ | ✅ |
+| DataStore (para birimi, tema, kur) | ✅ | ✅ | ✅ | ✅ |
+| WorkManager + `@HiltWorker` + bildirim | ✅ | ✅ (kendiliğinden) | ✅ | ✅ |
+| Compose Navigation (dört hedef) | ✅ | ✅ | ✅ | ✅ |
+| `java.time` / desugaring | ✅ | ✅ | ✅ | ✅ |
+| `NumberFormat` / locale | ✅ | ✅ | ✅ | ✅ |
+
+`logcat -b crash` dördünde de **boş** (0 satır).
+
+Room şema kimliği statik olarak da karşılaştırıldı:
+`schemas/…/1.json` → `ef18d874586948288a87736e03c2b556`, üretilen
+`SubTrackDatabase_Impl` (debug ve release) → aynı değer.
+
+117 maddelik listeden istenen alt küme release APK ile sürüldü:
+
+- **#1–#13** (temel akış): dördünde de. `159,99 + 59,90 = 219,89` kuruşu
+  kuruşuna; kısmi kaydırmalar silmiyor, tam kaydırma siliyor, "Geri al" öğeyi
+  **eski sırasına** koyuyor.
+- **#14, #17, #20–#26** (form, ayarlar, kurlar, klavye): `0`, `-5`, `1,23456`,
+  `1000,0001` dördü de alan altında hata veriyor ve kaydedilmiyor. Kur ekranı
+  klavye açıkken API 34'te `Kaydet [500,1228][580,1281]` — 16b'de ölçülen
+  değerle aynı satırda.
+- **#27–#32** (tarih): API 24'te "1 gün kaldı", saat bir gün ileri alınınca
+  "Bugün ödenecek"; geçmiş tarih + aylık periyot → "23 gün kaldı" (17 Eylül →
+  10 Ekim), "gecikmiş" demiyor; metin girişinden `01/01/2040` → *"The date can
+  be at most 10 years ahead"*, sheet açık kalıyor; döndürmede ad, fiyat ve
+  tarih duruyor.
+- **#33–#38, #40, #41** (bildirim): API 34'te tarihli ilk abonelikten sonra
+  sistem izin diyaloğu sheet kapandıktan **sonra** çıkıyor; izin sistem
+  ayarlarından kapatılınca satır **uygulama yeniden başlatılmadan** "Kapalı —
+  açmak için dokunun" oluyor, sonra açıklama diyaloğu → sistem diyaloğu →
+  "Açık". **#40:** API 24'te uygulama detay sayfası (`InstalledAppDetails`),
+  API 29'da uygulamanın bildirim ekranı (`AppNotificationSettingsActivity`) —
+  16b hotfix'i release'de de duruyor.
+- **#106–#117** (tema ve para birimi): üç seçenekli tema diyaloğu; **Koyu**
+  seçiliyken sistem açığa alınınca uygulama direniyor (`#0D1A14`), **Açık**
+  seçiliyken sistem koyuya alınınca yine direniyor (`#D3E2D8`), **Sistemi takip
+  et**'te takip ediyor; seçim soğuk başlatmada duruyor. Duvar kâğıdı renkleri
+  API 34/36'da açılıp kapanıyor, API 24/29'da satır "Android 12 ve üzeri
+  gerekir" diyerek devre dışı. **#117:** ₺ karakteri API 29'da dashboard'ın en
+  büyük puntosunda ekran görüntüsünden bakılarak doğrulandı — tofu yok.
+
+Tam tur atılmadı; 16b'de debug ile eksiksiz sürülmüştü.
+
+### Görev 6 — Belgeler
+
+`ARCHITECTURE.md` §24 eklendi; `ROADMAP.md` Faz 16'nın beş maddesi işaretlendi;
+`TESTING.md`'ye "Release APK ile Test Etme" bölümü kalıcı olarak yazıldı ve
+WorkManager bölümündeki bir yanlış düzeltildi (aşağıda).
+
+**Değişen dosyalar**
+
+- `app/build.gradle.kts` — `isMinifyEnabled`/`isShrinkResources` açıldı;
+  `local.properties`/ortam değişkeninden okuyan release `signingConfig` eklendi
+- `app/proguard-rules.pro` — şablon içerik silindi, kuralların neden
+  yazılmadığı yazıldı
+- `docs/ARCHITECTURE.md` — §24 eklendi
+- `docs/ROADMAP.md` — Faz 16: imzalama, R8 kuralları, `isMinifyEnabled`,
+  `material-icons-extended` ve desugar maddeleri işaretlendi
+- `docs/TESTING.md` — "Release APK ile Test Etme" bölümü; "duvar saati
+  ileri alınamaz" maddesi düzeltildi
+- `docs/PROGRESS.md` — bu kayıt
+
+`app/src` altında **hiçbir dosya değişmedi.**
+
+**Commit'ler**
+
+- `b951010` build: turn on R8 and resource shrinking for release
+- `b6425d0` build: read release signing material from local.properties
+- (bu kayıt) docs: record the R8, signing and icon measurements of phase 16c
+
+**Karşılaşılan sorunlar**
+
+- **`TESTING.md`'de yazan "duvar saati root olmadan ileri alınamaz" yanlışmış.**
+  Orada `adb root`, `adb shell date` ve `setprop persist.sys.timezone`
+  denenmiş ve üçü de reddedilmişti — üçü bu fazda da reddetti. Ama iki yol
+  daha var: API 31+'ta `cmd time_detector set_time_state_for_tests` izin
+  istemiyor, API 24/29'da Ayarlar'daki "Automatic date & time" kapatılınca saat
+  elle kurulabiliyor. İkisiyle de worker gerçekten koşturuldu. Bölüm
+  düzeltildi.
+- **Emülatörün `-timezone` bayrağı bu imajlarda çalışmıyor.** Hem snapshot'tan
+  hem soğuk açılışta denendi, misafir saat dilimi `Etc/GMT` kaldı.
+- **Hedef saatten önce `cmd jobscheduler run -f` denemek işi bozuyor.** API
+  24'te 08:59'da bir kez denendi; WorkManager o denemede işi yeniden zamanladı
+  ve sonraki çalıştırma **bir gün** ileri kaydı. Tarihi bir gün ileri alarak
+  çıkıldı. Doğru sıra: saati hedeften önceye kur → uygulamayı aç → hedefi geç →
+  **sonra** zorla.
+- **İlk ölçümde desugar dex'i yanlış dosyayla eşleştirilmişti.** minify kapalı
+  release'de son `classes5.dex` sanılmıştı; L8 ara çıktısına bakılınca gerçek
+  karşılığın `classes3.dex` (326.932 B) olduğu görüldü. Sayılar buna göre.
+- `material-icons-extended`'ı çıkarıp `-core` koymadan derlemek `Unresolved
+  reference 'icons'` veriyor — `material3` 1.4.0 core'u getirmiyor.
+
+**Sonraki faz için not**
+
+- **Keystore kullanıcıda.** `local.properties`'e dört satır yazılınca
+  `assembleRelease` imzalı çıkacak; yapılandırma hazır, denenmedi çünkü
+  denemek anahtar üretmeyi gerektirirdi.
+- **Açılış süresi R8 sonrası ölçülmedi.** ROADMAP maddesi "APK boyutu ve açılış
+  süresi düşer" diyor; boyut ölçüldü, süre ölçülmedi. `am start -W` ile beş
+  tekrarın medyanı alınabilir.
+- **`res/xml/backup_rules.xml` ve `data_extraction_rules.xml` hâlâ şablon.**
+  İkisi de manifest'ten referanslı, içerikleri tamamen yorum. Yedekleme
+  politikası (neyin yedeklenip neyin yedeklenmeyeceği) bir ürün kararı; Play
+  hazırlığında gizlilik politikası maddesiyle birlikte ele alınmalı.
+- **Enstrümantasyon paketi release APK'ya karşı koşulamıyor** — `testBuildType`
+  varsayılanı `debug`, `connectedReleaseAndroidTest` görevi yok. Release'e
+  çevirmek gerçek bir keystore ister (uygulama ve test APK'sı aynı anahtarla
+  imzalanmalı) ve `ui-test-manifest` `debugImplementation` olduğu için Compose
+  testlerinin Activity'si olmaz. İstenirse ayrı bir iş.
+- **`mapping.txt` saklanmalı.** R8 açıkken cihazdan gelen yığın izleri
+  karışıktır; `build/outputs/mapping/release/mapping.txt` (bu derlemede 37 MB)
+  her yayınla birlikte saklanmazsa o sürümün çökme raporları okunamaz. Play
+  Console'a yükleme adımı Faz 16'nın kalanında ele alınmalı.
+
+---
+
 ## [Faz 16b hotfix] API 26 Altında Bildirim Ayarlarına Doğru Yoldan Gidiliyor — 2026-09-17
 
 **Durum:** Tamamlandı. 16b turunda API 24'te düşen #40 kapandı. Tek bir dal

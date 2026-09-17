@@ -1949,3 +1949,170 @@ işaretin kendisi her locale'de `Currency.symbol`.
 diye ayrıca ölçüldü.
 
 ---
+
+## 24. R8, Kaynak Daraltma ve İmzalama
+
+Faz 16c. Release derlemesi bu faza kadar `isMinifyEnabled = false` ile
+çıkıyordu; APK'nın **%98,3'ü dex**ti. Bu bölüm neyin açıldığını, hangi kuralın
+neden **yazılmadığını** ve imzalama malzemesinin nereden okunduğunu kayda
+geçiriyor.
+
+### Ölçüm — R8 öncesi ve sonrası
+
+Aynı kaynak ağacı, üç derleme:
+
+| Derleme | APK | dex (sıkıştırılmamış) | dex (APK içinde) | dex dosyası | `resources.arsc` |
+|---|---|---|---|---|---|
+| debug | 20,28 MiB | 63,73 MiB | 19,53 MiB | 18 | 533.880 B |
+| release, minify **kapalı** | 13,06 MiB | 45,45 MiB | 12,31 MiB | 5 | 529.616 B |
+| release, minify **açık** | **2,02 MiB** | **3,09 MiB** | **1,50 MiB** | **2** | **306.388 B** |
+
+APK 13,06 → 2,02 MiB; dex 45,45 → 3,09 MiB. `isShrinkResources = true`
+`resources.arsc`'yi 529.616 → 306.388 B'ye indiriyor. Silinenlerin neredeyse
+tamamı kütüphanelerin kendi kaynakları: projenin 125 metninden **124'ü**
+daraltıcının erişilebilir listesinde, kalan biri (`app_name`) manifest
+üzerinden tutuluyor ve cihazda uygulama adı olarak doğrulandı.
+
+### `proguard-rules.pro` neden BOŞ
+
+Yöntem sırayla şuydu: **önce kural yazmadan derle, sonra release APK'yı
+cihazda sür, kırılanı ölç.** Hiçbir şey kırılmadı, bu yüzden tek bir `-keep`
+yazılmadı.
+
+Sebebi, kuralların zaten gelmesi: R8 birleşik yapılandırmayı
+`build/outputs/mapping/release/configuration.txt` dosyasına yazıyor ve orada
+**70'in üzerinde kural kaynağı** listeleniyor — `room-runtime`, `room-ktx`,
+`hilt-android`, `hilt-work`, `hilt-navigation-compose`,
+`datastore-preferences-core`, `work-runtime`, `navigation-*`, `material3`,
+`ui-*`, `lifecycle-*` ve R8'in kendi `coroutines.pro`'su. Kütüphaneler
+reflection kullandıkları yerleri kendi AAR'larında koruyor.
+
+Önleyici kural yazmak, hiçbir zaman silinmeye cesaret edilemeyen **ölü kural**
+bırakır: gerçekten gereksiz olduğu anlaşılsa bile kaldırmanın neyi kıracağını
+kimse bilemez. O yüzden dosya boş; ileride eklenecek her kuralın yanına
+**hangi yığın izini** kapattığı yazılacak.
+
+### Cihazda doğrulanan yerler
+
+Minify açık release APK dört cihaza da kuruldu (API 24 / 29 / 34 / 36) ve
+reflection kullanan her yol tek tek sürüldü:
+
+| Yer | Nasıl sürüldü | Sonuç |
+|---|---|---|
+| Hilt grafı | Uygulama açılışı | Dördünde de açılıyor |
+| Room | Açılış, liste, ekleme, düzenleme, silme, geri al | Dördünde de |
+| Room şema kimliği | `schemas/1.json` ↔ üretilen `SubTrackDatabase_Impl` | `ef18d874586948288a87736e03c2b556`, eşleşiyor |
+| DataStore | Para birimi, tema, kur; hepsi soğuk başlatma sonrası | Dördünde de duruyor |
+| WorkManager + `@HiltWorker` | İş koşturuldu, bildirim shade'de okundu | Dördünde de SUCCESS |
+| Compose Navigation | Ana / istatistik / ayarlar / kur / düzenleme | Dördünde de |
+| `java.time` + desugaring | Tarih seçici, "gün kaldı", "Son düzenleme" | **API 24 dahil** |
+| `NumberFormat` / locale | ₺ ve $ biçimlendirmesi, TR ve EN | Dördünde de |
+
+**En riskli yer `@HiltWorker`'dı** — assisted injection, worker sınıfını
+**adıyla** aranan bir multibinding haritasından kuruyor; R8 adı değiştirirse
+bu ancak çalışma anında patlar. API 29'da iş **zamanı geldiğinde kendiliğinden**
+koştu (`Worker result SUCCESS`), diğer üçünde cihaz saati ileri alınıp
+`cmd jobscheduler run -f` ile sürüldü. Dördünde de bildirim shade'e ulaştı.
+
+### `material-icons-extended` kalıyor — ölçüldü
+
+Kullanılan **12 ikonun 8'i** `material-icons-core`'da var (`Add`,
+`AutoMirrored.Filled.ArrowBack`, `AutoMirrored.Filled.List`, `DateRange`,
+`Delete`, `PlayArrow`, `Settings`, `Star`); **4'ü yalnızca `-extended`'da**:
+`BarChart`, `Cloud`, `ArrowUpward`, `ArrowDownward`.
+
+Core'da bu dördünün karşılığı **yok**. `BarChart` istatistik girişinin ve boş
+durumunun tek işareti; `Cloud` bulut depolama aboneliklerini diğerlerinden
+ayıran şey; yukarı/aşağı okların core'daki en yakın komşusu
+`KeyboardArrowUp`/`KeyboardArrowDown`, o da yön değil **açılır/kapanır**
+anlatan bir chevron. Dördünü birden karşılamayan bir değişim bağımlılığı
+kaldırmaya yetmez — ikisini değiştirip diğer ikisi için `-extended`'ı tutmak
+**sıfır bayt** kazandırır.
+
+Ayrıca `material3` 1.4.0 artık `material-icons-core`'u **getirmiyor**; core
+ağaca yalnızca `-extended`'ın bağımlılığı olarak giriyor. Yani bırakmak
+"extended'ı sil" değil, "extended'ı sil, core'u açıkça ekle" demek.
+
+Bedeli ölçüldü:
+
+| | minify kapalı | minify açık |
+|---|---|---|
+| `-extended` ile | 13.695.885 B | 2.114.862 B |
+| yalnızca `-core` ile | 9.550.517 B | 2.114.646 B |
+| fark | **4.145.368 B (~3,95 MiB)** | **216 B** |
+
+R8 kapalıyken `-extended` gerçekten pahalı; **R8 açıkken bedeli yok.** Son
+APK'da `androidx.compose.material.icons` altından **beş sınıf** kalıyor
+(`DateRange`, `Delete`, `PlayArrow`, `Settings`, `Star`), kalanlar çağıranın
+içine gömülmüş. 216 B'lik fark kütüphanenin değil, deneyde yerine konan yedek
+ikonların yol verisinin farkı.
+
+**Karar:** `material-icons-extended` kalıyor. ROADMAP Faz 16'daki "kaldırılsın
+veya daraltılsın" maddesinin cevabı: **R8 daraltıyor.**
+
+### `desugar_jdk_libs` bedeli — R8 sonrası ölçüldü
+
+Faz 10a'da "~200-400 KB" diye tahmin edilmişti; ölçülen değer:
+
+| | dex (sıkıştırılmamış) | APK içinde |
+|---|---|---|
+| minify kapalı | 326.932 B | 144.680 B |
+| minify açık | 278.384 B | 128.900 B |
+
+APK'daki `classes2.dex` tam olarak bu dosya. R8 desugar kütüphanesinden
+yalnızca ~15 KB kırpıyor; beklenen, çünkü L8 zaten uygulamanın kullandığı
+yüzeye göre daraltıyor. `minSdk 24` ile `java.time` kullanmanın bedeli
+**~126 KiB** — tahmin doğru taraftaymış, biraz cömertmiş.
+
+### İmzalama — malzeme `local.properties`'ten
+
+Release `signingConfig`'in dört değeri (`storeFile`, `storePassword`,
+`keyAlias`, `keyPassword`) **önce `local.properties`'ten**, orada yoksa
+**ortam değişkenlerinden** okunuyor.
+
+`local.properties` seçildi çünkü: zaten `.gitignore`'da (Faz 1a), Gradle onu
+`sdk.dir` için **zaten okuyor**, ve Android Studio ile komut satırı aynı
+değerleri kabuk profili kurmadan görüyor. Ortam değişkeni yedeği bugün için
+değil: `local.properties` bulunmayan bir CI makinesinin aynı dört değeri
+yapılandırmayı değiştirmeden verebilmesi için açık bırakılmış bir kapı.
+
+| `local.properties` | Ortam değişkeni |
+|---|---|
+| `subtrack.storeFile` | `SUBTRACK_STORE_FILE` |
+| `subtrack.storePassword` | `SUBTRACK_STORE_PASSWORD` |
+| `subtrack.keyAlias` | `SUBTRACK_KEY_ALIAS` |
+| `subtrack.keyPassword` | `SUBTRACK_KEY_PASSWORD` |
+
+`signingConfig` **yalnızca** dört değer de varken ve keystore dosyası gerçekten
+mevcutken oluşturuluyor; aksi halde `signingConfigs.findByName("release")`
+`null` döndürüyor ve build type imzasız kalıyor. Ölçüldü:
+
+- Keystore yokken `assembleRelease` **hata vermiyor**, `app-release-unsigned.apk`
+  üretiyor. `apksigner verify` bu dosya için *"DOES NOT VERIFY — Missing
+  META-INF/MANIFEST.MF"* diyor; imzasız olduğu açık.
+- `assembleDebug` **etkilenmiyor**: debug build kendi `signingConfig`'ini
+  SDK'nın debug anahtarıyla kullanmaya devam ediyor, çıktı boyutu değişmiyor.
+
+**Debug anahtarına düşülmüyor.** Eksik keystore'da release'i debug anahtarıyla
+imzalamak "çalışıyor gibi" görünür ve imzasız bir çıktının yayınlanabilir
+sanılmasına kapı açar; imzasız kalmak bu yüzden hata değil, kasıt.
+
+Keystore dosyası ve şifreler **kullanıcı tarafından** oluşturulur; bu depo
+hiçbir anahtar malzemesi taşımaz. `.gitignore`'da `*.jks`, `*.keystore`,
+`*.apk`, `*.aab` ve `local.properties` Faz 1a'dan beri var; 16c'de yeniden
+doğrulandı.
+
+### Enstrümantasyon paketi release APK'ya karşı koşulamıyor
+
+`testBuildType` ayarlanmadığı için varsayılan `debug`: Gradle'da yalnızca
+`connectedDebugAndroidTest` var, `connectedReleaseAndroidTest` **yok**.
+Release'e çevirmek iki şey ister ve ikisi de bu fazın dışında:
+
+1. Uygulama ile test APK'sı **aynı anahtarla** imzalanmak zorunda, yani gerçek
+   bir keystore (kullanıcıda).
+2. `ui-test-manifest` `debugImplementation` ile bağlı; release varyantında
+   Compose testlerinin çalışacağı test Activity'si olmaz.
+
+Bu yüzden 16c'de release APK **elle** sürüldü (yöntem `TESTING.md`'de).
+
+---

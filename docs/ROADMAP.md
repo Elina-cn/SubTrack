@@ -463,11 +463,35 @@ Aylık toplamın zaman içindeki anlık görüntüleri. `PROJECT_SPEC.md` §1'de
       altında. **Bildirim ikonu da bu işin parçası:**
       `res/drawable/ic_notification.xml` Faz 10b'de konan geçici bir siluet,
       marka çalışmasıyla birlikte yenilenecek.
-- [ ] Release imzalama yapılandırması, keystore güvenliği
-- [ ] ProGuard/R8 kuralları, release build testi
-- [ ] `isMinifyEnabled = true` (R8) — APK boyutu ve açılış süresi düşer
-- [ ] `material-icons-extended` kaldırılsın veya daraltılsın: binlerce ikon
-      getiriyor, **beş** tanesi kullanılıyor
+- [x] **Release imzalama yapılandırması, keystore güvenliği** — Faz 16c.
+      Dört değer (`storeFile`, `storePassword`, `keyAlias`, `keyPassword`)
+      **önce `local.properties`'ten**, yoksa ortam değişkenlerinden okunuyor;
+      derleme betiğinde şifre yok. `signingConfig` yalnızca dördü de varken ve
+      keystore dosyası gerçekten mevcutken kuruluyor; yoksa `assembleRelease`
+      **hata vermeden** `app-release-unsigned.apk` üretiyor ve `assembleDebug`
+      etkilenmiyor. **Debug anahtarına düşülmüyor** (gerekçe
+      `ARCHITECTURE.md` §24). **Keystore dosyasını kullanıcı oluşturacak** —
+      bu madde yapılandırmayı kapsıyor, anahtarı değil.
+- [x] **ProGuard/R8 kuralları, release build testi** — Faz 16c.
+      `proguard-rules.pro` **boş kaldı**: önce kuralsız derlendi, minify açık
+      release APK dört cihazda (API 24/29/34/36) sürüldü, hiçbir şey kırılmadı.
+      Room, Hilt, WorkManager, DataStore, Navigation, Compose ve coroutines
+      kendi kurallarını AAR'larında getiriyor (70+ kaynak,
+      `configuration.txt`). Önleyici kural yazılmadı; gerekçe §24'te.
+- [x] **`isMinifyEnabled = true` (R8)** — Faz 16c. `isShrinkResources = true`
+      da açıldı. APK **13,06 → 2,02 MiB**, dex **45,45 → 3,09 MiB** (beş
+      dosyadan ikiye), `resources.arsc` 529.616 → 306.388 B. Açılış süresi
+      ayrıca ölçülmedi.
+- [x] **`material-icons-extended` ölçüldü ve KALIYOR** — Faz 16c. Kullanılan
+      **12** ikonun (16-0 envanteri; eski "beş" sayısı yanlıştı) 8'i
+      `material-icons-core`'da, 4'ü (`BarChart`, `Cloud`, `ArrowUpward`,
+      `ArrowDownward`) yalnızca `-extended`'da ve core'da karşılıkları yok.
+      Bedeli: minify kapalıyken **3,95 MiB**, minify açıkken **216 B**.
+      Yani sorunun cevabı kaldırmak değil, **R8 zaten daraltıyor** — son
+      APK'da o kütüphaneden beş sınıf kalıyor. Ayrıntı ve karar §24'te.
+- [x] **`desugar_jdk_libs` bedeli ölçüldü** — Faz 16c. Desugar dex'i minify
+      kapalıyken APK'da 144.680 B, açıkken **128.900 B**. Faz 10a'daki
+      "~200-400 KB" tahmini doğru taraftaymış, biraz cömertmiş.
 - [x] **Şablon testler kaldırıldı** — Faz 16b. `ExampleUnitTest` (`2+2=4`) ve
       `ExampleInstrumentedTest` (paket adı kontrolü) silindi; **331 birim testi
       → 330**, **20 enstrümantasyon metodu → 19**. İkincisi her pakette bir cihaz

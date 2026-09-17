@@ -946,11 +946,53 @@ adb shell dumpsys jobscheduler | grep -A25 "JOB #u0a<UID>/0:"
 
 Yani JobScheduler'ı zorlamak yetmiyor; WorkManager `lastEnqueueTime +
 initial_delay` geçmeden çalışmıyor ve o eşiği aşmanın tek yolu duvar saatini
-ileri almak — o da root istiyor. `google_apis_playstore` imajlarında root yok.
+ileri almak.
 
-**Sonuç: ilk gecikmesi olan periyodik bir işin gövdesi, adb'den erken
-çalıştırılamaz.** Yukarıdaki iki yol yalnızca işin kuyruğa doğru girdiğini
-kanıtlar.
+**Faz 16c düzeltmesi: duvar saati root olmadan da ileri alınabiliyor.** Burada
+"çalıştırılamaz" yazıyordu; iki yol bulundu ve dördünde de kullanıldı. Yani
+yukarıdaki iki yol işin kuyruğa doğru girdiğini kanıtlar, **gövdesi ise
+aşağıdaki yolla gerçekten koşturulur.**
+
+### Duvar saatini root olmadan ileri almanın iki yolu
+
+**API 31+ (34, 36) — tek komut.** `time_detector` servisinin test kancası
+`SET_TIME` izni istemiyor:
+
+```bash
+adb shell cmd time_detector set_auto_detection_enabled false
+adb shell cmd time_detector set_time_state_for_tests --elapsed_realtime $(adb shell cat /proc/uptime | awk '{printf "%d", $1*1000}') --unix_epoch_time 1789635900000 --user_should_confirm_time false
+```
+
+`--unix_epoch_time` hedef anı milisaniye cinsinden ister. Bitince
+`set_auto_detection_enabled true` ile geri alınır.
+
+> `suggest_manual_time` **çalışmaz**: `uid 2000 does not have
+> android.permission.SUGGEST_MANUAL_TIME_AND_ZONE`. Çalışan çağrı
+> `set_time_state_for_tests`.
+
+**API 24 ve 29 — Ayarlar arayüzünden.** Bu sürümlerde `time_detector` ya hiç
+yok (API 24: *"Can't find service"*) ya da kabuk komutu yok (API 29: *"No
+shell command implementation"*). Ama Ayarlar'daki anahtar kapatılınca saat
+elle kurulabiliyor:
+
+```bash
+adb shell am start -a android.settings.DATE_SETTINGS
+```
+
+"Automatic date & time" (API 29'da "Use network-provided time") **kapatılır**,
+sonra "Set date" / "Set time" ile tarih ve saat verilir. Saat seçici bir
+kadran: önce AM/PM, sonra saat, sonra dakika. Test bitince anahtar **geri
+açılır**, cihaz gerçek saate döner.
+
+**Sıra önemli:** iş, uygulamanın ilk açılışında `09:00`'a kuyruklanır. Saati
+`09:00`'dan **önceye** kurup uygulamayı açmak, sonra `09:00`'ı geçip
+zorlamak gerekir. Hedef saatten **önce** bir kez `cmd jobscheduler run -f`
+denemek işi bozar: WorkManager o denemede işi yeniden zamanlar ve sonraki
+çalıştırma bir **gün** ileri kayar. O noktadan dönüş, tarihi bir gün ileri
+almak (veya `pm clear` ile WorkManager veritabanını silip baştan kurmak).
+
+API 29'da iş, saat `09:00`'a geldiğinde **kendiliğinden** koştu; zorlamaya
+gerek kalmadı. Bu, zamanlamanın da doğru olduğunun tek doğrudan kanıtı.
 
 ### Çalışan yöntem: gecikmesiz `OneTimeWorkRequest`
 
@@ -980,6 +1022,112 @@ adb shell am start -W -n com.elinacn.subtrack/.MainActivity
 
 Beş tekrarın medyanı alınır. Debug build ölçümüdür, release değil —
 karşılaştırma yalnızca kendi içinde anlamlıdır.
+
+---
+
+## Release APK ile Test Etme
+
+Faz 16c'de kalıcı hâle geldi. **R8 açıkken bir şeyin kırılıp kırılmadığı debug
+build'de görünmez.** Minify, reflection'la bulunan sınıf ve alan adlarını
+değiştirir; Room, Hilt, `@HiltWorker`, DataStore ve Compose tarafında bir
+kopma varsa **yalnızca release APK cihazda koşarken** ortaya çıkar. Bu yüzden
+R8'e dokunan her değişiklikten sonra aşağıdaki tur release APK ile atılır,
+debug ile değil.
+
+### 1. Release APK'yı üret
+
+```bash
+./gradlew :app:assembleRelease
+```
+
+Çıktı: `app/build/outputs/apk/release/app-release-unsigned.apk`.
+**Keystore yoksa dosyanın adı bunu söyler ve derleme yine geçer** — imzasız
+APK cihaza kurulamaz.
+
+### 2. Kurulabilmesi için imzala
+
+Yayın anahtarı testte kullanılmaz. Test kurulumu için APK, SDK'nın **debug
+anahtarıyla** imzalanır; bu yalnızca bir kurulum adımıdır, derleme
+yapılandırmasına dokunmaz:
+
+```bash
+"$ANDROID_HOME/build-tools/36.1.0/apksigner" sign \
+  --ks ~/.android/debug.keystore --ks-pass pass:android --key-pass pass:android \
+  --ks-key-alias androiddebugkey \
+  --out /tmp/release-signed.apk \
+  app/build/outputs/apk/release/app-release-unsigned.apk
+"$ANDROID_HOME/build-tools/36.1.0/apksigner" verify --print-certs /tmp/release-signed.apk
+```
+
+`verify` çıktısında `CN=Android Debug` görünmeli. Debug APK de aynı anahtarla
+imzalı olduğu için ikisi birbirinin üzerine kurulabilir; yine de **önce
+kaldırmak** temiz bir başlangıç verir.
+
+### 3. Kur ve sür
+
+```bash
+adb -s <serial> uninstall com.elinacn.subtrack
+adb -s <serial> install -r /tmp/release-signed.apk
+adb -s <serial> logcat -b crash -c
+adb -s <serial> shell am start -W -n com.elinacn.subtrack/.MainActivity
+```
+
+Uygulamanın **açılması** tek başına bir sonuçtur: Hilt grafı kırıksa süreç
+`Application` kurulurken çöker.
+
+### 4. Sürülecek yerler — hepsi reflection kullanıyor
+
+| Yer | Ne yapılır | Kırılırsa nasıl görünür |
+|---|---|---|
+| Hilt | Uygulamayı aç | Açılışta çöküyor |
+| Room | Liste, ekleme, düzenleme, silme, geri al | Açılışta veya ilk sorguda çöküyor |
+| Room şeması | `schemas/1.json`'daki `identityHash` ile üretilen `*_Impl` karşılaştırılır | *"Room cannot verify the data integrity"* |
+| DataStore | Para birimi, tema, kur değiştir; **tamamen kapatıp aç** | Tercih geri gelmiyor |
+| WorkManager + `@HiltWorker` | İşi koştur (yukarıdaki saat yöntemi), bildirimi oku | `Could not instantiate …Worker` |
+| Navigation | Dört hedefi de aç | Hedef açılmıyor / çöküyor |
+| `java.time` + desugaring | Tarih seç, "gün kaldı" ve "Son düzenleme" satırlarını oku — **API 24'te** | `NoClassDefFoundError` |
+| `NumberFormat` / locale | ₺ ve $ biçimlendirmesi, TR ve EN | Yanlış ayraç veya ISO kodu |
+
+Bildirimin gerçekten shade'e ulaştığı okunur:
+
+```bash
+adb -s <serial> shell dumpsys notification --noredact | grep -A40 "pkg=com.elinacn.subtrack" | grep "android.title\|android.text"
+```
+
+API 24'te `--noredact` yok; orada shade açılıp `uiautomator dump` ile okunur:
+
+```bash
+adb -s <serial> shell service call statusbar 1
+```
+
+### 5. Tur bitince crash tamponu boş olmalı
+
+```bash
+adb -s <serial> logcat -b crash -d
+```
+
+Tek satır bile çıkmamalı. Dört cihazda da ayrı ayrı bakılır.
+
+### 6. Debug build'e geri dön
+
+Release APK test için kuruldu, geliştirme için değil:
+
+```bash
+adb -s <serial> shell pm clear com.elinacn.subtrack
+adb -s <serial> uninstall com.elinacn.subtrack
+adb -s <serial> install -r app/build/outputs/apk/debug/app-debug.apk
+```
+
+Saat/dil gibi değiştirilen cihaz ayarları da geri alınır.
+
+### Enstrümantasyon paketi release APK'ya karşı koşulamıyor
+
+`testBuildType` ayarlanmadığı için varsayılan `debug`; Gradle'da yalnızca
+`connectedDebugAndroidTest` var, `connectedReleaseAndroidTest` **yok**.
+Release'e çevirmek uygulama ve test APK'sının **aynı anahtarla** imzalanmasını
+(yani gerçek bir keystore) ister ve `ui-test-manifest` `debugImplementation`
+ile bağlı olduğu için release varyantında Compose testlerinin Activity'si
+olmaz. Bu yüzden release turu **elle** atılır.
 
 ---
 
