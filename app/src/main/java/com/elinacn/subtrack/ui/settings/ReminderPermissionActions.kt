@@ -5,6 +5,7 @@ import android.app.Activity
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.provider.Settings
 import androidx.core.app.ActivityCompat
 import com.elinacn.subtrack.R
@@ -36,21 +37,45 @@ internal fun Activity?.canShowNotificationRationale(): Boolean =
         Manifest.permission.POST_NOTIFICATIONS
     )
 
-/** Opens this app's notification settings, falling back to its app details page. */
+/**
+ * Opens the best notification screen this Android version actually has.
+ *
+ * The per-app notification screen arrived in API 26. Below that the version branch is the only
+ * thing that helps, because catching cannot: Android 7.x's Settings answers
+ * ACTION_APP_NOTIFICATION_SETTINGS, so nothing is thrown - the screen opens, finds the app_uid
+ * extra it wants missing, and closes itself, leaving the tap looking like it did nothing.
+ * Measured in phase 16b; see ARCHITECTURE section 18.
+ */
 internal fun Activity.openNotificationSettings() {
-    val appNotifications = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
-        .putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
-    try {
-        startActivity(appNotifications)
-    } catch (notFound: ActivityNotFoundException) {
-        // Spelled out rather than swallowed: the per-app notification screen arrived in API 26,
-        // and below that - or on a build that ships without it - the app details page is the
-        // deliberate second choice. A stated fallback, not the silent catch section 9 forbids.
-        startActivity(
-            Intent(
-                Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-                Uri.fromParts("package", packageName, null)
-            )
-        )
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+        startAppDetails()
+        return
     }
+    try {
+        startActivity(
+            Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                .putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+        )
+    } catch (notFound: ActivityNotFoundException) {
+        // Spelled out rather than swallowed: a build that ships without the per-app screen still
+        // has the app details page, which is where the older versions go anyway. A stated
+        // fallback, not the silent catch section 9 forbids.
+        startAppDetails()
+    }
+}
+
+/**
+ * Where both branches end up: this app's page in Settings, with the notification section on it.
+ *
+ * It is one step further from the reminder toggle than the per-app screen, and that is the price
+ * of the versions that have no per-app screen. Leaving the row dead instead would take away the
+ * only way in.
+ */
+private fun Activity.startAppDetails() {
+    startActivity(
+        Intent(
+            Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+            Uri.fromParts("package", packageName, null)
+        )
+    )
 }
