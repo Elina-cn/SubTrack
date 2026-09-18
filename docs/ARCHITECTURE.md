@@ -2116,3 +2116,77 @@ Release'e çevirmek iki şey ister ve ikisi de bu fazın dışında:
 Bu yüzden 16c'de release APK **elle** sürüldü (yöntem `TESTING.md`'de).
 
 ---
+
+## 25. Android Auto Backup — Neyin Yedeklendiği
+
+Telefon değiştiren kullanıcı verisini kaybetmemeli. İlk adım Android'in kendi
+Auto Backup'ı: Room veritabanı ve DataStore tercihleri **kullanıcının kendi
+Google Drive hesabına** kopyalanıyor, yeni cihazda uygulama kurulunca geri
+geliyor. Sunucu yok, hesap yok, kod yok — yalnızca yapılandırma.
+
+### Varsayılan zaten açıktı
+
+`android:allowBackup` Android'de varsayılan olarak **açık**. Manifestte üç
+öznitelik de (`allowBackup`, `fullBackupContent`, `dataExtractionRules`) Faz
+1'den beri duruyordu, ama işaret ettikleri iki XML **Android Studio'nun
+şablonuydu**: içleri yorum satırıydı, kural yoktu. Boş kural kümesi "platformun
+almak istediği her şeyi al" demek.
+
+Bu bir teori değil, ölçüm: 16f'de yerel taşıyıcıyla alınan yedek **85 KB**
+uygulama verisini sandık dışına çıkardı. Yani "veriler cihazdan çıkmıyor"
+cümlesi o anda **yanlıştı**. Gizlilik politikasının metni bu ölçüme göre
+yazılacak (PROGRESS, Faz 16f).
+
+### İki dosya, biri diğerinin yerine geçmiyor
+
+| Dosya | Manifest özniteliği | Hangi sürüm okur |
+|---|---|---|
+| `res/xml/backup_rules.xml` | `android:fullBackupContent` | API 30 ve altı |
+| `res/xml/data_extraction_rules.xml` | `android:dataExtractionRules` | API 31 ve üstü |
+
+minSdk 24 olduğu için **ikisi de gerekli**. Platform yalnızca kendi sürümüne
+uyanı okur, diğerini görmezden gelir; birini silmek o tarafta yapılandırmayı
+yeniden varsayılana düşürür.
+
+`data-extraction-rules` ayrıca iki bölüm ister ve ikisi de yazıldı:
+`<cloud-backup>` (Drive'a yedek) ve `<device-transfer>` (eski telefondan yeni
+telefona doğrudan aktarım). İçerikleri aynı — kullanıcının yazdığı her şey iki
+yolda da taşınmalı.
+
+### Neler giriyor
+
+```
+databases/          → subtrack.db + -wal + -shm   (abonelikler, anlık görüntüler)
+files/datastore/    → settings.preferences_pb     (ana para birimi, kurlar, tema)
+```
+
+**Bir `<include>` yazmak kuralı beyaz listeye çevirir:** adı geçmeyen her şey
+dışarıda kalır. Yarın eklenen bir dosya, biri bilerek karar verene kadar
+yedeğe girmez. İstenen duruş bu.
+
+### Veritabanı domain'i neden bütün olarak giriyor
+
+`subtrack.db` tek başına değil, `domain="database" path="."` ile **tüm domain**
+alınıyor. Sebebi Room'un WAL kipi: işlenmiş satırlar henüz ana dosyaya
+katlanmamış olabilir. 16f'nin ölçülen fikstüründe ana dosya **4 KB**, WAL
+**103 KB** idi — yani `subtrack.db` tek başına yedeklenseydi geri yükleme
+neredeyse **boş bir veritabanı** verirdi. `-shm` SQLite'ın kendi yeniden
+ürettiği türev bir indeks; asıl önemli çiftin yanında taşınması zararsız.
+
+### Neler dışarıda ve neden
+
+| Yol | Durum | Gerekçe |
+|---|---|---|
+| `no_backup/androidx.work.workdb` | Platform zaten almıyor | WorkManager veritabanını **kendisi** `no_backup/` altına koyuyor (`getNoBackupFilesDir()`). Kural yazmaya gerek yok: yeni cihaz kendi işini kendi kuruyor, eski telefonun iş satırlarını miras almıyor. 16f'de geri yükleme sonrası `no_backup/` **boş** geldi ve iş yeniden kuruldu (yeni uid, yeni job id). |
+| `cache/`, `code_cache/` | Platform zaten almıyor | Auto Backup önbellek dizinlerini hiç taşımaz. |
+| `files/profileInstalled` | Beyaz liste dışı | ProfileInstaller'ın kurulum işareti; yeni cihaza taşınmasının bir değeri yok. Ayrı bir `<exclude>` gerekmiyor, beyaz liste zaten dışarıda bırakıyor. |
+
+### Geri yüklemenin taşımadığı tek şey: çalışma zamanı izni
+
+API 33+ cihazda geri yükleme sonrası **tercih** geri geliyor ama
+`POST_NOTIFICATIONS` izni gelmiyor — Android çalışma zamanı izinlerini hiçbir
+zaman geri yüklemez. Ayarlar satırı bunu doğru bildiriyor ("sistem ayarlarından
+açın"). API 32 ve altında böyle bir izin kavramı olmadığı için satır doğrudan
+"Açık" geliyor. İkisi de beklenen davranış, hata değil.
+
+---

@@ -1131,6 +1131,108 @@ olmaz. Bu yüzden release turu **elle** atılır.
 
 ---
 
+## Yedekle — Geri Yükle Turu (Auto Backup)
+
+Faz 16f'de kuruldu. Kural dosyaları `res/xml/backup_rules.xml` (API ≤30) ve
+`res/xml/data_extraction_rules.xml` (API 31+); ikisi birden gerekli, gerekçe
+`ARCHITECTURE.md` §25.
+
+### Taşıyıcının adı API'ye göre değişiyor
+
+Yerel test taşıyıcısının bileşen adı **iki sürümde iki türlü**. Önce listele,
+sonra listedeki adı birebir seç:
+
+```bash
+adb shell bmgr enable true
+adb shell bmgr list transports
+```
+
+| Cihaz | Bileşen |
+|---|---|
+| API 31+ (`subtrack_wide_api34`, `subtrack_edge_api36`) | `com.android.localtransport/.LocalTransport` |
+| API 24 (`subtrack_min_api24`) | `android/com.android.internal.backup.LocalTransport` |
+
+**Tuzak:** yanlış adı versen de `bmgr transport` "Selected transport ..." diyor
+ve hata vermiyor. Seçimin tuttuğunu `bmgr list transports` çıktısındaki `*`
+işaretinden doğrula.
+
+```bash
+# API 31+
+adb shell bmgr transport com.android.localtransport/.LocalTransport
+# API 24
+adb shell bmgr transport android/com.android.internal.backup.LocalTransport
+```
+
+### Tur
+
+```bash
+# 1. fikstürü kur (abonelikler, ana para birimi, kur, tema, tarih), sonra:
+adb shell bmgr backupnow com.elinacn.subtrack     # "Backup finished with result: Success"
+adb shell bmgr list sets                          # jeton: genelde "1"
+
+# 2. temiz cihaz taklidi
+adb uninstall com.elinacn.subtrack
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+
+# 3. geri yükle
+adb shell bmgr restore 1 com.elinacn.subtrack     # API 31+: "restoreFinished: 0"
+```
+
+`restoreFinished: 0` **başarı** demek (transport OK). API 24 bu satırı hiç
+yazmıyor, yalnızca `done` diyor — orada doğrulama çıktıdan değil, aşağıdaki
+dökümden yapılır.
+
+### Doğrulama — uygulamayı açmadan önce
+
+Beyaz listenin tuttuğu **ancak burada** görülür: geri gelen dizinde yalnızca
+`databases/` ve `files/datastore/` olmalı, `no_backup/` **boş**:
+
+```bash
+adb shell run-as com.elinacn.subtrack ls -R /data/data/com.elinacn.subtrack
+```
+
+Veritabanını okumak için (emülatörlerde `sqlite3` **yok**, dosyayı host'a
+çekip orada açmak gerekiyor — üç dosya birden, WAL'siz döküm eksik çıkar):
+
+```bash
+for f in "" "-wal" "-shm"; do
+  adb exec-out run-as com.elinacn.subtrack cat "databases/subtrack.db$f" > "subtrack.db$f"
+done
+python -c "import sqlite3;c=sqlite3.connect('subtrack.db');[print(r) for r in c.execute('SELECT * FROM subscriptions')];[print(r) for r in c.execute('SELECT * FROM monthly_snapshots')]"
+```
+
+Tercihler bayt bayt karşılaştırılır:
+
+```bash
+adb exec-out run-as com.elinacn.subtrack cat files/datastore/settings.preferences_pb | od -c
+```
+
+### Doğrulama — açtıktan sonra
+
+```bash
+adb logcat -c && adb shell am start -n com.elinacn.subtrack/.MainActivity
+adb logcat -d -b crash | grep -i elinacn            # boş olmalı
+adb shell dumpsys jobscheduler | grep -E "JOB .*subtrack|pkg=com.elinacn.subtrack"
+```
+
+İş kaydı **yeni** olmalı (yeni uid, sıfırdan job id): WorkManager veritabanı
+`no_backup/` altında olduğu için yedekten gelmiyor, uygulama işi kendisi
+yeniden kuruyor. Eski telefonun iş satırının taşınmaması **istenen** davranış.
+
+**Bildirim izni geri gelmez.** API 33+ cihazda tercih geri gelir ama
+`POST_NOTIFICATIONS` gelmez ve Ayarlar satırı "sistem ayarlarından açın" der;
+Android çalışma zamanı izinlerini hiçbir zaman geri yüklemez. API 32 ve altında
+böyle bir izin olmadığı için satır doğrudan "Açık" gelir. İkisi de doğru.
+
+### Tur bitince
+
+```bash
+adb shell bmgr transport com.google.android.gms/.backup.BackupTransportService
+adb shell pm clear com.elinacn.subtrack
+```
+
+---
+
 ## Faza Özel Testler
 
 Sabit liste geçtikten sonra çalıştırılır. Claude Code her faz sonunda bu

@@ -523,9 +523,21 @@ Aylık toplamın zaman içindeki anlık görüntüleri. `PROJECT_SPEC.md` §1'de
       gidiliyor; `app_uid` gönderilmiyor (belgelenmemiş davranış) ve satır
       devre dışı bırakılmıyor (bildirimleri açmanın tek yolu o). API 26+
       davranışı aynen kaldı. Lint'in iki `InlinedApi` uyarısı da kapandı.
+- [x] **Android Auto Backup açıkça yapılandırıldı** — Faz 16f. İki şablon XML
+      de gerçek kurallarla değiştirildi: yedeğe yalnızca Room veritabanı
+      (`domain="database"` bütün olarak, WAL yüzünden) ve DataStore tercihleri
+      giriyor. WorkManager'ın veritabanı `no_backup/` altında olduğu için zaten
+      dışarıda. `fullBackupContent` ve `dataExtractionRules` ikisi de gerekli
+      (minSdk 24). Yedekle-geri yükle turu API 24 ve API 34'te uçtan uca
+      sürüldü: veritabanı bire bir, tercihler bayt bayt aynı geldi, çökme yok,
+      bildirim işi yeniden kuruldu. Ayrıntı `ARCHITECTURE.md` §25,
+      ölçümler `PROGRESS.md`.
 - [ ] Gizlilik politikası — v1.0 çevrimdışı, veri toplanmıyor. **v1.1'de ağ
       eklendiğinde politika ve Data Safety formu güncellenecek**
-      (PROJECT_SPEC §4)
+      (PROJECT_SPEC §4). **16f'nin ölçümü politikanın metnini değiştiriyor:**
+      Auto Backup açık, yani veri kullanıcının kendi Google Drive'ına
+      kopyalanıyor. "Veriler cihazdan çıkmıyor" cümlesi olduğu gibi
+      kullanılamaz — doğru cümle `PROGRESS.md`'deki 16f kaydında.
 - [ ] Ücretlendirme kararı verilsin (peşin / ücretsiz+premium / ücretsiz) —
       kod tarafında etkisi yok, buraya kadar bekleyebilir (PROJECT_SPEC §5)
 - [ ] ARCHITECTURE'daki **"Şema sürümlemesi"** kuralı okunsun. Yayından sonra
@@ -595,3 +607,16 @@ Aylık toplamın zaman içindeki anlık görüntüleri. `PROJECT_SPEC.md` §1'de
 - [ ] Internal testing → production
 
 **Bitti:** `PROJECT_SPEC.md` §7'deki tüm maddeler işaretli.
+
+---
+
+## ⬜ Faz 17 — Dışa/İçe Aktarma
+
+Kullanıcının verisini dosyaya yazması ve geri yüklemesi. Auto Backup (Faz 16f)
+kullanıcının kendi Drive'ına yedekliyor ve kullanıcı o yedeğe elle
+dokunamıyor; bu faz veriyi kullanıcının **elinde tutabileceği bir dosyaya**
+çıkarmakla ilgili.
+
+Maddeler sohbette kararlaştırılacak.
+
+- [ ]

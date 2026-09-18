@@ -27,6 +27,240 @@ Her faz sonunda **en üste** yeni kayıt eklenir. Eski kayıtlar silinmez.
 
 ---
 
+## [Faz 16f] Android Auto Backup — Durum Tespiti ve Yapılandırma — 2026-09-18
+
+**Durum:** Tamamlandı
+
+**Yapılanlar**
+
+*Görev 1 — durum tespiti (kod yazmadan önce)*
+
+- a) `android:allowBackup` manifestte **vardı ve `true`** idi
+  (`app/src/main/AndroidManifest.xml:11`). Yazılmasaydı da varsayılan açıktır.
+- b) `android:dataExtractionRules` (satır 12) ve `android:fullBackupContent`
+  (satır 13) da tanımlıydı; işaret ettikleri iki dosya da vardı **ama ikisi de
+  Android Studio şablonuydu** — içleri örnek yorum, tek bir kural yok. Boş
+  kural kümesi "platformun alabildiği her şeyi al" demek.
+- c) Birleşik manifestte üçü de duruyor ve üçü de **bizim manifestimizden**
+  geliyor; hiçbir kütüphane katkı vermiyor.
+  `app/build/outputs/logs/manifest-merger-debug-report.txt`:
+
+  ```
+  android:fullBackupContent
+      ADDED from .../app/src/main/AndroidManifest.xml:13:9-54
+  android:allowBackup
+      ADDED from .../app/src/main/AndroidManifest.xml:11:9-35
+  android:dataExtractionRules
+      ADDED from .../app/src/main/AndroidManifest.xml:12:9-65
+  ```
+
+  Release birleşik manifesti de aynı üç değeri taşıyor.
+- d) **Cihazda ölçüldü: yedekleme fiilen çalışıyordu.** API 34'te, hiçbir
+  değişiklik yapılmadan:
+
+  ```
+  $ adb shell bmgr backupnow com.elinacn.subtrack
+  Running incremental backup for 1 requested packages.
+  Package @pm@ with result: Success
+  Package com.elinacn.subtrack with progress: 2048/84992
+  ...
+  Package com.elinacn.subtrack with progress: 87040/84992
+  Package com.elinacn.subtrack with result: Success
+  Backup finished with result: Success
+  ```
+
+  **85 KB uygulama verisi sandık dışına çıktı.** Yani "veriler cihazdan
+  çıkmıyor" cümlesi o anda yanlıştı.
+
+*Görev 2 — açık yapılandırma*
+
+- Manifestte değişiklik **gerekmedi**: üç öznitelik de zaten doğru yazılmıştı.
+  Değişen, iki XML'in içeriği.
+- Yedeğe girenler: `domain="database" path="."` ve
+  `domain="file" path="datastore"`. Bir `<include>` yazmak kuralı beyaz listeye
+  çevirdiği için adı geçmeyen her şey dışarıda kalıyor.
+- **Veritabanı domain'i bütün olarak alınıyor, `subtrack.db` tek başına
+  değil.** Ölçüm bunu zorunlu kıldı: fikstürde ana dosya **4096 bayt**,
+  `subtrack.db-wal` **107152 bayt**. Room WAL kipinde çalıştığı için işlenmiş
+  satırlar WAL'de duruyor; yalnızca ana dosya yedeklenseydi geri yükleme
+  neredeyse boş bir veritabanı verecekti.
+- **WorkManager için kural yazılmadı, çünkü gerekmiyor.** Cihazda ölçüldü:
+  `androidx.work.workdb` zaten `/data/data/com.elinacn.subtrack/no_backup/`
+  altında duruyor (WorkManager `getNoBackupFilesDir()` kullanıyor) ve platform
+  o dizini hiç yedeklemiyor. Geri yükleme sonrası `no_backup/` **boş** geldi.
+- `cache/` ve `code_cache/` platformun kendisi tarafından zaten dışarıda.
+  `files/profileInstalled` beyaz liste dışında kaldığı için ayrı bir
+  `<exclude>` istemedi.
+- `data-extraction-rules`'un **iki bölümü de** yazıldı: `<cloud-backup>` ve
+  `<device-transfer>`.
+
+*Görev 3 — cihazda doğrulama (bu fazın asıl sınavı)*
+
+Fikstür iki cihazda da aynı: dört abonelik (TRY/USD/EUR, aylık/yıllık, dört
+kategori), Netflix'e 22 Eyl 2026 ödeme tarihi, ana para birimi USD, USD kuru
+42.85 → 45.50, tema Koyu, bir de anlık görüntü satırı.
+
+Tur: `bmgr backupnow` → `adb uninstall` → `adb install` → `bmgr restore 1`.
+
+**API 34 — geri yükleme sonrası döküm (uygulama açılmadan):**
+
+```
+id | name    | priceInCents | currencyCode | billingPeriod | nextPaymentDate | category      | iconKey | createdAt
+1  | Netflix | 14999        | TRY          | MONTHLY       | 1790035200000   | ENTERTAINMENT | None    | 1789753565028
+2  | Spotify | 599          | USD          | MONTHLY       | None            | ENTERTAINMENT | None    | 1789753598718
+3  | Notion  | 9600         | EUR          | YEARLY        | None            | PRODUCTIVITY  | None    | 1789753634316
+4  | Fitness | 75000        | TRY          | MONTHLY       | None            | HEALTH        | None    | 1789753668650
+
+period | totalInCents | currencyCode | recordedAt
+202609 | 3389         | USD          | 1789753757162
+```
+
+**API 24 — aynı tur, aynı sonuç:**
+
+```
+id | name    | priceInCents | currencyCode | billingPeriod | nextPaymentDate | category      | iconKey | createdAt
+1  | Netflix | 14999        | TRY          | MONTHLY       | 1790035200000   | ENTERTAINMENT | None    | 1789755000150
+2  | Spotify | 599          | USD          | MONTHLY       | None            | ENTERTAINMENT | None    | 1789755034297
+3  | Notion  | 9600         | EUR          | YEARLY        | None            | PRODUCTIVITY  | None    | 1789755068866
+4  | Fitness | 75000        | TRY          | MONTHLY       | None            | HEALTH        | None    | 1789755102620
+
+period | totalInCents | currencyCode | recordedAt
+202609 | 3389         | USD          | 1789755166212
+```
+
+Her iki cihazda da yedek öncesi ve sonrası **bire bir aynı** — tutarlar,
+tarihler, kategoriler, periyotlar, `createdAt` dahil.
+
+Tercihler de bayt bayt aynı geldi. API 34, 166 bayt:
+
+```
+main_currency=USD · reminder_permission_requested=1 · theme_mode=DARK
+rate_USD=455000 · rate_EUR=460000 · rate_GBP=539000 · rates_updated_at=...
+```
+
+API 24'te aynı dosya 129 bayt: `reminder_permission_requested` anahtarı yok,
+çünkü o izin API 33'te geldi. Geri kalan her anahtar aynı.
+
+Geri yüklenen dizin — beyaz listenin kanıtı (iki cihazda da aynı):
+
+```
+databases/       subtrack.db, subtrack.db-shm, subtrack.db-wal
+files/datastore/ settings.preferences_pb
+no_backup/       (boş)
+cache/           (boş)
+```
+
+**Çökme yok:** iki cihazda da geri yükleme sonrası ilk açılışta crash tamponu
+boş. **Bildirim işi yeniden kuruldu:** API 34'te
+`JOB androidx.work.systemjobscheduler:u0a209/0`, API 24'te `JOB #u0a91/0` —
+ikisi de **yeni** uid ve sıfırdan job id, yani yedekten gelmiş bir iş satırı
+değil, uygulamanın kendi kurduğu iş.
+
+Prompt "diagnostics yayını" istedi ama **projede böyle bir yayın yok**; onun
+yerine `dumpsys jobscheduler` ve `no_backup/` dökümü kullanıldı.
+
+UI tarafı da doğrulandı: koyu tema (`#0D1A14` tam değer), ana para birimi USD
+(toplam `$33.89`), kurlar `45.5 / 46.2 / 53.9` ve "Last edited" damgası,
+Netflix "4 days left".
+
+*Regresyon listesi — #1, #11, #12, #20, #22, #106-#117, iki cihazda*
+
+| # | API 34 | API 24 |
+|---|---|---|
+| 1 Açılış, çökme yok | ✅ crash tamponu boş | ✅ crash tamponu boş |
+| 11 159,99 + 59,90 | ✅ `₺219.89` | ✅ `₺219.89` |
+| 12 Kapat-aç, liste duruyor | ✅ | ✅ |
+| 20 Ayarlar iki yoldan dönüş | ✅ yığında **1** ActivityRecord | ✅ yığında **1** ActivityRecord |
+| 22 Kur değişince toplam | ✅ `$33.89` → `$48.31` | ✅ `$33.89` → `$48.31` |
+| 106 Tema diyaloğu | ✅ üç seçenek, satır seçiliyi yazıyor | ✅ aynı |
+| 107 Açık + sistem koyu | ✅ `#D3E2D8` direniyor | — ölçülemez (API 24'te sistem koyu teması yok) |
+| 108 Koyu + sistem açık | ✅ `#0D1A14` direniyor | ✅ `#0D1A14` (sistem tarafı yok) |
+| 109 Sistemi takip et | ✅ `#D3E2D8` ↔ `#0D1A14`, yeniden başlatmadan | — ölçülemez |
+| 110 Tercih kalıcı, yanlış kare yok | ✅ `#FAFAFA` → `#0D1A14`, arada açık tema karesi yok | ✅ aynı |
+| 111 Duvar kâğıdı anahtarı | ✅ kapalı geliyor; açınca `#D3E2D8` → `#FFF8F7` | — (API 31+ maddesi) |
+| 112 Renk ve aydınlık bağımsız | ✅ açık `#FFF8F7`, koyu `#1E100F` | — |
+| 113 Çubuk/iz ayrımı | ✅ `#C00020` / `#DFBFBD` = **3,78:1**; Snackbar "Undo" `#FFB3AF` / `#1E100F` = **10,84:1**; mor piksel yok | — |
+| 114 API<31 satırı devre dışı | — (API 31+ cihaz) | ✅ "Requires Android 12 or newer"; iki kez dokunuldu, tercih dosyası **hiç oluşmadı** |
+| 115 ISO kodu yok | ✅ dashboard / istatistik / kur ekranı temiz | ✅ aynı |
+| 116 Dil değişimi | ✅ `$42.32` ↔ `$42,32` (uygulama dili, `cmd locale`) | ✅ `$48.31` ↔ `$48,31` (**gerçek cihaz dili**, `persist.sys.locale=tr-TR`) |
+| 117 (API 29) ₺ çizimi | — | — (API 29 maddesi) |
+
+`#115`'te düzenleme sheet'indeki TRY/USD/EUR/GBP chip'leri ISO kodu taşıyor,
+ama onlar tutar değil **seçici etiketi**; maddenin kapsamı tutar gösteren
+ekranlar ve hepsi temiz.
+
+*Doğrulama*
+
+- `./gradlew :app:testDebugUnitTest --rerun-tasks` → **330 test, 0 hata**
+  (`UP-TO-DATE` gelmesin diye zorlandı, CLAUDE.md §6)
+- `./gradlew :app:lintDebug` → **0 hata, 22 uyarı**; hepsi önceden vardı
+  (InlinedApi, bağımlılık sürümleri, PluralsCandidate). Yedeklemeyle ilgili tek
+  uyarı yok, yeni uyarı çıkmadı.
+
+**Değişen dosyalar**
+- `app/src/main/res/xml/backup_rules.xml` — şablon yorumları yerine gerçek
+  kurallar (API ≤30 tarafı)
+- `app/src/main/res/xml/data_extraction_rules.xml` — aynısı, artı
+  `<device-transfer>` bölümü (API 31+ tarafı)
+- `docs/ARCHITECTURE.md` — §25 "Android Auto Backup — Neyin Yedeklendiği"
+- `docs/ROADMAP.md` — Faz 16'ya yedekleme maddesi (işaretli), gizlilik
+  politikası maddesine ölçüm notu, sona Faz 17 başlığı
+- `docs/TESTING.md` — "Yedekle — Geri Yükle Turu (Auto Backup)" bölümü
+- `docs/PROGRESS.md` — bu kayıt
+
+**Commit'ler**
+- `f3a6ac2` feat: state the backup contents instead of inheriting the defaults
+- `docs:` belgeler ayrı commit'te
+
+**Karşılaşılan sorunlar**
+
+- **Yerel taşıyıcının adı API'ye göre değişiyor.** API 24'te bileşen
+  `android/com.android.internal.backup.LocalTransport`, API 31+'ta
+  `com.android.localtransport/.LocalTransport`. Daha kötüsü: yanlış adı verince
+  `bmgr transport` hata vermiyor, "Selected transport ..." deyip geçiyor.
+  Seçimin tuttuğu `bmgr list transports` çıktısındaki `*` ile doğrulanmalı.
+  TESTING.md'ye yazıldı.
+- **`restoreFinished: 0` başarı demek**, hata değil (transport OK). API 24 bu
+  satırı hiç yazmıyor, yalnızca `done` diyor — orada doğrulama dökümle yapılır.
+- Emülatörlerde `sqlite3` **yok**; veritabanı üç dosya birlikte host'a çekilip
+  orada açılmalı. WAL'siz çekilen döküm eksik çıkar.
+- API 24'te ekleme formu 360dp'de kaydırma istiyor (TESTING.md'de zaten yazılı)
+  ve kategori chip'leri ilk açılışta ekranın altında kalıyor. İlk turda bu
+  "chip'ler kırık" sanıldı; kaydırınca hepsi yerinde çıktı — **hata değil.**
+- Bottom sheet'te `keyevent 111` (ESC) klavyeyi değil **sheet'i** kapatıyor;
+  klavyeyi kapatmak için `keyevent 4` kullanılmalı.
+
+**Gizlilik politikası için not (Görev 4)**
+
+`docs/privacy/index.html` bu promptta **oluşturulmadı ve dokunulmadı.**
+Ölçümün politikaya etkisi şu:
+
+> Auto Backup **açık**. Bu yüzden politikada "veriler cihazdan çıkmıyor" ya da
+> "veriler yalnızca cihazınızda saklanır" cümlesi **olduğu gibi
+> kullanılamaz.** Doğru cümle: *"Abonelik verileriniz ve uygulama
+> tercihleriniz, Android'in kendi yedekleme özelliği aracılığıyla **sizin kendi
+> Google Drive hesabınıza** kopyalanır. Bu yedeğe yalnızca siz
+> erişebilirsiniz; geliştiricinin bu yedeğe erişimi yoktur ve verileriniz
+> geliştiriciye ya da üçüncü bir tarafa gönderilmez. Yedeklemeyi Android
+> ayarlarından kapatabilirsiniz."*
+
+Data Safety formundaki "veri aktarılıyor mu" sorusu da bu ölçüme göre
+yanıtlanmalı: veri Google'ın yedekleme altyapısına gidiyor, ama uygulamanın
+kendi sunucusu yok.
+
+**Sonraki faz için not**
+- Faz 17 (dışa/içe aktarma) Auto Backup'ın **yerine** değil, yanına geliyor:
+  Auto Backup kullanıcının yedeğe elle dokunmasına izin vermiyor, dosyaya
+  aktarma o boşluğu dolduracak.
+- Şema sürümlemesi kuralı hâlâ açık ve yedekleme onu **büyütüyor**: yayından
+  sonra `subtrack.db` yedekten **eski sürümüyle** geri gelebileceği için
+  migration zorunlu. Faz 17'den önce okunmalı.
+- #113'ün trend sütunu ölçülemedi: trend grafiği en az iki aylık geçmiş
+  istiyor, fikstürde tek ay var (uygulama da "A trend needs at least two
+  months" diyor). Çubuk/iz ve Snackbar tarafı ölçüldü.
+
+---
+
 ## [Faz 16c] R8, İmzalama Yapılandırması ve İkon Ölçümü — 2026-09-17
 
 **Durum:** Tamamlandı. Release derlemesi artık daraltılıyor ve imzalama
