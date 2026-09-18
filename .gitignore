@@ -2,18 +2,21 @@
 .gradle
 .kotlin
 local.properties
-/.idea/caches
-/.idea/libraries
-/.idea/modules.xml
-/.idea/workspace.xml
-/.idea/navEditor.xml
-/.idea/assetWizardSettings.xml
-# Machine-specific IDE state: devices, emulators and last deploy target
-/.idea/deploymentTargetSelector.xml
-/.idea/deviceManager.xml
-/.idea/emulatorDisplays.xml
-/.idea/appInsightsSettings.xml
-/.idea/markdown.xml
+# Everything under .idea/ is ignored and the shared project files are listed back in
+# one by one. The old per-file list only named the machine-specific files known at the
+# time, so any new IDE file - a device list, a deploy target, a local path - landed in
+# the repo by default. This way the default is "out" and adding a file is deliberate.
+# `/.idea/*` rather than `/.idea/`, because git cannot re-include a file whose parent
+# directory is excluded.
+/.idea/*
+!/.idea/.gitignore
+!/.idea/AndroidProjectSystem.xml
+!/.idea/compiler.xml
+!/.idea/gradle.xml
+!/.idea/inspectionProfiles/
+!/.idea/misc.xml
+!/.idea/runConfigurations.xml
+!/.idea/vcs.xml
 .DS_Store
 /build
 /captures
@@ -24,3 +27,7 @@ local.properties
 *.aab
 *.jks
 *.keystore
+*.p12
+*.pfx
+# Firebase/Google service configuration carries project ids and client keys
+google-services.json

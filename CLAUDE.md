@@ -83,6 +83,12 @@ döneceğini söyler — böylece veritabanı yazarken arayüz donmaz."
 - ✅ ViewModel dışarıya `StateFlow` verir, `MutableStateFlow` sızdırmaz
 - ✅ Yeni public sınıf/fonksiyon → tek satırlık KDoc
 
+### Gizli bilgi
+
+**Gizli bilgi repoya girmez.** Şifre, anahtar, token ve API anahtarı
+`local.properties`'ten veya ortam değişkeninden okunur; koda yazılmaz ve
+commit edilmez. Bu kural v1.1'de döviz kuru servisi eklenirken de geçerlidir.
+
 ---
 
 ## 5. Git Kuralları
