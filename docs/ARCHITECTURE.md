@@ -894,6 +894,31 @@ Geri kalan karar ekran başına verildi:
   `imePadding()` alır. `consumeWindowInsets` olmadan `imePadding` klavyeyi
   pencere kenarından ölçer ve zaten uygulanmış alt payı ikinci kez ekler.
 
+### `ListBottomSpacing` neyi garanti eder, neyi etmez
+
+`Dimens.ListBottomSpacing` (80dp) ana ekranın `contentPadding`'ine
+`Scaffold`'un alt payının **üstüne** eklenir. Garantisi tek ve dar:
+**liste sonuna kadar kaydırıldığında son satır FAB'ın altında kalmaz.**
+FAB'ın istediği pay 16dp (`FabSpacing`) + 56dp (kap) = 72dp; 80dp onu 8dp ile
+geçer. Faz 16e'de üç cihazda ve iki yazı boyutunda ölçüldü, altısında da aynı:
+son satırın alt kenarı ile FAB'ın üst kenarı arasında **8dp** var (API 29'da
+16 px, API 34 ve 36'da 21 px).
+
+**Kaydırmanın ortasında bir satırın örtülmesi bu garantinin dışındadır ve
+kabul edilmiştir.** FAB sabit durur, liste akar; her satır zorunlu olarak
+FAB'ın bandından geçer. `contentPadding` yalnızca içeriğin **uçlarda** nerede
+durduğunu belirler, bu yüzden alt boşluğu büyütmek ortadaki örtüşmeyi
+değiştirmez — yalnızca listenin sonuna ölü alan ekler. 16e'de ölçülen:
+API 36'da 7 abonelikle kaydırma yolunun yaklaşık yarısında bir satırın tutarı
+FAB'ın arkasında kalıyor, en kötü konumda tutarın **%28'i** çiziliyor.
+
+Kabul edilmesinin gerekçesi: liste sonu zaten temiz, satır TalkBack'e tek
+parça olarak tutarıyla birlikte okunuyor (`SwipeToDeleteRow`'un
+`clearAndSetSemantics`'i), ve tutarı görmek için bir parmak ucu kaydırma
+yetiyor. Bunu tümden kaldırmanın yolu FAB'ı kaydırırken gizlemekten geçer;
+o karar alınmadı, çünkü giriş noktasının kaydırma sırasında yok olması
+örtülen bir satırdan daha pahalı görüldü.
+
 ### Klavye: iki mekanizma, hiç çakışmadan
 
 `AndroidManifest.xml`'deki `windowSoftInputMode="adjustResize"` **duruyor**, ama

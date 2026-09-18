@@ -27,6 +27,112 @@ Her faz sonunda **en üste** yeni kayıt eklenir. Eski kayıtlar silinmez.
 
 ---
 
+## [Faz 16e] FAB'ın Liste Satırını Örtmesi — Ölçüm ve Karar — 2026-09-19
+
+**Durum:** Tamamlandı — **kod değişmedi**, ölçüm ve karar kayda geçti.
+
+**Yapılanlar**
+
+*Görev 1 — önce ölç*
+
+Sabit fikstür: 7 abonelik, `run-as` ile veritabanına yazıldı (§"86-95 için veri
+nasıl kurulur" ile aynı yol). Üç cihaz (API 29, 34, 36) × iki yazı boyutu
+(fs 1.0, fs 2.0). Her cihazda üç konum ölçüldü — açılış, liste sonu, ve liste
+sonundan yukarı doğru sekiz duraklık tarama — çünkü tek bir konum sorunun
+hangi kaydırma konumlarında çıktığını söylemiyor.
+
+Her durakta **iki bağımsız okuma** alındı:
+
+- **Koordinat:** `uiautomator dump`'tan FAB ile satırların kutuları.
+- **Piksel:** ekran görüntüsünde tutarın `colorScheme.primary` renkli
+  piksellerinin sayısı. Tutar, kartta bu renkteki **tek** metindir, yani
+  sayının düşmesi tutarın bir kısmının ekrana ulaşmadığı demektir.
+
+**Dump FAB'ın kabını vermiyor, 24dp'lik ikonunu veriyor.** Kap her kenardan
+16dp büyütülerek türetildi; sonuç §16'da kayıtlı `[891,2148][1038,2295]` ile
+**birebir** tuttu, yani türetme doğrulandı.
+
+*Bulgu 1 — örtüşme gerçek, altı ölçümün altısında da var*
+
+| Cihaz | fs | Örtülen satır | Satırın kutusu | Tutarın çizilen kısmı |
+|---|---|---|---|---|
+| API 29 | 1.0 | Netflix | `[0,1033][720,1263]` | 273 / 961 px = **%28,4** |
+| API 29 | 2.0 | Netflix | `[0,969][720,1280]` | 2155 / 3331 px = **%64,7** |
+| API 34 | 1.0 | Netflix | `[0,2094][1080,2395]` | 473 / 1661 px = **%28,5** |
+| API 34 | 2.0 | Netflix | `[0,1928][1080,2392]` | 4195 / 5604 px = **%74,9** |
+| API 36 | 1.0 | Netflix | `[0,2095][1080,2396]` | 473 / 1660 px = **%28,5** |
+| API 36 | 2.0 | Netflix | `[0,1925][1080,2389]` | 4301 / 5601 px = **%76,8** |
+
+fs 1.0'da tutarın dörtte üçü kayboluyor; fs 2.0'da tutar daha geniş olduğu
+için FAB'ın örtemediği kısım büyük kalıyor, ama yine kesiliyor.
+
+*Bulgu 2 — liste **sonu** zaten temiz, yani istenen düzeltme zaten kodda*
+
+| Cihaz | fs 1.0 | fs 2.0 |
+|---|---|---|
+| API 29 | son satırın altı → FAB'ın üstü **+16 px = 8dp** | **+16 px = 8dp** |
+| API 34 | **+21 px = 8dp** | **+21 px = 8dp** |
+| API 36 | **+21 px = 8dp** | **+21 px = 8dp** |
+
+`Dimens.ListBottomSpacing` = 80dp, 16a'dan beri `contentPadding`'in alt payına
+ekleniyor. FAB'ın istediği 16dp + 56dp = 72dp; 80dp onu 8dp ile geçiyor.
+Kartın kendi 8dp alt kenar boşluğuyla birlikte görünen boşluk 16dp.
+
+*Bulgu 3 — hangi koşulda (API 36, fs 1.0)*
+
+- **4 abonelik:** liste yalnızca 129 px kayıyor; son satırın tutarı her
+  konumda tam çiziliyor (1662 px). Örtüşme **yok**.
+- **5 abonelik:** örtüşme **var** — 473 px, %28.
+- **7 abonelik:** kaydırma yolunun kabaca yarısında bir satırın tutarı
+  FAB'ın arkasında.
+
+*Görev 2 — yapılmadı, gerekçesiyle*
+
+İstenen düzeltme "`contentPadding`'e FAB'ı geçecek kadar alt boşluk ekle"ydi.
+Ölçüm iki şeyi gösterdi: (a) o boşluk zaten var ve zaten yetiyor, (b) örtüşme
+liste sonunda değil, **ortasında** oluyor. `contentPadding` yalnızca içeriğin
+uçlarda nerede durduğunu belirler; kaydırma sırasında her satır FAB'ın
+bandından geçer. Yani boşluğu büyütmek örtüşmeyi değiştirmez, listenin altına
+ölü alan ekler.
+
+**Karar: değişiklik yapılmadı, madde kapatıldı.** Kayan FAB'ın içeriği geçici
+olarak örtmesi Android'de olağan; liste sonu garantisi duruyor, satır
+TalkBack'e tutarıyla birlikte tek parça okunuyor, ve tutarı görmek için bir
+parmak ucu kaydırma yetiyor. Bunu tümden kaldırmanın yolu FAB'ı kaydırırken
+gizlemek; giriş noktasının kaydırma sırasında yok olması örtülen bir satırdan
+pahalı görüldüğü için o yola gidilmedi.
+
+**Değişen dosyalar**
+- `docs/ARCHITECTURE.md` §16 — `ListBottomSpacing`'in neyi garanti ettiği,
+  neyi etmediği yazıldı; ortadaki örtüşmenin kabul edildiği ve gerekçesi
+- `docs/PROGRESS.md` — bu kayıt
+- `docs/screenshots/phase-16e/` — 9 görüntü (üç cihaz × iki yazı boyutu
+  örtüşme, iki cihaz liste sonu, bir de 4 abonelikli örtüşmesiz hâl)
+
+**Karşılaşılan sorunlar**
+- **Üç emülatör aynı anda "Process system isn't responding" getirdi.** Ölçüm
+  sırayla, tek emülatörle yapıldı. API 36 açılışında bir kez daha çıktı;
+  sistem oturana kadar beklenip tur yeniden koşuldu.
+- **İlk turun kaydırmaları boşa gitti:** betik sabit süre bekliyordu, uygulama
+  o sürede açılmamıştı ve fiskeler başka bir pencereye düştü. Betik artık
+  listenin kendisini bekliyor.
+- **`input swipe` mesafesinin tamamı kaydırmaya dönmüyor** — dokunma eşiği
+  (~8dp) düşüyor, 60 px'lik fiske ~39 px kaydırıyor. Tarama adımları buna
+  göre seçildi.
+- **Piksel sayacı başta FAB'ın kendi "+" ikonunu da sayıyordu** (ikon
+  `onPrimaryContainer`, tutar `primary`, ikisi aynı yeşil aile). Sayım FAB
+  kutusunun dışıyla sınırlandırıldı.
+
+**Sonraki faz için not**
+- Ölçüm betikleri geçici dizinde kaldı, repoya girmedi. Aynı ölçüm gerekirse
+  yol şu: fikstürü `run-as` ile kur, `uiautomator dump` + `screencap` al,
+  FAB ikonunu 16dp büyüterek kabı bul, tutarı `primary` piksel sayısıyla ölç.
+- Fikstür kurarken uygulamanın veritabanını **açmış** olması gerekiyor; taze
+  kurulumda `databases/` dizini uygulama bir kez açılana kadar yok ve ana
+  `.db` dosyası WAL katlanana dek "file is not a database" der.
+
+---
+
 ## [Faz 16f] Android Auto Backup — Durum Tespiti ve Yapılandırma — 2026-09-18
 
 **Durum:** Tamamlandı
