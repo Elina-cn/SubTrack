@@ -1,13 +1,20 @@
-<?xml version="1.0" encoding="utf-8"?><!--
-   Sample backup rules file; uncomment and customize as necessary.
-   See https://developer.android.com/guide/topics/data/autobackup
-   for details.
-   Note: This file is ignored for devices older than API 31
-   See https://developer.android.com/about/versions/12/backup-restore
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Backup rules for API 30 and below, read through android:fullBackupContent. API 31 and above
+    ignore this file and read data_extraction_rules.xml instead; both are required because minSdk
+    is 24. See ARCHITECTURE section 17.
+
+    Listing any <include> turns the rules into an allow-list: anything not named here stays out of
+    the backup, so a file added later is excluded until someone decides otherwise.
 -->
 <full-backup-content>
-    <!--
-   <include domain="sharedpref" path="."/>
-   <exclude domain="sharedpref" path="device.xml"/>
--->
+
+    <!-- The whole database domain, not just subtrack.db. Room runs in WAL mode, so committed rows
+         can still be sitting in subtrack.db-wal when the backup is taken; carrying the main file
+         alone would silently drop them. -->
+    <include domain="database" path="." />
+
+    <!-- DataStore preferences: main currency, exchange rates and the theme choice. -->
+    <include domain="file" path="datastore" />
+
 </full-backup-content>
