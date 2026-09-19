@@ -27,6 +27,185 @@ Her faz sonunda **en üste** yeni kayıt eklenir. Eski kayıtlar silinmez.
 
 ---
 
+## [Faz 16e-2] Mağaza Ekran Görüntüleri — 2026-09-19
+
+**Durum:** Tamamlandı — **üretim kodu değişmedi**, yalnızca çekim ve belge.
+
+**Yapılanlar**
+
+*Görev 1 — mağaza AVD'si*
+
+`subtrack_store_api34` kuruldu: **1080x1920, 420 dpi, API 34, gestural**.
+Mevcut geniş AVD'ler kullanılamıyordu — Play en fazla 2:1 kabul ediyor,
+1080x2400 = 2,22:1 reddedilir. Cihazda doğrulandı, varsayılmadı:
+
+| Ne | Komut | Çıktı |
+|---|---|---|
+| Çözünürlük | `wm size` | `Physical size: 1080x1920` |
+| Yoğunluk | `wm density` | `Physical density: 420` |
+| Efektif genişlik | 1080 / (420/160) | **411dp** — `subtrack_wide_api34` ile aynı |
+| Gezinme | `cmd overlay list android` | `[x] ...navbar.gestural` |
+| API | `getprop ro.build.version.sdk` | `34` |
+| Saat dilimi | `getprop persist.sys.timezone` | `GMT` |
+
+411dp kasıtlı: layout, ölçüm turlarında test edilmiş dp genişliğinde kalıyor,
+yani mağaza için yeni bir genişlik sınıfı açılmıyor. `pixel_6` profili 1080x2400
+ile geldiği için `config.ini` elle düzeltildi; kurulum komutu TESTING.md'de.
+
+*Görev 2 — fikstür*
+
+6 abonelik, dört kategori, `run-as` ile veritabanına yazıldı (16e'deki yol).
+Ana para birimi TRY (varsayılan, DataStore'a yazmak gerekmedi).
+
+| Ad | Tutar | Periyot | Kategori | Sonraki ödeme | Kartta |
+|---|---|---|---|---|---|
+| Netflix | ₺229,99 | aylık | Eğlence | bugün | "Bugün ödenecek" |
+| Spotify | ₺87,99 | aylık | Eğlence | +1 gün | "1 gün kaldı" |
+| Gym | ₺1.450,00 | aylık | Sağlık | +5 gün | "5 gün kaldı" |
+| Dropbox | ₺39,90 | **haftalık** | Diğer | +3 gün | "3 gün kaldı" |
+| iCloud | **$2,99** | aylık | Üretkenlik | +12 gün | "12 gün kaldı" |
+| Notion | **€96,00** | **yıllık** | Üretkenlik | +23 gün | "23 gün kaldı" |
+
+Dört TRY, bir USD, bir EUR; dört aylık, bir yıllık, bir haftalık. Çoklu para
+birimi görünüyor ama okuyanı yormuyor.
+
+`monthly_snapshots`'a geçmiş beş ay (202604-202608) yazıldı; 202609'u kaydedici
+uygulama açılır açılmaz kendisi yazdı. `MonthlyTrend.MAX_MONTHS` = 6 olduğu için
+pencere tam doldu ve grafik altı sütunla çıktı.
+
+Veritabanı dökümü — fikstür kurulduktan **sonra**, cihazdan geri okundu:
+
+```
+(202604, 198750, 'TRY', 1777334400000)
+(202605, 205430, 'TRY', 1779926400000)
+(202606, 199880, 'TRY', 1782604800000)
+(202607, 222615, 'TRY', 1785196800000)
+(202608, 231540, 'TRY', 1787875200000)
+(202609, 243860, 'TRY', 1789776135582)   <- uygulamanın kendi yazdığı satır
+```
+
+**Toplam ₺2.438,60** — yuvarlak değil, gerçekçi. Bu sayı elle hesaplanmadı,
+uygulamadan okundu: kur dönüşümünün son kuruşu `CurrencyConverter`'ın kendi
+yuvarlamasına bağlı ve elle yapılan hesap bir kuruş şaşıyordu. Ekranda ne
+yazıyorsa kayda o geçti.
+
+202609 - 202608 = **+₺123,20**, yani "geçen aya göre" satırı da çıkıyor.
+
+*Görev 3 — durum çubuğu*
+
+SystemUI demo modu bu imajda **çalışıyor**. Saat 09:41, pil %100, wifi ve
+sinyal tam dolu, bildirim ikonu yok.
+
+**İlk deneme yarım kaldı:** wifi simgesi "internet yok" ünlemiyle (`!`) ve
+sinyal çubuğu yarım çizildi. Sebep eksik `-e fully true`; eklendikten sonra
+ikisi de tam doldu. Komutların tamamı TESTING.md'de.
+
+Tur bitince demo modundan çıkıldı ve `sysui_demo_allowed` 0'a alındı.
+
+*Görev 4 — FAB örtüşmesi*
+
+**Liste kaydırılmadı — gerek kalmadı.** Uygulamanın açıldığı konumda FAB zaten
+Spotify ile iCloud kartlarının arasındaki boşluğa denk geliyor. Bu konum
+seçildi çünkü hem temiz hem de kullanıcının gerçekten gördüğü ilk kare.
+
+Ölçüm 16e'nin iki okumasıyla, üç ana ekran çekiminin **üçünde de**:
+
+| Okuma | Değer |
+|---|---|
+| FAB ikonu (dump) | `[933,1710][996,1773]` — 63x63 px = 24dp |
+| FAB kabı (ikon + her kenardan 16dp = 42 px) | `[891,1668][1038,1815]` — 147x147 px = **56dp** |
+| FAB kabının içindeki `primary` piksel | **0** (açık temada `#0B5C3F`, koyuda `#D4AF37`) |
+| FAB kutusuna değen tutar öbeği | **0** |
+
+Boşluklar, en yakın iki tutara:
+
+| Çekim | Üstteki tutar (Spotify) | FAB'a uzaklık | Alttaki tutar (iCloud) | FAB'a uzaklık |
+|---|---|---|---|---|
+| `store-01-home-tr` | `[867,1593][993,1629]` | **39 px = 15dp** | `[892,1890][993,1920]` | **75 px = 29dp** |
+| `store-01-home-en` | `[864,1593][993,1622]` | **46 px = 18dp** | `[891,1890][993,1920]` | **75 px = 29dp** |
+| `store-06-home-dark-en` | `[864,1593][993,1622]` | **46 px = 18dp** | `[891,1890][993,1920]` | **75 px = 29dp** |
+
+Kart kutusu olarak bakıldığında FAB iki kartın sınırını kesiyor (FAB 56dp,
+kartlar arası boşluk 16dp — kesmemesi zaten mümkün değil). Örtüşmenin ölçüsü
+kart kutusu değil **tutarın kendisi**, ve ona değmiyor.
+
+*Görev 5-6 — çekimler*
+
+12 görüntü: beş ekran × iki dil, artı iki koyu tema. Açık tema, ham uygulama
+ekranı — çerçeve, metin, logo eklenmedi.
+
+**Ekleme sheet'i iki dilde farklı çerçevelendi, sebebiyle:** Türkçe'de kategori
+chip'lerinin dördü tek satıra sığıyor (İngilizce'de "Other" alt satıra kayıyor),
+yani Türkçe içerik 147 px daha kısa ve "Sonraki Ödeme" alanı kaydırma
+penceresinin kenarına denk geliyor — ilk çekimde alanın yazısı **harflerin
+ortasından kesildi**. Türkçe sheet 71 px kaydırıldı; alan tamamen görünüyor,
+karşılığında başlık kareden çıkıyor. İngilizce'de kaydırma aynı sorunu bu kez
+"Subscription Name" alanının üstünde çıkardığı için o çekim kaydırılmadan
+bırakıldı. İkisi de temiz; ikisi de "alanlar boş, chip'ler görünür" şartını
+karşılıyor.
+
+*Görev 7 — dosyalar ve doğrulama*
+
+`docs/screenshots/store/` — 12 dosya. **Her biri tek tek doğrulandı**, hepsi
+geçti:
+
+| Dosya | Boyut | Format | Alfa | Bayt |
+|---|---|---|---|---|
+| `store-01-home-tr.png` | 1080x1920 | 24-bit PNG | yok | 142.250 |
+| `store-02-stats-tr.png` | 1080x1920 | 24-bit PNG | yok | 116.708 |
+| `store-03-trend-tr.png` | 1080x1920 | 24-bit PNG | yok | 99.833 |
+| `store-04-add-tr.png` | 1080x1920 | 24-bit PNG | yok | 98.794 |
+| `store-05-settings-tr.png` | 1080x1920 | 24-bit PNG | yok | 81.213 |
+| `store-01-home-en.png` | 1080x1920 | 24-bit PNG | yok | 149.344 |
+| `store-02-stats-en.png` | 1080x1920 | 24-bit PNG | yok | 128.280 |
+| `store-03-trend-en.png` | 1080x1920 | 24-bit PNG | yok | 106.178 |
+| `store-04-add-en.png` | 1080x1920 | 24-bit PNG | yok | 83.419 |
+| `store-05-settings-en.png` | 1080x1920 | 24-bit PNG | yok | 81.653 |
+| `store-06-home-dark-en.png` | 1080x1920 | 24-bit PNG | yok | 135.969 |
+| `store-07-stats-dark-en.png` | 1080x1920 | 24-bit PNG | yok | 128.340 |
+
+En büyük dosya 149 KB — 8 MB sınırının çok altında. PNG başlığından okunan
+değer 8 bit/kanal truecolour, yani tam olarak 24-bit.
+
+**Alfa kanalı vardı ve kaldırıldı.** `adb exec-out screencap -p` RGBA yazıyor;
+12 dosyanın 12'si de alfa kanalıyla geldi. Kanal her dosyada tamamen opak
+(255) olduğu **önce kanıtlandı**, sonra RGBA→RGB çevrildi — yani hiçbir piksel
+değişmedi, yalnızca kanal düştü. Dönüşümden sonra her dosya yeniden doğrulandı.
+
+**Değişen dosyalar**
+- `docs/screenshots/store/` — 12 yeni görüntü
+- `docs/TESTING.md` — `subtrack_store_api34` AVD tablosuna eklendi; yeni
+  "Mağaza Ekran Görüntüleri (Play Console)" bölümü: AVD kurulumu, demo modu
+  komutları, fikstür kurma yöntemi, dil ve tema değiştirme, FAB ölçümü,
+  alfa kanalı kaldırma
+- `docs/PROGRESS.md` — bu kayıt
+
+**Karşılaşılan sorunlar**
+- **Git Bash'te ters bölü kaçışı yönlendirmeyi yedi.** Yardımcı betikteki
+  yönlendirme hedefi çift tırnak içinde kaçışlı dolar işaretine dönüşüp
+  dosyayı üst dizine sabit bir adla yazdı; ekran görüntüsü alınmış gibi
+  görünüp hiçbir şey kaydedilmedi. Yönlendirme hedefleri POSIX yoluna
+  çevrildi; Windows yolu yalnızca `adb push` argümanında kaldı.
+- **`adb push` kaynak yolu Windows biçiminde olmalı.** MSYS, POSIX yolunu
+  çevirip `remote secure_mkdirs failed` aldı; `MSYS_NO_PATHCONV=1` + Windows
+  yolu ile geçti.
+- **Elle yapılan toplam hesabı bir kuruş şaştı** (₺2.438,61 dedi, uygulama
+  ₺2.438,60 yazdı). Kayda uygulamanın okunan değeri geçti.
+- **İlk demo modu turunda wifi ünlemli çıktı** — `-e fully true` eksikti.
+- **Türkçe ekleme sheet'inde tarih alanının yazısı kesildi** (yukarıda).
+
+**Sonraki faz için not**
+- Fikstür temizlendi (`pm clear`), demo modu kapatıldı, `cmd uimode night no`,
+  uygulama dili boşaltıldı, emülatör kapatıldı.
+- `subtrack_store_api34` **yalnızca mağaza çekimi içindir.** 1080x1920 gerçek
+  bir telefon oranı değil; ölçüm turları eski dört AVD'de kalmalı.
+- Ölçüm ve çekim betikleri geçici dizinde kaldı, repoya girmedi. Aynı seti
+  yeniden çekmek gerekirse yol TESTING.md'de tam olarak yazılı.
+- Play listeleme metni, özellik grafiği (1024x500) ve uygulama simgesi
+  (512x512) **hâlâ eksik** — bu tur yalnızca telefon ekran görüntüleriydi.
+
+---
+
 ## [Faz 16e] FAB'ın Liste Satırını Örtmesi — Ölçüm ve Karar — 2026-09-19
 
 **Durum:** Tamamlandı — **kod değişmedi**, ölçüm ve karar kayda geçti.

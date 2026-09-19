@@ -329,6 +329,7 @@ yapılır.
 | `subtrack_narrow_api29` | 720x1280 | 320 dpi | **360dp** | 29 | Dar ekran, sığma/sarma testleri. Test cihazıyla aynı Android sürümü. |
 | `subtrack_wide_api34` | 1080x2400 | 420 dpi | 411dp | 34 | Güncel Android davranışları, koyu tema, dynamic color |
 | `subtrack_edge_api36` | 1080x2400 | 420 dpi | 411dp | 36 | **Zorunlu edge-to-edge.** targetSdk 36 + Android 16; gezinme modu GESTURAL (Faz 16-0) |
+| `subtrack_store_api34` | 1080x**1920** | 420 dpi | 411dp | 34 | **Yalnızca mağaza çekimi** (Faz 16e-2). Play en fazla 2:1 kabul ediyor; 1080x2400 = 2,22:1 reddedilir. Ölçüm turlarında kullanılmaz |
 
 360dp keyfi değil: Compose bileşenlerinin sığıp sığmadığı bu eşiğe göre
 hesaplanıyor, ve yaygın bütçe telefonlarının genişliği bu. Fiziksel cihaz
@@ -1022,6 +1023,188 @@ adb shell am start -W -n com.elinacn.subtrack/.MainActivity
 
 Beş tekrarın medyanı alınır. Debug build ölçümüdür, release değil —
 karşılaştırma yalnızca kendi içinde anlamlıdır.
+
+---
+
+## Mağaza Ekran Görüntüleri (Play Console)
+
+Faz 16e-2'de kuruldu. `docs/screenshots/` altındaki diğer klasörler ham ölçüm
+çıktısıdır; **mağaza seti ayrı bir AVD'de, sabit bir fikstürle** çekilir ve
+`docs/screenshots/store/` altında durur.
+
+### Neden ayrı bir AVD gerekiyor
+
+Play telefon görüntülerinde **en fazla 2:1** en-boy oranı kabul ediyor.
+Mevcut geniş AVD'ler 1080x2400 = **2,22:1** veriyor, yani yüklenmeden reddedilir.
+Önerilen boyut 1080x1920 (9:16). Kenar başına 320-3840 px, JPEG veya **24-bit
+PNG**, **alfa kanalı yok**, dosya başına en fazla 8 MB.
+
+Yoğunluk 420 dpi seçiliyor çünkü 1080 / (420/160) = **411dp** — `subtrack_wide_api34`
+ile birebir aynı dp genişliği. Yani layout, ölçüm turlarında test edilmiş
+davranışını gösteriyor; mağaza için yeni bir genişlik sınıfı açılmıyor.
+
+### Kurulum
+
+```bash
+avdmanager create avd -n subtrack_store_api34 -k "system-images;android-34;google_apis_playstore;x86_64" -d pixel_6 --abi x86_64
+```
+
+`pixel_6` profili 1080x2400 ile geliyor; sonra
+`~/.android/avd/subtrack_store_api34.avd/config.ini` içinde şunlar değiştirilir:
+
+```ini
+hw.lcd.width=1080
+hw.lcd.height=1920
+hw.lcd.density=420
+hw.keyboard=yes
+showDeviceFrame=no
+```
+
+Başlatma ve doğrulama — **çözünürlük tutmuyorsa çekim yapılmaz**:
+
+```bash
+emulator -avd subtrack_store_api34 -no-snapshot-save -no-boot-anim -gpu swiftshader_indirect
+
+adb shell wm size                            # Physical size: 1080x1920
+adb shell wm density                         # Physical density: 420
+adb shell cmd overlay list android | grep navbar   # [x] ...navbar.gestural
+```
+
+Gezinme modu imajda zaten gestural geliyor, değiştirmek gerekmedi. Saat dilimi
+GMT — `subtrack_wide_api34` ile aynı, yani tarih fikstürü aynı çıpayla kurulur.
+
+### Durum çubuğunu temizleme — SystemUI demo modu
+
+Play durum çubuğunun düzenli olmasını istiyor. Demo modu bu imajda **çalışıyor**:
+
+```bash
+adb shell settings put global sysui_demo_allowed 1
+adb shell am broadcast -a com.android.systemui.demo -e command enter
+adb shell am broadcast -a com.android.systemui.demo -e command clock -e hhmm 0941
+adb shell am broadcast -a com.android.systemui.demo -e command battery -e level 100 -e plugged false
+adb shell am broadcast -a com.android.systemui.demo -e command network -e wifi show -e level 4 -e fully true
+adb shell am broadcast -a com.android.systemui.demo -e command network -e mobile show -e datatype none -e level 4 -e fully true
+adb shell am broadcast -a com.android.systemui.demo -e command notifications -e visible false
+```
+
+**`-e fully true` şart.** O olmadan wifi simgesi "internet yok" ünlemiyle
+(`!`) çiziliyor ve sinyal çubuğu yarım kalıyor — ilk turda tam olarak bu oldu.
+
+Bitince demo modundan çıkılır; unutulursa sonraki her ölçüm sahte bir durum
+çubuğuyla yapılır:
+
+```bash
+adb shell am broadcast -a com.android.systemui.demo -e command exit
+adb shell settings put global sysui_demo_allowed 0
+```
+
+**Uygulama her yeniden başladığında demo komutları tekrar gönderilir** —
+`am force-stop` + `am start` turu SystemUI'yi sıfırlamıyor ama ekran görüntüsü
+alınmadan önce komutların gitmiş olduğundan emin olmak gerekiyor.
+
+### Fikstür
+
+16e'deki yolun aynısı (§"86-95 için veri nasıl kurulur"): uygulama durdurulur,
+veritabanı `run-as` ile host'a alınır, host'ta `sqlite3` ile yazılır, geri
+konur. Cihazda `sqlite3` yok. Fikstür **veritabanına** yazılır; üretim kodunda
+buna açılmış bir kanca yoktur.
+
+```bash
+adb shell am force-stop com.elinacn.subtrack
+adb exec-out run-as com.elinacn.subtrack cat databases/subtrack.db > subtrack.db
+# host'ta: subscriptions ve monthly_snapshots yazılır
+adb push subtrack.db /data/local/tmp/fixture.db
+adb shell "cat /data/local/tmp/fixture.db | run-as com.elinacn.subtrack sh -c 'cat > databases/subtrack.db'"
+adb shell "run-as com.elinacn.subtrack sh -c 'rm -f databases/subtrack.db-wal databases/subtrack.db-shm'"
+```
+
+**Veritabanı ancak uygulama bir kez açıldıktan sonra var.** Taze kurulumda
+`databases/` dizini yok; önce uygulama açılır, sonra fikstür kurulur. WAL
+dosyası da çekilir — host'taki `sqlite3` açılışta onu katlar, yoksa ana dosya
+"file is not a database" der.
+
+Mağaza setinin fikstürü — tek set, bütün ekranlarda aynı:
+
+| Ad | Tutar | Periyot | Kategori | Sonraki ödeme |
+|---|---|---|---|---|
+| Netflix | ₺229,99 | aylık | Eğlence | bugün |
+| Spotify | ₺87,99 | aylık | Eğlence | +1 gün |
+| Gym | ₺1.450,00 | aylık | Sağlık | +5 gün |
+| Dropbox | ₺39,90 | **haftalık** | Diğer | +3 gün |
+| iCloud | **$2,99** | aylık | Üretkenlik | +12 gün |
+| Notion | **€96,00** | **yıllık** | Üretkenlik | +23 gün |
+
+Ana para birimi TRY (varsayılan, DataStore'a yazmak gerekmiyor). Kurlar
+`ExchangeRateTable.Default` — USD 42,8500, EUR 46,2000.
+
+`monthly_snapshots`'a **geçmiş beş ay** yazılır (202604-202608); içinde
+bulunulan ayı kaydedici uygulama açılır açılmaz kendisi yazıyor (§19), ve
+`MonthlyTrend.MAX_MONTHS` = 6 olduğu için pencere böyle dolar:
+
+| period | totalInCents |
+|---|---|
+| 202604 | 198750 |
+| 202605 | 205430 |
+| 202606 | 199880 |
+| 202607 | 222615 |
+| 202608 | 231540 |
+| 202609 | *243860 — uygulama yazar* |
+
+Hepsi `TRY`; başka para birimindeki bir satır grafikten düşer ve ekranda
+"şu kadar ay başka para biriminde" notu çıkar.
+
+### Dil
+
+`cmd locale` ile uygulama dili (API 33+):
+
+```bash
+adb shell cmd locale set-app-locales com.elinacn.subtrack --locales tr-TR
+adb shell cmd locale set-app-locales com.elinacn.subtrack --locales en-US
+adb shell cmd locale set-app-locales com.elinacn.subtrack --locales ""     # geri al
+```
+
+`values/` Türkçe (varsayılan), `values-en/` İngilizce. Emülatörün sistem dili
+İngilizce olduğu için **dil verilmezse uygulama İngilizce açılır**.
+
+### Koyu tema
+
+`ThemeMode.Default` = SYSTEM, yani sistem anahtarı yetiyor:
+
+```bash
+adb shell cmd uimode night yes
+adb shell cmd uimode night no
+```
+
+### FAB örtüşmesi — çekimden önce ölçülür
+
+16e'nin bulgusu mağaza çekiminde de geçerli: kayan FAB liste ortasındaki bir
+satırın tutarını örtebiliyor. Ana ekran çekiminde bu **olmamalı**.
+
+Ölçüm 16e'nin yöntemiyle, iki bağımsız okumayla yapılır:
+
+- **Koordinat:** `uiautomator dump` FAB'ın kabını değil 24dp'lik ikonunu
+  veriyor; kap her kenardan **16dp (=42 px @420dpi)** büyütülerek türetilir.
+- **Piksel:** tutar, kartta `colorScheme.primary` renkli **tek** metindir
+  (açık temada `#0B5C3F`, koyu temada `#D4AF37`). O renkteki piksel öbekleri
+  bulunur ve hiçbirinin FAB kutusuna değmediği doğrulanır.
+
+Kartın baştaki ikonu da `primary` — sayıma girer, ama zaten kartın solunda
+olduğu için FAB kutusuna hiç yaklaşmaz.
+
+### Çekim sonrası: alfa kanalı
+
+`adb exec-out screencap -p` **RGBA yazıyor**, Play ise alfa kanalı olan PNG'yi
+reddediyor. Kanal her çekimde tamamen opak (255) çıkıyor, yani RGB'ye çevirmek
+hiçbir pikseli değiştirmiyor — ama çevirmek **şart**:
+
+```python
+from PIL import Image
+src = Image.open(path)
+assert src.getchannel("A").getextrema() == (255, 255)   # önce opak olduğu kanıtlanır
+src.convert("RGB").save(path, "PNG", optimize=True)
+```
+
+Sonuç 8 bit/kanal truecolour = **24-bit PNG**, alfa yok.
 
 ---
 

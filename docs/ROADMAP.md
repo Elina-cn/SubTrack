@@ -603,7 +603,10 @@ Aylık toplamın zaman içindeki anlık görüntüleri. `PROJECT_SPEC.md` §1'de
       istemiyor. Birleşik manifestte ölçüldü (Faz 10b Görev 0). İzin beyanında
       ve gizlilik politikasında bunlar da açıklanmalı.
 - [ ] Play Console Data Safety formu
-- [ ] Mağaza görselleri ve açıklama metni
+- [ ] Mağaza görselleri ve açıklama metni — **telefon ekran görüntüleri bitti**
+      (Faz 16e-2): `docs/screenshots/store/`, 12 dosya, 1080x1920 24-bit PNG,
+      Türkçe ve İngilizce + koyu tema. **Kalanlar:** özellik grafiği
+      (1024x500), mağaza simgesi (512x512), listeleme metni
 - [ ] Internal testing → production
 
 **Bitti:** `PROJECT_SPEC.md` §7'deki tüm maddeler işaretli.
