@@ -27,6 +27,135 @@ Her faz sonunda **en üste** yeni kayıt eklenir. Eski kayıtlar silinmez.
 
 ---
 
+## [Faz 16g] Release AAB ve Foreground Service Tipi Denetimi — 2026-09-19
+
+**Durum:** Tamamlandı — **üretim kodu değişmedi**, yalnızca belge.
+
+**Yapılanlar**
+
+*Görev 0 — foreground service denetimi (her şeyden önce)*
+
+Play, Android 14+ hedefleyen uygulamalardan manifestte bildirilen her
+foreground service **tipi** için Console'da beyan istiyor. Denetim varsayımla
+değil, release birleşik manifestinin satırlarıyla yapıldı. Dört bulgu:
+
+1. **`FOREGROUND_SERVICE` ile başlayan izinler — tek satır, alt tip yok.**
+   Birleşik manifestte yalnızca
+   `<uses-permission android:name="android.permission.FOREGROUND_SERVICE" />`
+   (satır 19). `FOREGROUND_SERVICE_DATA_SYNC`, `_SHORT_SERVICE` ve kardeşleri
+   **hiç geçmiyor.** Birleşik manifest yetmez diye **bütün bağımlılık
+   manifestleri** de tarandı (`transforms/*/AndroidManifest.xml`) — hiçbirinde
+   `FOREGROUND_SERVICE_` dizgesi yok.
+2. **`SystemForegroundService`'te `foregroundServiceType` özniteliği yok.**
+   Eleman dört öznitelik taşıyor: `name`, `directBootAware`, `enabled`,
+   `exported` (satır 91-94). `foregroundServiceType` dizgesi birleşik
+   manifestin tamamında geçmiyor; AAB'nin base manifestinde de geçmiyor.
+3. **İkisi de `androidx.work:work-runtime:2.11.2`'den geliyor.** Manifest
+   merger raporu: izin için satır 365-368 (`work-runtime AndroidManifest.xml:26:5-77`),
+   servis için 383-396 (`…:46:9-52:35`). Uygulamanın kendi manifestinde tek bir
+   `FOREGROUND_SERVICE` satırı yok.
+4. **Kodda foreground service yolu hiç kullanılmıyor.** `app/src/` altında
+   `setForeground`, `setExpedited`, `ForegroundInfo`, `OutOfQuotaPolicy` →
+   **hit yok**. `OneTimeWorkRequest` yalnızca `androidTest`'te iki satır, ikisi
+   de düz `OneTimeWorkRequestBuilder<…>().build()`. `PaymentReminderScheduler`
+   tek bir kısıtsız, gecikmeli `PeriodicWorkRequest` kuruyor.
+
+**Karar: Görev 0(c) uygulanmadı.** Alt tip olmadığı için `tools:node="remove"`
+ile kaldırılacak bir şey yok; manifeste ve üretim koduna dokunulmadı. Temel
+`FOREGROUND_SERVICE` izni de kaldırılmadı — kapsam denetim ve AAB, izin budama
+değil; izin kütüphaneden geliyor ve kaldırmak ölçülmemiş bir risk alır.
+
+*Görev 1 — sürüm numaraları*
+
+`versionCode = 1`, `versionName = "1.0"`. Play'in ilk yayın beklentisiyle
+birebir; **değiştirilmedi, sorulacak bir sapma çıkmadı.**
+
+*Görev 2-3 — AAB ve imza*
+
+`./gradlew :app:bundleRelease` → BUILD SUCCESSFUL (22 sn, 9 görev koştu).
+`signReleaseBundle` çalıştı. `jarsigner -verify` → **`jar verified.`**,
+`CN=ElinaDorothea, OU=Development, O=SubTrack, L=Denizli, ST=Denizli, C=TR`,
+SHA384withRSA / 2048-bit, geçerlilik 2026-09-17 → **2054-02-02**.
+
+*Görev 4 — bundletool ile iki cihazda kurulum*
+
+APK seti üretildi ve **`subtrack_min_api24`** ile **`subtrack_wide_api34`**'e
+kuruldu. İkisinde de `pm path` **üç** parça döndü: `base.apk`,
+`split_config.en.apk`, `split_config.x86_64.apk`. Temel tur iki cihazda da
+geçti — abonelik ekleme, toplam, istatistik, ayarlar, bildirim, crash tamponu
+boş.
+
+*Görev 5-6 — içerik ve yol*
+
+Tek `base` modülü, dört ABI, altı yoğunluk, 86 locale. Base manifest
+`versionCode=1 / versionName=1.0 / minSdk=24 / targetSdk=36`.
+Yol: `app/build/outputs/bundle/release/app-release.aab` — **commit edilmedi**
+(`.gitignore`'da `*.aab`).
+
+**Ölçümler**
+
+| | Değer |
+|---|---|
+| AAB | **4.598.466 B** |
+| 16c universal APK | 2.127.430 B |
+| Oran | **2,16 kat** — AAB tüm ABI/dil/yoğunluğu bölünmemiş taşıyor |
+| APK seti (`.apks`) | 11.944.603 B |
+| Cihaza inen parça | base + `split_config.en` + `split_config.x86_64` |
+
+**Değişen dosyalar**
+- `docs/ARCHITECTURE.md` — §26 eklendi (AAB içeriği + FGS denetimi ve kararı)
+- `docs/TESTING.md` — "AAB ile Test Etme" bölümü eklendi (8 adım)
+- `docs/ROADMAP.md` — Faz 16'ya iki madde işaretlendi
+- `docs/PROGRESS.md` — bu kayıt
+
+**Karşılaşılan sorunlar**
+
+- **Gradle önbelleğindeki `bundletool-1.18.3.jar` çalıştırılamıyor**
+  (`no main manifest attribute`) — o kütüphane sürümü. Çalıştırılabilir olan
+  `bundletool-all-1.18.3.jar` GitHub'dan indirildi ve
+  `C:\Users\cane7\tools\bundletool-all-1.18.3.jar` altına kondu. **Depoya
+  girmedi.**
+- **`install-apks` `ANDROID_HOME` olmadan düşüyor** — `CommandUtils.getAdbPath`
+  yığın izi bırakıyor ama çıktı "Success" satırıyla karışabiliyor. Kurulum her
+  seferinde `pm path` ile ayrıca doğrulandı.
+- **API 34 emülatörü anlık görüntüden açılmadı** — `default_boot` yüklerken
+  takıldı, süreç öldürülüp `-no-snapshot-load` ile soğuk açıldı. Ürünle ilgisi
+  yok.
+- **Duvar saatini ileri almak tek başına işi koşturmuyor.** JobScheduler'ın
+  gecikmesi **elapsed realtime** tabanlı; saat sıçraması yalnızca
+  WorkManager'ın `lastEnqueueTime + initial_delay` denetimini açıyor. İş ancak
+  saat hedefi geçtikten **sonra** `cmd jobscheduler run -f` ile koştu.
+- **API 34'te `jobscheduler run` ad alanı istiyor.** Ad alanı verilmeyince
+  `Could not find job 0 in package com.elinacn.subtrack`. Doğrusu
+  `-n androidx.work.systemjobscheduler`. API 24'te ad alanı yok.
+- **API 34'te klavye düzeni kaydırıyor.** Ad alanına yazınca form yukarı
+  kayıyor ve önceki ekran görüntüsünün koordinatları geçersiz oluyor; ilk
+  denemede ad "Spotify89.9" oldu ve para birimi EUR'ya atladı. Her alan
+  dokunuşundan sonra ekran görüntüsü yenilenerek düzeltildi. Ürün hatası
+  değil, test yöntemi notu — `TESTING.md`'ye yazıldı.
+- **API 24'te `time_detector` yok** (`Can't find service`), saat Ayarlar
+  arayüzünden kuruldu. İki cihazda da saat tur sonunda geri alındı ve gerçek
+  saatle karşılaştırılarak doğrulandı.
+- **`uiautomator dump /sdcard/…` Git Bash'te yol dönüşümüne uğruyor**
+  (`/Files/Git/sdcard/ui.xml`). Doğrulama ekran görüntüleriyle yapıldı.
+
+**Doğrulanmayan tek nokta**
+
+Alt tip bildirilmediğine göre Play Console'da foreground service tipi beyan
+formunun **açılmaması bekleniyor**. Bu manifest bulgularından çıkarılan bir
+sonuç; **Console ekranında görülmedi.** İlk yüklemede doğrulanacak.
+
+**Sonraki faz için not**
+- AAB ilk yüklemede Play'in imzalama devrine (Play App Signing) girecek;
+  yüklenen anahtar **upload key** olacak. Keystore'un yedeği olmadan sonraki
+  sürüm yüklenemez.
+- `targetSdk` maddesi hâlâ açık; 36 şu an Play'in eşiğinin üstünde ama madde
+  her yayın döneminde tekrar okunmalı.
+- Sonraki yüklemede `versionCode` **artırılmalı** — Play aynı değeri ikinci
+  kez kabul etmiyor.
+
+---
+
 ## [Faz 16e-2] Mağaza Ekran Görüntüleri — 2026-09-19
 
 **Durum:** Tamamlandı — **üretim kodu değişmedi**, yalnızca çekim ve belge.

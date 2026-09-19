@@ -472,6 +472,28 @@ Aylık toplamın zaman içindeki anlık görüntüleri. `PROJECT_SPEC.md` §1'de
       etkilenmiyor. **Debug anahtarına düşülmüyor** (gerekçe
       `ARCHITECTURE.md` §24). **Keystore dosyasını kullanıcı oluşturacak** —
       bu madde yapılandırmayı kapsıyor, anahtarı değil.
+- [x] **Release AAB üretildi ve iki cihazda kurulup sürüldü** — Faz 16g.
+      `./gradlew :app:bundleRelease` → `app-release.aab`, **4.598.466 B**
+      (16c'nin universal APK'sı 2.127.430 B; AAB tüm ABI/dil/yoğunluğu
+      bölünmemiş taşıdığı için 2,16 kat büyük, Play kullanıcıya bunu
+      göndermiyor). `jarsigner` **`jar verified.`** ve `CN=ElinaDorothea`
+      diyor. `bundletool` ile üretilen APK seti `subtrack_min_api24` ve
+      `subtrack_wide_api34`'e kuruldu; ikisinde de **base + `split_config.en`
+      + `split_config.x86_64`** geldi, yani Play'in teslim modeli birebir
+      çalışıyor. Temel tur (abonelik, toplam, istatistik, ayarlar, bildirim)
+      iki cihazda da geçti. **Commit edilmedi** — `*.aab` `.gitignore`'da.
+      Komutlar `TESTING.md`, içerik dökümü `ARCHITECTURE.md` §26.
+- [x] **Foreground service tipi denetlendi — beyan GEREKMİYOR** — Faz 16g.
+      Release birleşik manifestinde `FOREGROUND_SERVICE` ile başlayan **tek**
+      izin var, **alt tip yok** (`_DATA_SYNC`, `_SHORT_SERVICE` vb. hiçbir
+      bağımlılığın manifestinde de geçmiyor). `SystemForegroundService`
+      elemanında `foregroundServiceType` özniteliği **yok**; ikisi de
+      `androidx.work:work-runtime:2.11.2`'den geliyor. Kodda `setForeground`,
+      `setExpedited`, `ForegroundInfo`, `OutOfQuotaPolicy` **hiç geçmiyor** —
+      tek iş kısıtsız bir `PeriodicWorkRequest`. Alt tip olmadığı için
+      **manifest değiştirilmedi** (`tools:node="remove"` gereksiz) ve Play
+      Console'da beyan formunun açılmaması bekleniyor — **bu tek nokta
+      Console'da henüz doğrulanmadı.** Ayrıntı `ARCHITECTURE.md` §26.
 - [x] **ProGuard/R8 kuralları, release build testi** — Faz 16c.
       `proguard-rules.pro` **boş kaldı**: önce kuralsız derlendi, minify açık
       release APK dört cihazda (API 24/29/34/36) sürüldü, hiçbir şey kırılmadı.

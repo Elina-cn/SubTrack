@@ -1314,6 +1314,161 @@ olmaz. Bu yüzden release turu **elle** atılır.
 
 ---
 
+## AAB ile Test Etme (Play'in Gerçekten Göndereceği Şey)
+
+Faz 16g'de kuruldu. **Release APK turu bunun yerine geçmez.** Play kullanıcıya
+universal APK'yı değil, AAB'den türetilmiş **bölünmüş** APK'ları gönderiyor;
+base + dil + ABI ayrı ayrı. O ayrımın bozuk olması yalnızca bölünmüş kurulumda
+görünür. Bu yüzden yayın öncesi tur AAB'den atılır.
+
+### 1. AAB'yi üret
+
+```bash
+./gradlew :app:bundleRelease
+```
+
+Çıktı: `app/build/outputs/bundle/release/app-release.aab`.
+İmzalama malzemesi `local.properties`'ten okunuyor (§24); dördü de varsa
+`signReleaseBundle` görevi koşar ve bundle imzalı çıkar.
+
+### 2. İmzayı doğrula
+
+AAB **JAR imzası** taşır (APK Signature Scheme v2/v3 değil), yani `apksigner`
+değil `jarsigner` sorulur:
+
+```bash
+jarsigner -verify -verbose:summary -certs app/build/outputs/bundle/release/app-release.aab
+```
+
+`jar verified.` ve `CN=ElinaDorothea` görülmeli. Üç uyarı **normaldir** ve
+hata değildir: sertifika zinciri "geçersiz" (kendinden imzalı — Android
+anahtarları zaten öyledir), imzada zaman damgası yok (Play istemiyor) ve
+sertifika 2054-02-02'de dolacak (Play'in istediği 2033-10-22 eşiğinin çok
+ötesinde).
+
+### 3. bundletool
+
+Gradle önbelleğindeki `bundletool-*.jar` **kütüphane** sürümüdür,
+çalıştırılamaz (`no main manifest attribute`). Çalıştırılabilir olan
+`bundletool-all-*.jar`'dır ve GitHub'dan indirilir:
+
+```bash
+curl -sSL -o bundletool-all-1.18.3.jar \
+  https://github.com/google/bundletool/releases/download/1.18.3/bundletool-all-1.18.3.jar
+```
+
+**Bu depoda durmuyor.** Kullanılan kopya `C:\Users\cane7\tools\bundletool-all-1.18.3.jar`
+altında; sürüm `java -jar … version` ile doğrulanır.
+
+### 4. APK setini üret ve kur
+
+`build-apks` imzalama malzemesini ister — **şifreler komut satırına elle
+yazılmaz**, `local.properties`'ten okunur:
+
+```bash
+java -jar bundletool-all-1.18.3.jar build-apks \
+  --bundle=app/build/outputs/bundle/release/app-release.aab \
+  --output=subtrack.apks \
+  --ks="$STORE" --ks-pass="pass:$STOREPW" \
+  --ks-key-alias="$ALIAS" --key-pass="pass:$KEYPW"
+
+java -jar bundletool-all-1.18.3.jar install-apks \
+  --apks=subtrack.apks --device-id=<serial>
+```
+
+> **`install-apks` `ANDROID_HOME` ister.** Ayarlı değilse komut
+> `CommandUtils.getAdbPath` içinde yığın izi bırakarak düşer; kurulum
+> yapılmadığı hâlde çıktı yanıltıcı olabilir, bu yüzden **her zaman**
+> `pm path` ile doğrulanır.
+
+### 5. Kurulumu doğrula — üç parça gelmeli
+
+```bash
+adb -s <serial> shell pm path com.elinacn.subtrack
+```
+
+Beklenen: `base.apk`, `split_config.<dil>.apk`, `split_config.<abi>.apk`.
+**Tek satır dönerse bölünme çalışmamıştır.** Sürüm de buradan okunur:
+
+```bash
+adb -s <serial> shell dumpsys package com.elinacn.subtrack | grep -E "versionCode|versionName"
+```
+
+API 34'te `minSdk=32` görmek normaldir — bundletool SDK'ya göre varyant
+üretiyor, bundle'ın kendi base manifesti `minSdk=24` der (§26).
+
+### 6. AAB içeriğini oku
+
+```bash
+java -jar bundletool-all-1.18.3.jar dump manifest --bundle=…/app-release.aab
+java -jar bundletool-all-1.18.3.jar dump config   --bundle=…/app-release.aab
+java -jar bundletool-all-1.18.3.jar dump resources --bundle=…/app-release.aab --values
+unzip -l app-release.aab | grep '\.so$'          # ABI'ler
+```
+
+Diller `values-*` klasörlerinde **değil**, `resources.pb` içindedir; bu yüzden
+dil listesi `dump resources` çıktısındaki `locale:` niteliklerinden sayılır.
+
+### 7. Turu sür — iki cihazda
+
+`subtrack_min_api24` ve `subtrack_wide_api34`. Her ikisinde: abonelik ekle,
+toplamı doğrula, istatistik ve ayarlar ekranlarını aç, bildirimi tetikle
+(aşağıdaki bölüm), crash tamponunun boş olduğunu gör.
+
+> **Klavye API 34'te düzeni kaydırıyor.** Geniş cihazda ad alanına yazınca
+> klavye açılıyor ve form yukarı kayıyor; önceki ekran görüntüsünden alınan
+> koordinatlar artık geçersiz. Her alan dokunuşundan **sonra** ekran
+> görüntüsü alınıp koordinat yenilenmezse dokunuşlar yanlış öğeye gider
+> (16g'de ad alanına "Spotify89.9" yazıldı ve para birimi EUR'ya atladı).
+
+### 8. Bildirimi AAB kurulumunda tetiklemek
+
+Enstrümantasyon testi burada **kullanılamaz**: test APK'sı debug anahtarıyla,
+uygulama yayın anahtarıyla imzalı. Tek yol duvar saatini ileri almak.
+
+**Sıra önemli.** İş uygulamanın ilk açılışında ertesi 09:00'a kuyruklanır;
+abonelik **o güne** ödemeli olmalı ve saat 09:00'ı geçtikten **sonra**
+zorlanmalıdır.
+
+JobScheduler'ın gecikmesi **elapsed realtime** tabanlıdır — duvar saatini
+ileri almak onu tetiklemez, yalnızca WorkManager'ın kendi
+`lastEnqueueTime + initial_delay` denetimini açar. İşi asıl koşturan şey
+ikisinin birleşimidir:
+
+```bash
+# API 31+ (34, 36)
+adb shell cmd time_detector set_auto_detection_enabled false
+adb shell cmd time_detector set_time_state_for_tests \
+  --elapsed_realtime <uptime_ms> --unix_epoch_time <hedef_ms> --user_should_confirm_time false
+
+# API 24 ve 29 — Ayarlar arayüzünden (time_detector yok)
+adb shell am start -a android.settings.DATE_SETTINGS
+```
+
+Sonra iş zorlanır. **Ad alanı API'ye göre değişiyor:**
+
+```bash
+adb shell cmd jobscheduler run -f com.elinacn.subtrack 0                              # API 24
+adb shell cmd jobscheduler run -f -n androidx.work.systemjobscheduler com.elinacn.subtrack 0   # API 34
+```
+
+API 34'te ad alanı verilmezse komut `Could not find job 0 in package …` der.
+Doğru iş kimliği `dumpsys jobscheduler | grep subtrack` ile okunur.
+
+Bildirim **uygulamayı açmadan önce** okunur:
+
+```bash
+adb shell dumpsys notification --noredact | grep -E "android.title=|android.text="
+```
+
+Beklenen: `Payment reminder: 1 subscription` / `<Ad> — today`.
+
+Tur bitince saat geri alınır (`set_auto_detection_enabled true`, ya da API 24'te
+"Automatic date & time" yeniden açılır) ve **cihaz saati gerçek saatle
+karşılaştırılarak doğrulanır.**
+
+---
+
 ## Yedekle — Geri Yükle Turu (Auto Backup)
 
 Faz 16f'de kuruldu. Kural dosyaları `res/xml/backup_rules.xml` (API ≤30) ve

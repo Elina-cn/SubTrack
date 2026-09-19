@@ -2215,3 +2215,142 @@ açın"). API 32 ve altında böyle bir izin kavramı olmadığı için satır d
 "Açık" geliyor. İkisi de beklenen davranış, hata değil.
 
 ---
+
+## 26. App Bundle (AAB) ve Foreground Service Tipi
+
+Faz 16g. Play Console APK değil **AAB** istiyor. Bu bölüm iki şeyi kayda
+geçiriyor: bundle'ın ne taşıdığı ve Android 14+ için Play'in istediği
+**foreground service tipi beyanının bu uygulamada neden gerekmediği**.
+
+### Foreground service denetimi — dört bulgu
+
+Play, Android 14+ hedefleyen uygulamalardan manifestte bildirilen **her
+foreground service tipi** için Console'da beyan istiyor; bazı tipler tanıtım
+videosu da gerektiriyor. Denetim varsayımla değil, **release birleşik
+manifestinin satırlarıyla** yapıldı.
+
+**1 — `FOREGROUND_SERVICE` ile başlayan izinler.** Birleşik manifestte
+(`app/build/intermediates/merged_manifests/release/processReleaseManifest/AndroidManifest.xml:19`)
+tek bir satır var:
+
+```xml
+<uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+```
+
+**Alt tip yok.** `FOREGROUND_SERVICE_DATA_SYNC`, `_SHORT_SERVICE` ve
+kardeşlerinin hiçbiri manifestte geçmiyor. Yalnızca birleşik manifest değil,
+**bağımlılıkların kendi manifestleri de** tarandı (`transforms/*/AndroidManifest.xml`):
+hiçbirinde `FOREGROUND_SERVICE_` dizgesi yok.
+
+**2 — `SystemForegroundService` elemanı.** Var, ama `foregroundServiceType`
+özniteliği **yok** (satır 91-94):
+
+```xml
+<service
+    android:name="androidx.work.impl.foreground.SystemForegroundService"
+    android:directBootAware="false"
+    android:enabled="@bool/enable_system_foreground_service_default"
+    android:exported="false" />
+```
+
+Dört öznitelik: `name`, `directBootAware`, `enabled`, `exported`. Beşinci yok.
+`foregroundServiceType` dizgesi birleşik manifestin **tamamında** geçmiyor;
+AAB'nin base manifestinde de geçmiyor (`bundletool dump manifest`).
+
+**3 — Nereden geliyor.** İkisi de tek bir kütüphaneden, manifest merger
+raporunun söylediğine göre (`build/outputs/logs/manifest-merger-release-report.txt`):
+
+| Eleman | Kaynak | Rapor satırı |
+|---|---|---|
+| `uses-permission#...FOREGROUND_SERVICE` | `androidx.work:work-runtime:2.11.2` | 365-368 (`AndroidManifest.xml:26:5-77`) |
+| `service#...SystemForegroundService` | `androidx.work:work-runtime:2.11.2` | 383-396 (`AndroidManifest.xml:46:9-52:35`) |
+
+Yani ikisi de **bizim yazdığımız bir şey değil**; WorkManager'ın AAR'ı
+getiriyor. Uygulamanın kendi `src/main/AndroidManifest.xml`'inde tek bir
+`FOREGROUND_SERVICE` satırı yok.
+
+**4 — Kodda foreground service yolu hiç kullanılmıyor.** `app/src/` altında
+arama:
+
+| Aranan | Sonuç |
+|---|---|
+| `setForeground` | hit yok |
+| `setExpedited` | hit yok |
+| `ForegroundInfo` | hit yok |
+| `OutOfQuotaPolicy` | hit yok |
+| `OneTimeWorkRequest` | yalnızca `androidTest`'te iki satır, ikisi de düz `OneTimeWorkRequestBuilder<…>().build()` |
+
+`PaymentReminderScheduler` tek bir iş kuruyor: kısıtsız, gecikmeli bir
+`PeriodicWorkRequest`. Expedited iş yok, dolayısıyla WorkManager'ın
+`SystemForegroundService`'i başlatacağı yol hiç tetiklenmiyor.
+
+### Karar: beyan yazılmayacak, manifest değiştirilmeyecek
+
+**Alt tip olmadığı için Görev 0(c) uygulanmadı** — `tools:node="remove"` ile
+kaldırılacak bir şey yok. Üretim koduna ve manifeste dokunulmadı.
+
+Alt tip bildirilmediğine göre Play Console'da foreground service tipi beyan
+formunun **açılmaması bekleniyor**. Bu, manifest bulgularından çıkarılan bir
+sonuç; Console ekranında **henüz doğrulanmadı** — ilk yükleme sırasında
+görülecek.
+
+**Temel `FOREGROUND_SERVICE` izni kaldırılmadı.** İki sebep: (a) 16g'nin
+kapsamı denetim ve AAB'dir, izin budama değil; (b) izin WorkManager'ın kendi
+AAR'ından geliyor ve kütüphanenin ileride expedited iş yolunu kullanması
+hâlinde gereken izin odur. Kaldırmak bugün ölçülmemiş bir risk alır, bugün
+ölçülmüş bir kazanç getirmez.
+
+> **Android 14+ notu.** API 34'ten itibaren tip bildirmeden foreground service
+> başlatmak `MissingForegroundServiceTypeException` atıyor. SubTrack hiç
+> foreground service başlatmadığı için bu istisnanın yolu da açılmıyor —
+> API 34 cihazda AAB'den kurulup sürülen tur (abonelik, toplam, istatistik,
+> ayarlar, bildirim) çökmesiz geçti.
+
+### AAB içeriği — ne taşıyor
+
+`./gradlew :app:bundleRelease` → `app/build/outputs/bundle/release/app-release.aab`,
+**4.598.466 B**. 16c'nin universal APK'sı 2.127.430 B idi; bundle **2,16 kat**
+büyük ve bu beklenen durum: AAB bütün ABI'leri, dilleri ve yoğunlukları
+**bölünmemiş** taşıyor, Play kullanıcıya bunlardan yalnızca cihaza uyanları
+gönderiyor.
+
+| | İçerik |
+|---|---|
+| Modül | Tek `base` — dinamik özellik modülü yok |
+| ABI | `arm64-v8a`, `armeabi-v7a`, `x86`, `x86_64` (iki `.so`: `libandroidx.graphics.path`, `libdatastore_shared_counter`) |
+| Yoğunluk | `mdpi`, `hdpi`, `xhdpi`, `xxhdpi`, `xxxhdpi` + `anydpi-v26` |
+| Dil | Kaynak tablosunda **86 locale** |
+| Base manifest | `versionCode=1`, `versionName=1.0`, `minSdk=24`, `targetSdk=36` |
+
+**86 dil beklenmedik değil.** Uygulamanın **kendi** metinleri tam olarak iki
+yapılandırmada: varsayılan (Türkçe) ve `en`. Kaynak tablosunda doğrulandı —
+`string/my_subscriptions` yalnızca `(default) "Aboneliklerim"` ve
+`locale:"en" "My Subscriptions"` taşıyor. Kalan 84 locale AndroidX ve
+Material'ın kendi çevirileri (`string/autofill` gibi). Play dil bölünmesi
+yaptığı için kullanıcıya yalnızca kendi dili gidiyor.
+
+### Kurulabilirlik — APK testi bunun yerine geçmiyor
+
+Play kullanıcıya AAB'den **türetilmiş bölünmüş APK'ları** gönderiyor, 16c'de
+sürülen universal APK'yı değil. Bu yüzden tur `bundletool` ile üretilen APK
+setiyle, iki cihazda ayrıca sürüldü:
+
+```
+bundletool build-apks --bundle=app-release.aab --output=subtrack.apks --ks=…
+bundletool install-apks --apks=subtrack.apks --device-id=…
+```
+
+Her iki cihaza da **üç** parça kuruldu — Play'in teslim modeli birebir:
+
+| Cihaz | `pm path` çıktısı |
+|---|---|
+| `subtrack_min_api24` | `base.apk`, `split_config.en.apk`, `split_config.x86_64.apk` |
+| `subtrack_wide_api34` | `base.apk`, `split_config.en.apk`, `split_config.x86_64.apk` |
+
+> **`dumpsys package` API 34'te `minSdk=32` diyor.** Bu bir çelişki değil:
+> bundletool SDK'ya göre birkaç **varyant** üretiyor (`base-*_2`, `_3`
+> son ekleri) ve API 34 cihaza 16 KB hizalama gibi yeni optimizasyonları
+> taşıyan varyant gidiyor. Bundle'ın kendi base manifesti `minSdk=24` diyor ve
+> API 24 cihaz gerçekten kurulup çalıştı — teslim doğru varyantı seçiyor.
+
+---
