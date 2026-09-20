@@ -29,9 +29,16 @@ turbine = "1.2.1"
 desugarJdkLibs = "2.1.5"
 # Newest stable; the 2.12.0 line is still alpha/beta/rc. Measured against AGP 9.0.1 in phase 10b.
 work = "2.11.2"
+# Newest stable, by the same test as `work` above: every other entry in the 1.1.0 and 1.2.0 lines
+# is alpha/beta/rc, and 1.0.1 is the 2022 release that predates targetSdk 31's own splash screen
+# attributes. Not free: it pulls androidx.appcompat:appcompat-resources 1.7.0 in transitively,
+# which is the only reason the release APK grows in phase 16h - measured at +5554 bytes, +0.25%.
+# See the phase 16h entry in PROGRESS.md.
+splashscreen = "1.2.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
+androidx-core-splashscreen = { group = "androidx.core", name = "core-splashscreen", version.ref = "splashscreen" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
 androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
