@@ -27,6 +27,128 @@ Her faz sonunda **en üste** yeni kayıt eklenir. Eski kayıtlar silinmez.
 
 ---
 
+## [Faz 16d düzeltme] İşaret %88 Küçültüldü — 2026-09-20
+
+**Durum:** Tamamlandı — **uygulama kodu, renkler, para sayısı, açı aralığı ve
+merkez değişmedi; bildirim ikonuna dokunulmadı.**
+
+**Neden**
+
+16d'de çizilen işaret 108dp tuvalde **65,78dp**'ydi ve Material'ın 66dp anahtar
+dairesine **0,218dp** payla giriyordu. Aritmetik olarak sığıyordu, cihazda da
+kesilmiyordu (api34'te 2,06dp, api36'da 2,59dp pay ölçülmüştü) — ama maskenin
+kenarına yaslanıyor, etrafında nefes alacak zemin kalmıyordu. Sığmak ile iyi
+oturmak aynı şey değil.
+
+**Yapılanlar**
+
+*Görev 1 — üretici*
+
+`tools/icon/generate_icons.py` içine tek bir `SCALE = 0.88` sabiti kondu;
+halka, para ve ayrım artık ondan türüyor. Merkez, para sayısı, açı aralığı ve
+renkler ölçeğin dışında. Yeni değerler:
+
+| Değer | 220 birim | 108dp | ilk hâl (220 / 108dp) |
+|---|---|---|---|
+| Halka yarıçapı | 45,76 | 22,4640 | 52 / 25,5273 |
+| Para yarıçapı | 13,20 | 6,4800 | 15 / 7,3636 |
+| Ayrım | 3,52 | 1,7280 | 4 / 1,9636 |
+| Kesme yarıçapı | 13,60356 | 6,6781 | 15,45859 / 7,58876 |
+| İşaret dış sınırı | 58,96 | 28,9440 | 67 / 32,8909 |
+
+Raster karolardaki `MARK_FRACTION` artık elle yazılan bir sayı değil,
+`0,965 × MASKED_FILL` diye türetiliyor — yani `SCALE` değişince kendiliğinden
+güncelleniyor. Değeri **0,88 → 0,7759** oldu.
+
+Yeniden üretilenler: `ic_launcher_foreground.xml`, `ic_launcher_monochrome.xml`,
+on PNG, `docs/store/icon-512.png`. `ic_launcher_background.xml` düz zemin
+olduğu için ölçekten etkilenmiyor ve **bayt bayt aynı** kaldı.
+
+*Görev 2 — bildirim ikonu DEĞİŞMEDİ*
+
+`ic_notification.xml` yeniden üretildikten sonra **md5'i doğrulandı, aynı.**
+Bildirim değerleri üreticide dp cinsinden ayrı sabitler (`NOTIF_RING = 8,54`,
+`NOTIF_COIN = 2,46`, `NOTIF_GAP = 1,3`) ve halka değerlerinden türemiyor. Aynı
+çarpanı ona uygulamak, 16d'de ölçülerek kazanılmış 1,3dp'lik ayrımı 1,14dp'ye
+indirip o ölçümün cevabını bozardı.
+
+*Görev 3 — yeni ölçümler*
+
+Güvenli alan, 108dp tuvalde:
+
+```
+işaret çapı                        57,89dp   (ilk hâl 65,78dp)
+66dp anahtar dairesine pay          8,11dp   (ilk hâl 0,218dp)
+72dp maskeye pay                   14,11dp   (ilk hâl  4,26dp)
+ayrım hattıyla 72dp maskeye pay    12,38dp
+220 birim cinsinden: 58,96 < 67,22 -> 8,26 birim pay
+```
+
+Para örtüşmesi **3,0828 → 2,7129 birim**; örtüşmenin işarete oranı aynı
+(%88'i de örtüşme, hem paralar hem aralık aynı çarpanla küçüldü). Üretilen yol
+verisi yine bağımsız bir maske-çıkarma render'ıyla karşılaştırıldı: fark
+mürekkebin **%1,82'si** kadar, yani yalnızca kenar yumuşatma. Halka üzerinde
+**12/12 ayrım** sayıldı.
+
+*Görev 4 — üç cihazda doğrulama*
+
+| Ölçüm | api24 | api34 | api36 |
+|---|---|---|---|
+| Maske | yok (PNG) | daire (1,0222) | daire (1,0190) |
+| Karo | 60,00dp | 51,43dp | 60,19dp |
+| İşaret, ilk hâl | 52,65dp | 47,30dp | 55,01dp |
+| İşaret, şimdi | **46,33dp** | **41,55dp** | **48,62dp** |
+| Ölçülen oran | **0,880** | **0,878** | **0,884** |
+| Maskeye pay, ilk hâl | — | 2,06dp | 2,59dp |
+| Maskeye pay, şimdi | — | **4,94dp** | **5,79dp** |
+| İşaret / karo | 0,878 → **0,772** | 0,920 → **0,808** | 0,914 → **0,808** |
+| Sayılan ayrım | **12/12** | **12/12** | **12/12** |
+
+API 24'te çizilenin hâlâ PNG yedeği olduğu doğrulandı: köşe erişim oranı
+**1,256** (üreticinin `0,1875 × kenar` yuvarlaması 1,2588 verir) ve karo hâlâ
+60,00dp — küçülen karo değil, içindeki işaret. **Monochrome api34 ve api36'da
+elle açılıp bakıldı: ikisinde de on iki para ayrı duruyor.**
+
+`icon-512.png` yeniden doğrulandı: 512×512, RGBA, **alfa her pikselde 255**,
+köşeler ve merkez `(13, 26, 20)`, paralar `(212, 175, 55)`, işaret çapı
+**396,5 px = karonun %77,45'i**, 41.939 bayt (önce 49.143).
+
+**Değişen dosyalar**
+- `tools/icon/generate_icons.py` — `SCALE` sabiti, türetilen `MARK_FRACTION`
+- `app/src/main/res/drawable/ic_launcher_foreground.xml` — yeniden üretildi
+- `app/src/main/res/drawable/ic_launcher_monochrome.xml` — yeniden üretildi
+- `app/src/main/res/mipmap-*/ic_launcher{,_round}.png` — 10 dosya
+- `docs/store/icon-512.png` — yeniden üretildi
+- `docs/screenshots/phase-16d/*-v2.png` — 10 yeni görüntü, **eskiler duruyor**
+- `docs/ARCHITECTURE.md` §27 — geometri tablosuna ilk hâl sütunu eklendi,
+  "İşaret neden küçültüldü" başlığı eklendi; `docs/ROADMAP.md`, bu kayıt
+- **Değişmeyenler:** `ic_notification.xml`, `ic_launcher_background.xml`,
+  `values/colors.xml`, `mipmap-anydpi-v26/*.xml`, manifest, uygulama kodu
+
+**Commit'ler**
+- `(bu faz)` refactor: scale the icon mark down to 88 percent
+- (bu kayıt) docs: record why the mark was scaled down and what it measures now
+
+**Karşılaşılan sorunlar**
+- **`MARK_FRACTION` sessizce yanlış kalabilirdi.** 0,88 elle yazılmış bir sayıydı
+  ve işaret küçülünce raster karolar adaptive ikondan büyük görünecekti. Sayı
+  artık geometriden türetiliyor; cihazda ölçülen işaret/karo oranı üç cihazda da
+  0,772–0,808, yani tasarlanan 0,804 ile uyuşuyor.
+- **API 34 emülatörü kilit ekranında uyandı**, ilk ekran görüntüsü tamamen
+  siyah çıktı. `KEYCODE_WAKEUP` + yukarı kaydırma gerekiyor; bu TESTING.md'deki
+  ikon bölümüne ayrıca eklenmedi, çünkü emülatörün genel davranışı.
+- **API 36'da çekmece açma kaydırması arama alanına düştü** ve klavye açıldı.
+  Çalışan kaydırma dipten kısa olanı: `input swipe 540 2200 540 500 300`.
+
+**Sonraki faz için not**
+- İşaret bir daha ayarlanacaksa tek yer var: üreticideki `SCALE`. Bildirim
+  ikonu bilerek o çarpanın dışında; oraya dokunmadan önce 16d'deki ayrım
+  ölçümü yeniden okunmalı.
+- Ekran görüntülerinin iki takımı da repoda: eski adlar ilk hâl, `-v2` ekli
+  olanlar küçültülmüş hâl. Karşılaştırma bitince eski takım silinebilir.
+
+---
+
 ## [Faz 16d] Uygulama İkonu — On İki Para Halkası — 2026-09-20
 
 **Durum:** Tamamlandı — **uygulama kodu değişmedi**, yalnızca kaynaklar,

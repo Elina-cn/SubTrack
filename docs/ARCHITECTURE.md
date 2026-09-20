@@ -2362,36 +2362,43 @@ paletinden gelen marka işareti kondu: **koyu zümrüt zemin üzerinde halka
 biçiminde dizilmiş on iki altın para.** Halka aylık döngüyü, on iki parça yılın
 aylarını, paraların örtüşmesi hem birikimi hem pul dokusunu anlatıyor.
 
-Bu bölüm dört kararı kayda geçiriyor: geometrinin ne olduğu, ikonun neden
-**temaya uymadığı**, paraların arasındaki ayrımın neden **boya değil boşluk**
-olduğu ve bildirim ikonunun neden **ayrı bir çizim** olduğu.
+Bu bölüm beş kararı kayda geçiriyor: geometrinin ne olduğu, **neden bir kez
+küçültüldüğü**, ikonun neden **temaya uymadığı**, paraların arasındaki ayrımın
+neden **boya değil boşluk** olduğu ve bildirim ikonunun neden **ayrı bir
+çizim** olduğu.
 
 ### Geometri — tek tanım, 220 birimlik tuval
 
 İşaret bir kere, 220 birimlik kare bir tuvalde tanımlanıyor; bütün hedefler
 oradan ölçekleniyor. Ölçek çarpanı 108dp tuval için `k = 108/220 = 0,490909`.
 
-| Değer | 220 birim | 108dp viewport |
-|---|---|---|
-| Merkez | 110 | **54** |
-| Para yarıçapı | 15 | **7,3636** |
-| Paranın merkeze uzaklığı | 52 | **25,5273** |
-| Paralar arası ayrım | 4 | **1,9636** |
-| Komşu kesme yarıçapı | 15,45859 | **7,58876** |
-| İşaretin dış sınırı (52+15) | 67 | **32,8909** |
-| Ayrım hattıyla (52+15+2) | 69 | **33,8727** |
-| Güvenli alan sınırı | 73 | **35,8364** |
+İşaret ayrıca **tek bir `SCALE` çarpanıyla** büyütülüp küçültülebiliyor;
+`SCALE = 0,88` (aşağıda "İşaret neden küçültüldü"). Halka, para ve ayrım aynı
+çarpanla ölçeklendiği için oranları hiçbir zaman ayrışamıyor. **Merkez, para
+sayısı, açı aralığı ve renkler ölçeğin dışında** — onlar sabit.
+
+| Değer | 220 birim | 108dp viewport | *ilk hâl (SCALE = 1)* |
+|---|---|---|---|
+| Merkez | 110 | **54** | *110 · 54* |
+| Para yarıçapı | 13,20 | **6,4800** | *15 · 7,3636* |
+| Paranın merkeze uzaklığı | 45,76 | **22,4640** | *52 · 25,5273* |
+| Paralar arası ayrım | 3,52 | **1,7280** | *4 · 1,9636* |
+| Komşu kesme yarıçapı | 13,60356 | **6,6781** | *15,45859 · 7,58876* |
+| İşaretin dış sınırı | 58,96 | **28,9440** | *67 · 32,8909* |
+| Ayrım hattıyla | 60,72 | **29,8080** | *69 · 33,8727* |
+| Güvenli alan sınırı | 73 | **35,8364** | *(ölçeklenmez)* |
 
 **Paralar örtüşüyor, ve bu kasıtlı.** İki komşu paranın merkezleri arasındaki
-uzaklık `2 × 52 × sin(15°) = 26,9172` birim; iki para yarıçapı ise 30. Yani
-paralar **3,0828 birim** iç içe geçiyor. Örtüşme işaretin kendisi — birikim ve
-pul dokusu oradan geliyor.
+uzaklık `2 × 45,76 × sin(15°) = 23,6871` birim; iki para yarıçapı ise 26,40.
+Yani paralar **2,7129 birim** iç içe geçiyor (ilk hâlde 3,0828). Örtüşme
+işaretin kendisi — birikim ve pul dokusu oradan geliyor; ölçek değişse de
+örtüşmenin işarete oranı aynı kalıyor.
 
 Her para, kendi diskinden komşularının açtığı iki ısırığın çıkarılmasıyla
-çiziliyor. Isırık yarıçapı `(pitch + ayrım) / 2 = 15,45859` seçilerek iki
-paranın görünen kenarları arasında **tam olarak 4 birim** zemin bırakılıyor,
-üstelik iki tarafa da simetrik. Sonuç dört yaylı kapalı bir yol: paranın kendi
-çemberinden iki yay, komşuların kesme çemberlerinden iki yay.
+çiziliyor. Isırık yarıçapı `(pitch + ayrım) / 2 = 13,60356` seçilerek iki
+paranın görünen kenarları arasında **tam olarak 3,52 birim** zemin
+bırakılıyor, üstelik iki tarafa da simetrik. Sonuç dört yaylı kapalı bir yol:
+paranın kendi çemberinden iki yay, komşuların kesme çemberlerinden iki yay.
 
 ### Güvenli alan — hesap
 
@@ -2403,11 +2410,33 @@ Material'ın anahtar çizgisi bundan daha dar: içteki **66dp çaplı daire**.
 66dp anahtar -> 33dp yarıçap -> 33 / 0,490909 = 67,22 birim
 ```
 
-İşaretin dış sınırı 67 birim, yani **67 < 67,22**: işaret dar olan sınıra bile
-sığıyor. 108dp karşılığıyla: işaret **65,78dp** çapında, 66dp'lik daireye
-**0,218dp** payla giriyor. Promptun verdiği 73 birimlik sınır 72dp maskenin
-karşılığı (71,67dp) ve orada pay 4,26dp. Yani hiçbir maske — daire, squircle
-veya yuvarlatılmış kare — işareti kesemiyor.
+İşaretin dış sınırı **58,96 birim**, yani 66dp anahtar dairesine **8,26 birim**
+payla giriyor. 108dp karşılığıyla: işaret **57,89dp** çapında; 66dp daireye
+**8,11dp**, 72dp maskeye **14,11dp** pay kalıyor. Hiçbir maske — daire,
+squircle veya yuvarlatılmış kare — işareti kesemiyor.
+
+### İşaret neden küçültüldü — `SCALE = 0,88`
+
+İlk hâlde (`SCALE = 1`) işaret **65,78dp** çapındaydı ve 66dp anahtar
+dairesine **0,218dp** payla giriyordu. Aritmetik olarak sığıyordu ve cihazda
+da kesilmiyordu — api34'te 2,06dp, api36'da 2,59dp pay ölçüldü. **Ama sıkışık
+duruyordu:** işaret maskenin kenarına yaslanmış, etrafında nefes alacak zemin
+kalmamıştı. Sığmak ile iyi oturmak aynı şey değil.
+
+Bütün geometri bu yüzden merkez sabit kalacak şekilde **%88** ölçeklendi.
+Sonuç, üç cihazda ölçülmüş hâliyle:
+
+| | api24 | api34 | api36 |
+|---|---|---|---|
+| İşaret, ilk hâl | 52,65dp | 47,30dp | 55,01dp |
+| İşaret, %88 sonrası | **46,33dp** | **41,55dp** | **48,62dp** |
+| Maskeye pay, ilk hâl | *(maske yok)* | 2,06dp | 2,59dp |
+| Maskeye pay, şimdi | *(maske yok)* | **4,94dp** | **5,79dp** |
+| İşaret / karo | 0,878 → **0,772** | 0,920 → **0,808** | 0,914 → **0,808** |
+
+Ölçek tek bir sabit olduğu için bir daha ayarlanması gerekirse tek satır
+değişiyor ve on iki paranın hiçbiri orantısını kaybetmiyor. **Bildirim ikonu
+bu ölçeğin dışında** — gerekçesi aşağıda.
 
 ### İkon temayı takip ETMİYOR
 
@@ -2482,6 +2511,14 @@ Isırık genişlediği için paralar hafifçe badem biçimi alıyor; bu boyutta
 görünmüyor. Ölçümler `TESTING.md`'de, cihaz görüntüleri
 `docs/screenshots/phase-16d/` altında.
 
+**Bu değerler `SCALE`'den etkilenmiyor ve etkilenmemeli.** Uygulama ikonu
+küçültüldüğünde (`SCALE = 0,88`) bildirim ikonuna dokunulmadı: o işaret zaten
+24dp'lik bir tuvalde ve zaten sıkışık boyutlarda çalışıyor, ayrımı da tam
+bunun için kalınlaştırılmıştı. Aynı çarpanı ona da uygulamak, kazanılmış
+1,3dp'lik ayrımı 1,14dp'ye indirip ölçümün cevabını bozardı. Üreticide bu
+yüzden bildirim değerleri dp cinsinden **ayrı sabitler**, halka değerlerinden
+türetilmiyor.
+
 ### Raster varlıklar ve üretici
 
 API 26 altında adaptive icon yok, başlatıcı `mipmap-*/ic_launcher.png` ve
@@ -2489,10 +2526,14 @@ API 26 altında adaptive icon yok, başlatıcı `mipmap-*/ic_launcher.png` ve
 uygulanmıyor, yuvarlatma dosyanın içinde olmak zorunda. Kare karo
 `0,1875 × kenar` köşe yarıçapıyla, yuvarlak karo daire olarak üretiliyor.
 
-Bu karolarda işaret karonun **%88'ini** kaplıyor. Sayı keyfi değil: adaptive
-ikonda işaret 72dp maskenin 65,78dp'sini, yani %91,4'ünü dolduruyor; aynı
-görünürlüğü maskesiz karoda tutturmak için gereken oran bu. Play'in 512×512
-karosu da aynı %88'i kullanıyor, böylece üç yüzey aynı görünüyor.
+Bu karolarda işaret karonun **%77,6'sını** kaplıyor (ilk hâlde %88'di). Sayı
+keyfi değil, hesaplanıyor: adaptive ikonda işaret 72dp maskenin 57,89dp'sini,
+yani **%80,4'ünü** dolduruyor; maskesiz karoda aynı görünürlüğü tutturmak için
+gereken oran bu, üstüne karoyu biraz içeride tutan 0,965'lik bir pay. Üretici
+oranı `MARK_FRACTION = 0,965 × MASKED_FILL` diye türetiyor, yani `SCALE`
+değişince kendiliğinden güncelleniyor — elle ayarlanacak bir sayı değil.
+Play'in 512×512 karosu da aynı oranı kullanıyor (396,5 px işaret, 512 px
+karo), böylece üç yüzey aynı görünüyor.
 
 Bütün varlıklar `tools/icon/generate_icons.py` tarafından tek tanımdan
 üretiliyor: vektörler, beş yoğunlukta PNG ve mağaza karosu. Elle düzenlenen

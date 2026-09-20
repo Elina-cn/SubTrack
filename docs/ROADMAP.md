@@ -464,11 +464,14 @@ Aylık toplamın zaman içindeki anlık görüntüleri. `PROJECT_SPEC.md` §1'de
       **8,50:1** (§12 kuralı korunuyor). İşaret 220 birimlik tek bir tanımdan,
       `tools/icon/generate_icons.py` ile üretiliyor: iki vektör katman +
       monochrome, beş yoğunlukta PNG yedeği, 512×512 mağaza karosu.
-      108dp tuvalde işaret **65,78dp**, Material'ın 66dp anahtar dairesine
-      0,218dp payla giriyor — hiçbir maske kesmiyor (api34 ve api36'da
-      ölçüldü: ikisi de **daire**, pay 2,06dp ve 2,59dp). **Şablondan kalan on
-      `.webp` silindi.** Ayrıntı `ARCHITECTURE.md` §27, doğrulama yöntemi
-      `TESTING.md`, görüntüler `docs/screenshots/phase-16d/`.
+      108dp tuvalde işaret **57,89dp**, Material'ın 66dp anahtar dairesine
+      **8,11dp** payla giriyor — hiçbir maske kesmiyor (api34 ve api36'da
+      ölçüldü: ikisi de **daire**, pay 4,94dp ve 5,79dp). İlk çizim 65,78dp'ydi
+      ve 0,218dp payla sığıyordu; sığmasına rağmen sıkışık durduğu için bütün
+      geometri tek bir `SCALE` sabitiyle **%88** küçültüldü. **Şablondan kalan
+      on `.webp` silindi.** Ayrıntı `ARCHITECTURE.md` §27, doğrulama yöntemi
+      `TESTING.md`, görüntüler `docs/screenshots/phase-16d/` (ilk hâl ile
+      karşılaştırma için `-v2` ekli dosyalar).
 - [x] **Bildirim ikonu yenilendi** — Faz 16d. Faz 10b'nin geçici çan silueti
       gitti; durum çubuğu artık aynı işareti taşıyor ama **ayrı bir çizim**
       olarak. Ölçüm gerekçesi: işareti 24dp'ye olduğu gibi indirince paralar
