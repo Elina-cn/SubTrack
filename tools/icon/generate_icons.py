@@ -34,10 +34,19 @@ except ImportError:  # pragma: no cover - the raster half simply cannot run
 CANVAS = 220.0          # the square the mark is described on
 CENTRE = 110.0          # its centre, on both axes
 COINS = 12              # one per month
-COIN_R = 15.0           # coin radius
-RING_R = 52.0           # centre of the canvas to centre of a coin
-GAP = 4.0               # ground showing between two coins
-SAFE_R = 73.0           # nothing may sit further out than this
+
+# How large the mark is drawn inside that canvas. At 1.0 it spans 134 units,
+# which is 65.78dp on the 108dp adaptive canvas - 0.218dp inside Material's
+# 66dp key-line circle. That clears the mask arithmetically and still reads as
+# cramped, so the whole mark is scaled about the fixed centre. One number, so
+# the ring, the coins and the gap can never drift out of proportion.
+SCALE = 0.88
+
+COIN_R = 15.0 * SCALE   # coin radius                       -> 13.20
+RING_R = 52.0 * SCALE   # centre of the canvas to a coin    -> 45.76
+GAP = 4.0 * SCALE       # ground showing between two coins  ->  3.52
+SAFE_R = 73.0           # nothing may sit further out than this; not scaled,
+                        # it is a property of the canvas rather than the mark
 
 GROUND = "#0D1A14"      # phase 14a's dark emerald, fixed in both schemes
 COIN = "#D4AF37"        # phase 14a's gold
@@ -187,8 +196,14 @@ def vector(size, paths, colour):
 # --- raster targets ----------------------------------------------------------
 
 SUPERSAMPLE = 8
-MARK_FRACTION = 0.88   # mark diameter as a share of the tile, matching how much
-                       # of the adaptive icon's masked area the mark fills
+
+# The share of a maskless tile the mark spans. Not a free choice: a legacy PNG
+# and the Play tile have to read at the same size as the adaptive icon, where
+# the mark fills MASKED_FILL of the 72dp the launcher shows. The 0.965 is an
+# inset that keeps the raster tiles a hair inside that, and it is what made the
+# pre-SCALE tiles 0.88.
+MASKED_FILL = 2.0 * (RING_R + COIN_R) * (108.0 / CANVAS) / 72.0
+MARK_FRACTION = 0.965 * MASKED_FILL
 
 
 def _hex(colour):
