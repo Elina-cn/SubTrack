@@ -864,11 +864,14 @@ ikonlar temayı takip edebildiği için `background` çubuğu uygulamanın devam
 yapar. API 29'dan itibaren ikisi de şeffaf, kontrastı sistem zorlar.
 
 **Açılıştaki ilk kare.** `onCreate`'teki ilk `enableEdgeToEdge` çağrısı durum
-çubuğunu bilerek `SystemBarStyle.light` ile kurar: o karelerde ekranda olan
-pencere `Theme.SubTrack`'in açık arka planıdır (`#FAFAFA`), cihaz ne olursa
-olsun. 14b'nin ilk-kare kapısıyla çakışmıyor, aynı kareler için cevap veriyor —
-kare kare taramayla doğrulandı: `#FAFAFA` boyunca ikonlar siyah (3078 px),
-tercih gelince `#1F3D2D` üstünde beyaz (3078 px), arada görünmez ikon yok.
+çubuğunu `SystemBarStyle.dark` ile kurar (16h'ye kadar `light`'tı; o zaman
+ekrandaki pencere `Theme.SubTrack`'in beyaz arka planıydı, şimdi splash'ın
+`#0D1A14`'ü). Bu değer **yukarıdaki tabloyu kurmuyor**: uygulamanın kararlı
+karelerindeki ikon rengini `SystemBarsFollowTheTheme` belirliyor, ve splash
+karelerindeki ikon rengini uygulamanın penceresi değil sistemin başlatma
+penceresi belirliyor. İki pencerenin nasıl ayrıştığı, hangi bayrağın neyi
+söylediği ve dört ölçüm **§23'te** — 16h'nin bu konudaki iki sayısının
+düzeltmesiyle birlikte.
 
 ### Ekranların insets'i nasıl aldığı
 
@@ -1919,31 +1922,147 @@ cihaz dışında sıfır okur ve ViewModel testlenemez hâle gelir. Desen
 `isAvailableOnThisBuild()`, `@ChecksSdkIntAtLeast` ile işaretli ki lint
 koruma çağrısını takip edebilsin.
 
-### Açılışta ilk kare TUTULUYOR
+### Açılışta ilk kare TUTULUYOR — kapı 16h'den beri splash'ta
 
 **Ölçüldü (API 34, sistem açık temada, saklanan tercih koyu):** tutma
 olmadan ana ekran **açık temada tam olarak çiziliyordu** — arka plan
 `#D3E2D8`, uygulama çubuğu beyaz — ve ancak ondan sonra koyuya dönüyordu. Tek
 bir tam kare, ama kullanıcıya uygulamanın fikir değiştirdiği gibi görünüyor.
+**Karar bu ve değişmedi: tema tahmin edilmiyor, okunması bekleniyor** — her
+tahmin biri için yanlış. Değişen yalnızca beklenirken ekranda ne durduğu.
 
-Çözüm `MainActivity`'de bir `OnPreDrawListener`: tercih okunana kadar pencere
-çizilmiyor. Bekleyeceğine bir tema tahmin etmek çözüm değil — her tahmin biri
-için yanlış. Bu yolla pencerenin kendi arka planı birkaç kare yerini tutuyor,
-zaten soğuk açılışta yaptığı gibi.
+**Mekanizma (Faz 16h).** 14b'nin `OnPreDrawListener`'ı **kaldırıldı**; yerine
+`androidx.core:core-splashscreen` 1.2.0 geldi ve kapı sistemin splash'ına
+bağlandı. `MainActivity.onCreate`:
 
-İki ayrıntı önemli:
+- `installSplashScreen()` `super.onCreate`'ten **önce**. Kütüphanenin şartı,
+  tercih değil: çağrı activity'nin temasını `Theme.SubTrack.Starting`'ten
+  `postSplashScreenTheme`'e çeviriyor ve bunu pencere kurulmadan yapması
+  gerekiyor. Sonra çağrılsaydı başlangıç teması uygulamanın kalıcı teması
+  olurdu.
+- `setKeepOnScreenCondition { tercih yok && son tarih geçmedi }`
+  `setContent`'ten **sonra**. Sebep 14b'de ölçülmüştü ve kütüphane de aynı
+  kısıta tabi: içerik görünümünün içine bir şey konana kadar kendi
+  `ViewTreeObserver`'ı yok, kütüphane kendi dinleyicisini tam o görünüme
+  kayıt ediyor.
+- **Tek kapı var.** Eski pre-draw dinleyicisi silindi; üst üste iki kapı aynı
+  okumayı iki kez beklerdi.
+- Gecikmeli `invalidate()` korundu: iptal edilen bir çizim yeni traversal
+  planlamaz, yani tercih hiç gelmezse koşulun bir daha okunacağı an olmaz.
+  Ana looper'a atılan gecikmeli mesaj her iki yolda da çalışır.
 
-- Dinleyici **`setContent`'ten SONRA** kayıt ediliyor. Önce kaydedildiğinde
-  hiç çalışmadı: içerik görünümünün içine bir şey konana kadar kendi
-  `ViewTreeObserver`'ı yok, placeholder olana kayıt edilen dinleyici kayboluyor.
-  Ölçüldü — önce kayıtta açık temalı kare hâlâ görünüyordu (`#D3E2D8`).
-- Bir **son tarih** var (1 sn). Tercihler hiç gelmezse — repository'nin
-  `IOException` yedeğinin kapsamadığı bir hata — kapı yine de açılıyor ve
-  uygulama varsayılan temayla geliyor. Yanlış tema düzeltilebilir; hiç
-  çizilmeyen bir pencere düzeltilemez.
+**Üst sınır 1000 ms — bütçe değil, failure path.** Tercih hiç gelmezse
+(DataStore takılırsa; `SettingsRepositoryImpl`'in `IOException` yedeğinin
+kapsamadığı bir hâl) kapı son tarihle açılıyor ve uygulama varsayılan temayla
+geliyor. Yanlış tema düzeltilebilir, hiç çizilmeyen bir pencere düzeltilemez:
+sistem onu "does not have a focused window" diye raporlayıp uygulamayı
+öldürür. 16g gerçek okumayı **173–212 ms** ölçtü, yani bir saniye normal
+kullanımda erişilemeyecek kadar uzak. 16h son tarihi simüle takılmayla ayrıca
+doğruladı: api34'te kapı **t+1258 ms**'de, tercih hâlâ okunmamışken açıldı.
+Son tarih `MainActivity`'de, ViewModel'de değil — "bu pencere ne kadar boş
+kalabilir" pencereye ait bir soru, tercihe ait değil.
 
-Doğrulandıktan sonra: beyaz açılış penceresinden **doğrudan** koyuya
-(`#0D1A14`) geçiyor, arada açık temalı kare yok.
+**Splash zemini `#0D1A14`, iki şemada da.** Ön plan on iki altın para ve altın
+beyaz üstünde 2,10:1 (§27); orada şekil taşıyamaz, yani açık bir splash
+işareti gizlerdi. Bu, §27'nin "ikon sistem temasına göre değişmez" kararının
+devamı, ve zemin `colors.xml`'deki `ic_launcher_ground`'dan okunuyor,
+`Color.kt`'den değil. Bedeli kabul edildi: koyu temada splash uygulamaya
+**renk değişmeden** devrediyor, açık temada sonda tek bir koyu→açık adım var.
+Bu turda release build ile, ham kare yakalamayla yeniden ölçüldü (gövdenin
+baskın rengi, durum çubuğu bandı kırpılarak):
+
+| Cihaz / tema | Kare dizisi |
+|---|---|
+| api34 koyu | `#0D1A14` (%96,8) → `#0D1A14` (%76,3) → `#0D1A14` (%74,5) |
+| api34 açık | `#0D1A14` (%96,8) → `#C8D7CC` (%72,5) → `#D3E2D8` (%72,7) |
+| api29 koyu | `#0D1A14` (%94,9) → `#0D1A14` (%64,5) |
+| api29 açık | `#0D1A14` (%94,9) → `#65736C` (%58,1) → `#D3E2D8` (%62,6) |
+
+Aradaki `#C8D7CC` ve `#65736C` bağımsız bir üçüncü renk değil, çapraz geçiş
+karesi — 16h bunu kanal başına aynı `t` çıkararak göstermişti. İşaretin kendisi
+splash karesinde iki cihazda ve iki temada da **`#D4AF37` / `#0D1A14` =
+8,50:1**; altın piksel oranı api34'te %2,78, api29'da %4,52 ve iki tema
+arasında birebir aynı.
+
+### Durum çubuğu ikon rengini ne belirliyor — iki pencere, iki mekanizma
+
+`SystemBarStyle` **ikon rengini söylemez**; "arkamdaki zemin koyu mu" der.
+`androidx.activity` 1.12.4, `EdgeToEdge.kt`:
+
+- `SystemBarStyle.dark(scrim)` → `detectDarkMode = { true }`
+- `SystemBarStyle.light(scrim, darkScrim)` → `detectDarkMode = { false }`
+- `SystemBarStyle.auto(l, d) { ... }` → verilen lambda
+
+`enableEdgeToEdge` bu cevabı `statusBarIsDark`'a çeviriyor ve ikon için tek
+yaptığı şu:
+`WindowInsetsControllerCompat(...).isAppearanceLightStatusBars = !statusBarIsDark`.
+Yani `dark` → bayrak **kapalı** → ikonlar beyaz; `light` → bayrak açık →
+ikonlar koyu. Bayrak **`window.decorView`'a**, yani uygulamanın kendi
+penceresine yazılıyor; başka bir pencereye ulaşamaz.
+
+**1. Uygulama penceresi — bayrağı composable koyuyor.** `onCreate`'teki
+`SystemBarStyle.dark` geçicidir ve kararlı hiçbir kareye ulaşmaz: tercih gelir
+gelmez `SystemBarsFollowTheTheme` `enableEdgeToEdge`'i `auto(...) { darkTheme }`
+ile yeniden çağırıp bayrağı temaya bağlar. Bu turda dört durumda hem bayrak hem
+piksel okundu. Bant = ekranın üst `statusBars.top` şeridi (api29'da 48 px,
+api34'te 128 px); "ikon çekirdeği" bandın zeminden parlaklıkça **en uzak**
+pikseli, koordinatıyla birlikte:
+
+| Cihaz | Tema | Pencere bayrağı | Bant zemini | İkon çekirdeği | Okunan piksel | Kontrast |
+|---|---|---|---|---|---|---|
+| api29 | açık | `mSystemUiVisibility=0x2710` (LIGHT_STATUS_BAR) | `#FFFFFF` | `#666666` | (106,10) | **5,74:1** |
+| api29 | koyu | `0x700` — LIGHT_STATUS_BAR yok | `#1F3D2D` | `#FFFFFF` | (106,10) | **11,91:1** |
+| api34 | açık | `apr=LIGHT_STATUS_BARS` | `#FFFFFF` | `#666666` | (905,48) | **5,74:1** |
+| api34 | koyu | `apr=` satırı yok (appearance 0) | `#1F3D2D` | `#FFFFFF` | (905,48) | **11,91:1** |
+
+Açık temanın kanıt değeri şurada: `dark` hâlâ yürürlükte olsaydı bayrak kapalı
+kalır, ikonlar `#FFFFFF` üstüne beyaz çizilir, kontrast 1,00:1 olurdu — 16-0'da
+ölçülen hata tam buydu ("üst bantta beyaz olmayan piksel yok"). Olmuyor; geçici
+stili composable'ın çağrısı eziyor.
+
+**2. Splash penceresi uygulamanın penceresi DEĞİL.** Açılış sırasında
+`dumpsys window` iki ayrı pencere gösteriyor ve sırası ölçüldü: önce
+`Splash Screen com.elinacn.subtrack` (`ty=APPLICATION_STARTING` — sistemin
+başlatma penceresi), uygulamanınki (`com.elinacn.subtrack/.MainActivity`)
+ancak birkaç örnekleme sonra. Başlatma penceresi uygulama kodu çalışmadan
+kuruluyor ve kaynağı `Theme.SubTrack.Starting`; o tema da türediği
+`Theme.SplashScreen` de `windowLightStatusBar` **yazmıyor** (AAR'ın kaynakları
+tarandı: yalnızca `windowLightNavigationBar` var). Bayrak sıfır kalıyor —
+api29'da `mSystemUiVisibility=0x0` diye okundu, api34'te o pencerede appearance
+satırı hiç basılmıyor — yani ikonlar beyaz, ki splash zemini `#0D1A14` olduğu
+için doğru cevap. Ölçülen: splash karesinde bant `#0D1A14` üstünde `#FFFFFF`,
+**17,87:1**, api29 ve api34'te aynı.
+
+Yani **splash'ın okunur olmasını sağlayan şey `SystemBarStyle.dark` değil,
+splash temasının kendisi.** `dark` yine de yanlış değil: başlatma penceresinden
+uygulamanın penceresine geçilen ve temanın henüz bilinmediği karelerde ekranda
+duran zemin koyudur.
+
+> **16h'nin iki sayısı yanlış kareye yazılmış.** 16h kaydı "api29'da koyu temada
+> bant 11,91:1, açık temada 5,74:1" diyerek bunları `SystemBarStyle.dark`
+> değişikliğinin doğrulaması olarak sunuyor. Sayılar doğru — bu turda ikisi de
+> birebir yeniden üretildi — ama **splash karesinden gelmiyorlar:** ikisi de
+> uygulama karesinin ölçüsü, yani `auto { darkTheme }`'in sonucu, `dark`'ın
+> değil. Cihaza da bağlı değiller; api29 ile api34 aynı değerleri veriyor.
+> Splash karesinin gerçek değeri iki temada da **17,87:1**, ve depodaki
+> `docs/screenshots/phase-16h/splash-*-api29.png` dosyaları da bunu söylüyor
+> (zemin `#0D1A14` %92,7, ikon `#FFFFFF` %4,6, iki dosyada da).
+
+**Tema değişince — uygulama yeniden başlatılmadan.** `SystemBarsFollowTheTheme`
+bir `DisposableEffect` ve anahtarlarından biri `darkTheme`, yani ayar değişince
+yeniden koşuyor. Ölçüldü: ayarlardan açık → koyu → açık, süreç aynı kalarak
+(api34 `pid 5490`, api29 `pid 7177`; üç ölçümün üçünde de aynı pid), bant her
+adımda yukarıdaki tablonun değerine oturuyor. Ekran görüntüleri
+`docs/screenshots/phase-16h-1/themeswitch-*`.
+
+**Açılışta ölçülen bir geçiş penceresi var; bu turda ölçüldü, düzeltilmedi.**
+api34, açık tema, ham kare dizisinde splash'tan uygulamaya devirde iki ardışık
+kare `#F1F2F1` üstünde beyaz ikon (**1,12:1**) ve `#FFFFFF` üstünde beyaz ikon
+(**1,00:1** — bantta zeminden farklı tek piksel yok) okunuyor; üçüncü kareden
+itibaren 5,74:1'e oturuyor. Yakalama çözünürlüğü ~85 ms/kare, yani süre
+100–250 ms mertebesinde. api29'un aynı yerinde ölçülen en düşük değer
+**4,04:1**. Koyu temada böyle bir kare yok — geçici stil ile nihai stilin aynı
+şeyi söylediği yer orası. Kararı kullanıcı verecek.
 
 ### Para birimi: HER YERDE SEMBOL
 

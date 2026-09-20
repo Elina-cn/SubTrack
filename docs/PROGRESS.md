@@ -27,6 +27,224 @@ Her faz sonunda **en üste** yeni kayıt eklenir. Eski kayıtlar silinmez.
 
 ---
 
+## [Faz 16h-1] Durum Çubuğu Açıklandı, Bayat Belge ve Yorumlar Düzeltildi — 2026-09-20
+
+**Durum:** Tamamlandı
+
+**Neden**
+
+16h'nin açık bıraktığı maddeler. Yeni özellik yok, **davranış değişikliği yok.**
+`SystemBarStyle` değeri, `MainActivity`, manifest, ikon varlıkları ve
+`generate_icons.py` bu turda hiç açılmadı; değişen tek kaynak dosya iki mipmap
+XML'inin **yorum satırları**.
+
+Çıkış noktası 16h'nin yan etkisiydi: geçici durum çubuğu stili `light` →
+`dark` çevrilmişti ve "açık temada durum çubuğu okunmaz olabilir" şüphesi
+kalmıştı. Kullanıcı fiziksel cihazda (OPPO A15s, Android 10, release) iki
+temada da okunduğunu doğruladı. **Kusur yok, düzeltilecek bir şey yok** — bu
+tur yalnızca *neden* okunduğunu ölçtü.
+
+---
+
+### Görev 1 — durum çubuğu ikon rengini gerçekte ne belirliyor
+
+**`SystemBarStyle` ikon rengi atamıyor.** `androidx.activity` 1.12.4
+kaynağında (`EdgeToEdge.kt`) `dark(scrim)` yalnızca `detectDarkMode = { true }`
+kuruyor; `enableEdgeToEdge` bunu `statusBarIsDark`'a çevirip ikon için tek bir
+şey yapıyor:
+`WindowInsetsControllerCompat(...).isAppearanceLightStatusBars = !statusBarIsDark`.
+Bayrak **`window.decorView`'a**, yani uygulamanın kendi penceresine yazılıyor.
+
+**Uygulamanın kendi tema tercihi bu değeri eziyor.** `onCreate`'teki
+`SystemBarStyle.dark` geçici; tercih gelir gelmez `SystemBarsFollowTheTheme`
+`enableEdgeToEdge`'i `auto(...) { darkTheme }` ile yeniden çağırıyor. Dört
+durumda hem pencere bayrağı hem piksel okundu (bant = üst `statusBars.top`
+şeridi; "ikon çekirdeği" = bandın zeminden parlaklıkça en uzak pikseli):
+
+| Cihaz | Tema | Pencere bayrağı | Bant zemini | İkon çekirdeği | Okunan piksel | Kontrast |
+|---|---|---|---|---|---|---|
+| api29 | açık | `mSystemUiVisibility=0x2710` | `#FFFFFF` | `#666666` | (106,10) | **5,74:1** |
+| api29 | koyu | `0x700` (LIGHT_STATUS_BAR yok) | `#1F3D2D` | `#FFFFFF` | (106,10) | **11,91:1** |
+| api34 | açık | `apr=LIGHT_STATUS_BARS` | `#FFFFFF` | `#666666` | (905,48) | **5,74:1** |
+| api34 | koyu | `apr=` satırı yok (appearance 0) | `#1F3D2D` | `#FFFFFF` | (905,48) | **11,91:1** |
+
+Açık temanın kanıt değeri: `dark` hâlâ yürürlükte olsaydı ikonlar `#FFFFFF`
+üstüne beyaz çizilir, kontrast 1,00:1 olurdu — 16-0'da ölçülen hata tam buydu.
+Olmuyor. Cihaz gözlemiyle ölçüm tutuyor.
+
+**Splash karesinde ikon rengini başka bir mekanizma belirliyor.** `dumpsys
+window` açılışta iki ayrı pencere gösteriyor: önce `Splash Screen
+com.elinacn.subtrack` (`ty=APPLICATION_STARTING`, sistemin başlatma penceresi),
+uygulamanınki ancak sonra. `enableEdgeToEdge` ilkine yazamıyor. O pencerenin
+kaynağı `Theme.SubTrack.Starting`, ve ne o ne de türediği `Theme.SplashScreen`
+`windowLightStatusBar` yazıyor (AAR kaynakları tarandı; yalnızca
+`windowLightNavigationBar` var). Bayrak sıfır → ikonlar beyaz → `#0D1A14`
+zemin üstünde doğru cevap. Ölçülen: **17,87:1**, api29 ve api34'te aynı.
+
+Yani splash'ı okunur yapan şey `SystemBarStyle.dark` **değil**, splash
+temasının kendisi. `dark` yine de yanlış değil; devir karelerinde ekranda
+duran zemin koyu.
+
+**16h'nin iki sayısı yanlış kareye atfedilmiş.** 16h kaydı "api29'da koyu
+temada bant 11,91:1, açık temada 5,74:1" diyerek bunları `SystemBarStyle.dark`
+değişikliğinin doğrulaması olarak sunuyor. **Sayılar doğru** — ikisi de bu
+turda birebir yeniden üretildi — ama **splash karesinden gelmiyorlar:** ikisi
+de uygulama karesinin ölçüsü, yani `auto { darkTheme }`'in sonucu. Cihaza da
+bağlı değiller; api29 ile api34 aynı değerleri veriyor. Depodaki
+`docs/screenshots/phase-16h/splash-*-api29.png` iki dosyası da bunu doğruluyor:
+ikisinde de zemin `#0D1A14` (%92,7), ikon `#FFFFFF` (%4,6), kontrast
+**17,87:1** — ve iki dosya birbirinden yalnızca saat kadar farklı, çünkü
+splash'ta temaya bağlı piksel yok. 16h'nin metni düzeltilmedi (eski kayıt
+silinmez); düzeltme ARCHITECTURE §23'e ve bu kayda yazıldı.
+
+### Görev 2 — tema değişiminde, yeniden başlatmadan
+
+`SystemBarsFollowTheTheme` bir `DisposableEffect` ve anahtarlarından biri
+`darkTheme`. Uygulamanın kendi ayar ekranından açık → koyu → açık sürüldü,
+süreç hiç yeniden başlamadan:
+
+| Cihaz | pid (önce) | pid (açık→koyu sonrası) | pid (koyu→açık sonrası) | bant |
+|---|---|---|---|---|
+| api34 | 5490 | 5490 | 5490 | 5,74 → 11,91 → 5,74 |
+| api29 | 7177 | 7177 | 7177 | 5,74 → 11,91 → 5,74 |
+
+**Her iki yönde de okunur kalıyor.** Öncesi/sonrası kareler
+`docs/screenshots/phase-16h-1/themeswitch-*`.
+
+### Görev 3–4 — ARCHITECTURE
+
+- **§23** "Açılışta ilk kare TUTULUYOR" bölümü yeniden yazıldı: kaldırılan
+  `OnPreDrawListener` yerine `installSplashScreen` + `setKeepOnScreenCondition`,
+  1000 ms üst sınırının **neden** var olduğu (DataStore takılırsa pencere hiç
+  çizilmesin; sistem onu "does not have a focused window" diye öldürür),
+  splash zeminine `#0D1A14` seçilme gerekçesi (altın beyaz üstünde 2,10:1,
+  §27'nin "ikon temayı takip etmez" kararının devamı) ve ölçülen kare dizileri.
+- **§23**'e yeni bir başlık eklendi: "Durum çubuğu ikon rengini ne belirliyor —
+  iki pencere, iki mekanizma". Görev 1'in bütün ölçümleri, 16h düzeltmesi ve
+  aşağıdaki geçiş penceresi orada.
+- **§16**'nın "Açılıştaki ilk kare" paragrafı bayattı (hâlâ
+  `SystemBarStyle.light` ve `#FAFAFA` diyordu); §23'e yönlendiren doğru
+  paragrafla değiştirildi.
+
+### Görev 5 — mipmap yorumları
+
+`mipmap-anydpi-v26/ic_launcher.xml` ve `ic_launcher_round.xml` işaretin
+65,78dp olduğunu yazıyordu; 16d'den beri 57,888dp. **Yalnızca yorum
+değişti.** Kanıt: her iki dosyanın yorumları çıkarılmış ve boşlukları
+normalleştirilmiş gövdesi HEAD ile aynı sha256'yı veriyor
+(`40f9eb4c0a880b4e…`), ve `git diff` yalnızca yorum satırlarına dokunuyor.
+
+`tools/icon/generate_icons.py:39` de 65.78dp diyor ama **bayat değil**: orada
+cümle açıkça `SCALE = 1.0` hâlini anlatıyor ("At 1.0 it spans 134 units").
+Dosyaya dokunulmadı, dokunulması da gerekmiyor.
+
+### Görev 6 — api34 ANR'ı tekrarlamadı
+
+`./gradlew --stop` ile derleme daemon'ı kapatıldıktan sonra, arka planda
+hiçbir Gradle/R8 işi yokken, release build ile **beş temiz soğuk açılış**
+(`force-stop` → `logcat -c` → `am start -W`, sayılmayan bir ısınmadan sonra).
+Her koşunun logcat'i `ANR in`, `isn't responding`, `Input dispatching timed
+out`, `am_anr` kalıplarıyla tarandı.
+
+| Koşu | TotalTime | ANR kalıbı |
+|---|---|---|
+| 1 | 582 ms | 0 |
+| 2 | 735 ms | 0 |
+| 3 | 1059 ms | 0 |
+| 4 | 640 ms | 0 |
+| 5 | 1672 ms | 0 |
+
+**Tekrarlamadı.** (Daemon kapatılmadan önce yapılan beş koşuda da sıfır:
+714/652/746/595/639 ms.) Süreler 16h'nin 499–576 ms'inden geniş ve dağınık;
+sebebi ölçüm makinesinde aynı anda Android Studio, üç emülatör ve bir fiziksel
+cihazın açık olması. **Bu turda süre bir ölçüt değildi**, yorum yüklemiyorum.
+
+---
+
+### Doğrulama
+
+| Ölçüt | Sonuç |
+|---|---|
+| Durum çubuğu kontrastı | dört ölçüm, yukarıdaki tablo — api29/api34 × açık/koyu |
+| Tema değişimi, yeniden başlatmadan | iki cihaz, iki yön, pid sabit |
+| Splash karesinde okunurluk | bant **17,87:1**; işaret `#D4AF37`/`#0D1A14` = **8,50:1**, api29 ve api34 |
+| Renk sürekliliği (16h sonucu) | **bozulmamış** — üçüncü renk yok, koyu temada zemin sabit |
+| mipmap diff | yorum dışı içerik birebir aynı (sha256 eşleşiyor) |
+| `testDebugUnitTest --rerun-tasks` | **330 test, 0 başarısız, 0 hata, 0 atlanan** |
+| `lintDebug --rerun-tasks` | **22 bulgu**, hepsi 16h'dekiyle aynı dağılım; mipmap dosyalarında sıfır |
+| `assembleRelease` | geçti |
+| Release APK | **2 184 114 B** — 16h tabanıyla **birebir aynı** (yorum AAPT2'de düşüyor) |
+| AAB | **üretilmedi** — 16g ayrı tur |
+
+Renk sürekliliği yeniden ölçümü (release build, ham kare yakalama, gövdenin
+baskın rengi):
+
+| Cihaz / tema | Dizi |
+|---|---|
+| api34 koyu | `#0D1A14` (%96,8) → `#0D1A14` (%76,3) → `#0D1A14` (%74,5) |
+| api34 açık | `#0D1A14` (%96,8) → `#C8D7CC` (%72,5) → `#D3E2D8` (%72,7) |
+| api29 koyu | `#0D1A14` (%94,9) → `#0D1A14` (%64,5) |
+| api29 açık | `#0D1A14` (%94,9) → `#65736C` (%58,1) → `#D3E2D8` (%62,6) |
+
+Ara değerler 16h'nin ölçtüğü çapraz geçiş kareleriyle **aynı renkler**.
+
+### Ekran görüntüleri
+
+`docs/screenshots/phase-16h-1/` altında on dört dosya:
+`statusbar-api{29,34}-{light,dark}.png`,
+`themeswitch-api{29,34}-{1-light,2-dark,3-light}.png`,
+`splash-api{29,34}.png`, `handover-api34-light-{1,2}.png`.
+
+---
+
+### Kapsam dışı — bildiriliyor, yapılmadı
+
+1. **Açılışta ~100–250 ms'lik bir geçiş penceresinde açık temada durum çubuğu
+   ikonları görünmez oluyor.** api34, açık tema, ham kare dizisinde splash'tan
+   uygulamaya devirde iki ardışık kare: `#F1F2F1` üstünde beyaz ikon
+   (**1,12:1**) ve `#FFFFFF` üstünde beyaz ikon (**1,00:1** — bantta zeminden
+   farklı tek piksel yok). Üçüncü kareden itibaren 5,74:1. Yakalama
+   çözünürlüğü ~85 ms/kare, yani gerçek süre 100–250 ms mertebesinde; api29'un
+   aynı yerinde en düşük değer 4,04:1, yani orada görünmezlik ölçülmedi. Koyu
+   temada böyle bir kare yok. Sebebi geçici `SystemBarStyle.dark`'ın, uygulama
+   penceresinin ilk çizilen karelerinde hâlâ yürürlükte olması;
+   `SystemBarsFollowTheTheme` bir iki kare sonra devralıyor. Kareler
+   `handover-api34-light-{1,2}.png`. **Dokunulmadı** — bu turun kuralı davranışı
+   değiştirmemekti, ve kararı kullanıcı verecek.
+2. **16h'nin metni düzeltilmedi.** Eski kayıtlar silinmez kuralı gereği 16h'nin
+   11,91/5,74 cümlesi olduğu gibi duruyor; düzeltme yalnızca ARCHITECTURE §23'e
+   ve bu kayda yazıldı.
+3. **AAB hâlâ bayat.** 16h'nin uyarısı geçerli: manifest ve tema 16h'de
+   değişti, mevcut AAB bu kodu temsil etmiyor. 16g yeniden koşulmalı.
+
+**Değişen dosyalar**
+- `app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml` — yalnızca yorum
+- `app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml` — yalnızca yorum
+- `docs/ARCHITECTURE.md` — §16'nın bayat paragrafı; §23'ün açılış kapısı
+  bölümü yeniden yazıldı, durum çubuğu mekanizması başlığı eklendi
+- `docs/PROGRESS.md` — bu kayıt
+- `docs/screenshots/phase-16h-1/` — on dört kare
+
+**Commit'ler**
+- `a2a9272` docs: correct the stale mark diameter in the adaptive icon comments
+- *(bu kayıt)* docs: record what sets the status bar icon colour
+
+**Karşılaşılan sorunlar**
+- Splash karesini yakalamak 16h'de geçici bir gecikme yaması gerektirmişti. Bu
+  turda yama kullanılmadı: `screencap` PNG yerine **ham** yazdırıldı
+  (~85 ms/kare, PNG'de ~250–300 ms) ve kareler cihaz üstünde md5 ile
+  tekilleştirilip yalnızca farklı olanlar çekildi. Splash karesi gerçek release
+  build'de böyle yakalandı.
+- Emülatörlerde `adb root` yok (Google Play imajları), `cmd uimode night` API
+  29'da yok; tema uygulamanın kendi ayar ekranından sürüldü.
+
+**Sonraki faz için not**
+- Yukarıdaki 1 numaralı bulgu bir karar bekliyor: geçici stil `auto` yapılabilir
+  ya da olduğu gibi bırakılabilir. Ölçüm hazır, kod değişmedi.
+- 16g yeniden koşulup AAB yeniden üretilmeli.
+
+---
+
 ## [Faz 16h] Açılış Ekranı — Beyaz Boşluk Kapatıldı — 2026-09-20
 
 **Durum:** Tamamlandı
