@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  The mark is a ring of twelve gold coins. It sits inside a 65.78dp circle on the 108dp canvas,
-  which clears Material's 66dp key-line safe circle, so no launcher mask - circle, squircle or
-  rounded square - can cut into it.
+  The mark is a ring of twelve gold coins. It sits inside a 57.888dp circle on the 108dp canvas,
+  which clears Material's 66dp key-line safe circle with 8.11dp to spare, so no launcher mask -
+  circle, squircle or rounded square - can cut into it. It was 65.78dp until phase 16d scaled the
+  whole mark by 0.88.
 
   The monochrome layer is a separate file rather than a reuse of the foreground because the
   themed-icon renderer keeps only the alpha channel: the gaps between coins are drawn as real
