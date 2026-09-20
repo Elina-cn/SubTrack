@@ -2,4 +2,41 @@
 <resources>
 
     <style name="Theme.SubTrack" parent="android:Theme.Material.Light.NoActionBar" />
+
+    <!--
+      The theme the launcher activity starts in, and only that.
+
+      It exists because of what phase 16g measured: the system splash showed the icon on #FAFAFA,
+      then handed over to a window whose background was also #FAFAFA but carried nothing - a blank
+      white frame the theme gate held on screen for 173-212 ms on API 34 - and only then did the
+      app draw its own #D3E2D8. Three colours for one launch, the middle one empty. This theme
+      removes the middle one by making the splash and the held window the same surface.
+
+      The parent is explicit and overrides what the dotted name would otherwise imply: `Theme.X.Y`
+      normally inherits from `Theme.X`, but this one inherits from the library instead. The name
+      still reads as "the starting form of Theme.SubTrack", which is what it is - the activity
+      leaves it through `postSplashScreenTheme` below.
+
+      `windowSplashScreenBackground` is the icon's own ground, read from colors.xml rather than
+      from Color.kt. That is the same one-directional rule ARCHITECTURE section 27 sets for the
+      icon: the mark's colours are pinned where the launcher and the Play Store can reach them,
+      and a later adjustment to a *theme* colour must not silently repaint them. The splash draws
+      the icon, so it takes the icon's colour, not the scheme's.
+
+      Dark, in both schemes, and that is the decision rather than an oversight. The foreground is
+      twelve gold coins; gold measures 2.42:1 on white (Color.kt) and cannot carry a shape there,
+      so a light splash would hide the mark. The cost is accepted: in the dark theme the splash
+      hands over to the app with no colour change at all, and in the light theme there is one
+      dark-to-light step at the end. One step, not two, and never an empty frame.
+
+      No `windowSplashScreenIconBackgroundColor`: the foreground is already drawn on its own
+      ground by this theme's background, and adding a second disc behind it would shrink the
+      icon into the smaller of the two size classes Android 12 defines.
+    -->
+    <style name="Theme.SubTrack.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/ic_launcher_ground</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <item name="postSplashScreenTheme">@style/Theme.SubTrack</item>
+    </style>
+
 </resources>

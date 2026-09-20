@@ -2,8 +2,8 @@ package com.elinacn.subtrack
 
 import android.graphics.Color
 import android.os.Bundle
+import android.os.SystemClock
 import android.view.View
-import android.view.ViewTreeObserver
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.LocalActivity
@@ -15,6 +15,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.graphics.toArgb
+import androidx.core.splashscreen.SplashScreen
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.elinacn.subtrack.ui.navigation.SubTrackNavHost
 import com.elinacn.subtrack.ui.theme.SubTrackTheme
@@ -31,6 +33,11 @@ class MainActivity : ComponentActivity() {
     private val viewModel: MainViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Before super.onCreate, and that order is the library's requirement rather than a
+        // preference: the call swaps the activity's theme from Theme.SubTrack.Starting to the
+        // `postSplashScreenTheme` it names, and it has to do that before the window is set up.
+        // Called after, the starting theme would be the theme the app keeps.
+        val splashScreen = installSplashScreen()
         super.onCreate(savedInstanceState)
         // Before setContent, because this is what stops the decor view fitting the system windows
         // and the window has to know before it is first laid out. Since phase 16 the app targets
@@ -38,18 +45,21 @@ class MainActivity : ComponentActivity() {
         // explicit on every release, and is what finally lets the insets reach Compose. See
         // ARCHITECTURE section 16.
         //
-        // The status bar style here is provisional and deliberately not `auto`: the window on
-        // screen for these few frames is the launch window, whose background comes from
-        // Theme.SubTrack and is light whatever the device is set to. `light` means "the background
-        // behind me is light", so the icons are drawn dark and stay readable during the hold. The
-        // effect inside the composition replaces this as soon as the stored theme arrives.
+        // The status bar style here is provisional and deliberately not `auto`. It follows the
+        // window that is actually on screen for these frames, and since phase 16h that window is
+        // the splash, whose background is the icon's own ground (#0D1A14) in both schemes. `dark`
+        // means "the background behind me is dark", so the icons are drawn light and stay
+        // readable across the hold. It was `light` until 16h, which was right while the launch
+        // window came from Theme.SubTrack and was white; against the splash it would draw dark
+        // icons on a near-black ground. The effect inside the composition replaces this as soon
+        // as the stored theme arrives.
         enableEdgeToEdge(
-            statusBarStyle = SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT)
+            statusBarStyle = SystemBarStyle.dark(Color.TRANSPARENT)
         )
         setContent {
             val themeState by viewModel.themeState.collectAsStateWithLifecycle()
             // Composed with the defaults while the read is still out. Those frames are real, and
-            // they are the ones the gate above keeps off the screen.
+            // they are the ones the splash below keeps off the screen.
             val theme = themeState ?: ThemeState()
             SubTrackTheme(themeMode = theme.mode, dynamicColor = theme.dynamicColor) {
                 SystemBarsFollowTheTheme(
@@ -61,61 +71,62 @@ class MainActivity : ComponentActivity() {
         }
         // After setContent, not before: the content view has no ViewTreeObserver of its own until
         // something is put in it, and a listener registered on the placeholder one never runs.
-        holdFirstFrameUntilThemeIsRead()
+        // The library registers its own OnPreDrawListener on exactly that view, so it inherits
+        // the constraint phase 14b measured - hence here rather than next to installSplashScreen.
+        keepSplashScreenUntilThemeIsRead(splashScreen)
     }
 
     /**
-     * Keeps the window from being drawn until the stored theme is in hand.
+     * Keeps the splash on screen until the stored theme is in hand.
      *
-     * Measured in phase 14b before this existed: with dark stored and the system on light, the
-     * home screen was drawn in full in the light scheme - background #D3E2D8, white app bar - and
-     * only then turned dark. One complete frame in the wrong theme, which reads as the app
-     * changing its mind in front of the user.
+     * Same job the phase 14b pre-draw gate did, and for the same measured reason: with dark stored
+     * and the system on light, the home screen was drawn in full in the light scheme - background
+     * #D3E2D8, white app bar - and only then turned dark. One complete frame in the wrong theme,
+     * which reads as the app changing its mind in front of the user.
      *
-     * Holding the first frame is the fix rather than guessing a theme to draw meanwhile: any guess
-     * is wrong for somebody, and this way the window background stands in for the few frames the
-     * read takes, exactly as it already does during a cold start.
+     * What changed in 16h is only *what stands in* during the wait. The gate used to hold the
+     * launch window, whose background came from Theme.SubTrack and was white; phase 16g measured
+     * the result as a blank #FAFAFA frame, 173-212 ms of it on API 34, sitting between the system
+     * splash and the app. Now the splash itself is what is held, so the wait shows the mark on the
+     * icon's own ground instead of nothing. **There is exactly one gate** - the old listener is
+     * gone, and two of them in series would each wait for the same read.
      *
      * The deadline is what keeps a held frame from becoming a blank app. If the preferences never
-     * arrive - a failure the repository's IOException fallback does not cover - the gate opens
-     * anyway and the app comes up in the default theme, which is what it did before this method
-     * existed. A wrong theme is recoverable; a window that never draws is not: the system reports
-     * it as "does not have a focused window" and kills the app for not responding.
+     * arrive - a failure the repository's IOException fallback does not cover - the splash gives
+     * up anyway and the app comes up in the default theme. A wrong theme is recoverable; a window
+     * that never draws is not: the system reports it as "does not have a focused window" and kills
+     * the app for not responding. Phase 16g measured the real wait at 173-212 ms, so a second is
+     * far out of reach in normal use - this is the failure path, not a budget.
      *
-     * The release is **posted** rather than checked inside the listener, and that part is
-     * load-bearing. Cancelling a draw does not schedule another traversal, and a listener only
-     * runs when one happens - so a deadline tested inside it would only be read if something else
-     * asked to draw. On the ordinary path that is fine, because the emission being waited for is
-     * itself what triggers the next traversal. On the path where nothing ever arrives there is no
-     * next traversal, and a deadline that never gets read is not a deadline. A delayed message on
-     * the main looper runs either way.
+     * The deadline lives here rather than in the ViewModel on purpose. "How long is this window
+     * allowed to stay blank" is a fact about this window, not about the preference; MainViewModel
+     * says only whether the value has arrived, and a repository that reported its own timeout
+     * would be answering a question about the UI.
+     *
+     * The wake-up is **posted** rather than only tested inside the condition, and that part is
+     * load-bearing. Cancelling a draw does not schedule another traversal, and the condition is
+     * only read when one happens - so a deadline tested inside it would only be read if something
+     * else asked to draw. On the ordinary path that is fine, because the emission being waited for
+     * is itself what triggers the next traversal. On the path where nothing ever arrives there is
+     * no next traversal, and a deadline that never gets read is not a deadline. A delayed message
+     * on the main looper runs either way.
      */
-    private fun holdFirstFrameUntilThemeIsRead() {
-        val content = findViewById<View>(android.R.id.content)
-        val gate = object : ViewTreeObserver.OnPreDrawListener {
-            override fun onPreDraw(): Boolean {
-                if (viewModel.themeState.value == null) return false
-                content.viewTreeObserver.removeOnPreDrawListener(this)
-                return true
-            }
+    private fun keepSplashScreenUntilThemeIsRead(splashScreen: SplashScreen) {
+        val deadline = SystemClock.uptimeMillis() + THEME_READ_TIMEOUT_MS
+        splashScreen.setKeepOnScreenCondition {
+            viewModel.themeState.value == null && SystemClock.uptimeMillis() < deadline
         }
-        content.viewTreeObserver.addOnPreDrawListener(gate)
-        content.postDelayed(
-            {
-                content.viewTreeObserver.removeOnPreDrawListener(gate)
-                // Asks for the traversal that the cancelled draws never scheduled.
-                content.invalidate()
-            },
-            THEME_READ_TIMEOUT_MS
-        )
+        val content = findViewById<View>(android.R.id.content)
+        // Asks for the traversal that the cancelled draws never scheduled.
+        content.postDelayed({ content.invalidate() }, THEME_READ_TIMEOUT_MS)
     }
 
     private companion object {
         /**
-         * The longest the window is held for a preference read.
+         * The longest the splash is held for a preference read.
          *
-         * Generous next to a read that finishes in a handful of frames, and short next to the
-         * cold start the user is already waiting through.
+         * Generous next to a read phase 16g measured at 173-212 ms, and short next to the cold
+         * start the user is already waiting through.
          */
         const val THEME_READ_TIMEOUT_MS = 1_000L
     }
