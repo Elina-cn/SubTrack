@@ -27,6 +27,330 @@ Her faz sonunda **en üste** yeni kayıt eklenir. Eski kayıtlar silinmez.
 
 ---
 
+## [Faz 16h] Açılış Ekranı — Beyaz Boşluk Kapatıldı — 2026-09-20
+
+**Durum:** Tamamlandı
+
+**Neden**
+
+16g'nin ölçümü şunu söylüyordu: performans sorunu yok (release soğuk açılış api34'te
+596 ms, api24'te 501 ms), ama kullanıcının gördüğü sırada **üç renk** vardı —
+sistem splash'ı `#FAFAFA` üzerinde ikonu gösteriyor, sonra **ikonsuz, tamamen boş
+bir `#FAFAFA` kare** geliyor (api34'te 173–212 ms, pikselin %99,75'i tek renk),
+ancak ondan sonra uygulama kendi `#D3E2D8` zeminini çiziyordu. API 24'te sistem
+splash'ı hiç yok, açılış boyunca markasız beyaz duruyordu.
+
+Bu turda **yeni bir açılış ekranı yazılmadı.** Var olan tema kapısı splash'a
+bağlandı: bekleme aynı bekleme, ama artık boşluk yerine işaretin kendisi duruyor.
+Tercihi okuyan kaynak (`MainViewModel`, `SettingsRepositoryImpl`) **değişmedi**.
+
+**Yapılanlar**
+
+*Görev 1 — bağımlılık*
+
+`gradle/libs.versions.toml`'a `splashscreen = "1.2.0"` girdisi ve
+`androidx-core-splashscreen` kütüphanesi eklendi; `app/build.gradle.kts` katalogdan
+tüketiyor. **Sürüm gerekçesi:** 1.2.0 en yeni **stabil** sürüm — 1.1.0 ve 1.2.0
+hatlarının geri kalan tüm girdileri alpha/beta/rc, 1.0.1 ise targetSdk 31'in kendi
+splash attribute'larından önceki 2022 sürümü. Aynı ölçüt katalogdaki `work` girdisinde
+de kullanılmıştı. Bağımsız doğrulama: `lintDebug` katalogdaki **eski olan her girdiyi**
+işaretliyor (AGP, core-ktx, room, hilt, navigation, datastore, compose-bom…) ama
+`core-splashscreen` için tek satır üretmiyor.
+
+Bedeli var: `androidx.appcompat:appcompat-resources:1.7.0` transitive olarak geliyor.
+
+*Görev 2 — tema*
+
+`values/themes.xml` içinde `Theme.SubTrack.Starting`, `Theme.SplashScreen`'den
+türetildi. Üç attribute:
+
+| Attribute | Değer |
+|---|---|
+| `windowSplashScreenBackground` | `@color/ic_launcher_ground` (`#FF0D1A14`) |
+| `windowSplashScreenAnimatedIcon` | `@drawable/ic_launcher_foreground` |
+| `postSplashScreenTheme` | `@style/Theme.SubTrack` |
+
+Zemin **`colors.xml`'den** okunuyor, `Color.kt`'den değil — ARCHITECTURE §27'nin tek
+yönlü kuralı: işaretin renkleri launcher'ın ve Play Store'un erişebileceği yerde sabit,
+bir tema renginin sonradan değişmesi işareti sessizce yeniden boyamamalı.
+
+`values-v31` dosyası **yazılmadı, gerekmedi**: kütüphane kendi `values-v31`'inde
+compat attribute'larını platform attribute'larına bağlıyor
+(`android:windowSplashScreenBackground` → `?windowSplashScreenBackground` vb.).
+AAR açılıp doğrulandı.
+
+`windowSplashScreenIconBackgroundColor` **kasıtlı olarak yazılmadı**: ön plan zaten
+bu temanın zemini üzerinde duruyor, ikinci bir disk eklemek ikonu Android 12'nin iki
+boyut sınıfından küçüğüne düşürürdü (240dp yerine 288dp).
+
+Manifest'te launcher activity'nin teması bu oldu. **`windowSoftInputMode="adjustResize"`
+satırına dokunulmadı** — diff'te yalnızca `android:theme` satırı değişik.
+
+`setOnExitAnimationListener` kullanılmadı; varsayılan çıkış yeterli.
+
+*Görev 4–5 — kapı*
+
+`MainActivity.onCreate`'te `super.onCreate` **öncesinde** `installSplashScreen()`.
+Dönen nesneye `setKeepOnScreenCondition` veriliyor: tercih okunana kadar `true`,
+1000 ms üst sınırıyla. **Eski `OnPreDrawListener` kapısı ve
+`holdFirstFrameUntilThemeIsRead()` tamamen kaldırıldı** — iki kapı üst üste kalmadı.
+
+`setKeepOnScreenCondition` `setContent`'ten **sonra** çağrılıyor. Sebep 14b'de
+ölçülmüştü: içerik görünümünün içine bir şey konana kadar kendi `ViewTreeObserver`'ı
+yok. Kütüphane dinleyicisini tam o görünüme kayıt ediyor, yani aynı kısıta tabi.
+
+Üst sınır mantığı `MainActivity`'de; `MainViewModel` ve repository'ler
+**değiştirilmedi**. Gecikmeli `invalidate()` korundu: iptal edilen çizim yeni bir
+traversal planlamaz, tercih hiç gelmezse koşulun bir daha okunacağı an olmazdı.
+
+**Yan etki — bilerek yapıldı**
+
+`enableEdgeToEdge`'deki geçici durum çubuğu stili `SystemBarStyle.light` →
+**`SystemBarStyle.dark`**. 16h'ye kadar `light` doğruydu, çünkü o karelerde ekranda
+duran pencere `Theme.SubTrack`'ten gelen beyaz açılış penceresiydi. Artık splash
+duruyor ve zemini `#0D1A14`; `light` bırakılsaydı ikonlar koyu zemine koyu çizilirdi.
+Ekran görüntüsüyle doğrulandı: api29'da koyu temada bant **11,91:1**, açık temada
+**5,74:1**, iki temada da bandın %7'si zeminden farklı piksel — yani ikonlar gerçekten
+çiziliyor (16-0'daki "bant tamamen boş" hatası yok).
+
+---
+
+### Görev 3 — pre-31 ikon boyutu ÖLÇÜLDÜ
+
+Endişe şuydu: kütüphane API 31 altında ikonu kendi çiziyor ve Android 12'nin
+maske/ölçek kuralını uygulamıyor; ön plan 108dp tuvalde 57,888dp işaret taşıdığı için
+pre-31'de küçük kalabilir.
+
+AAR'dan çıkan kural: ikon arka planı **verilmediğinde** çizim
+`splashscreen_icon_size_no_background` = **288dp**; maske 410dp dairede 109dp'lik
+kontur, yani görünür daire 301dp — 288dp'lik ikonu kırpmıyor. Android 12+'ın kendi
+"ikon arka planı yok" ölçüsü de 288dp. Beklenen işaret çapı:
+288 × (57,888 ⁄ 108) = **154,37 dp**.
+
+Ekranda ölçülen (splash karesinde altın piksellerin sınır kutusu, dp'ye çevrilmiş):
+
+| Cihaz | Yol | Yoğunluk | Ölçülen işaret çapı | api34'ten fark |
+|---|---|---|---|---|
+| api24 (SDK 24) | kütüphane çiziyor | 320dpi | **154,00 dp** | +0,065% |
+| api29 (SDK 29) | kütüphane çiziyor | 320dpi | **154,00 dp** | +0,065% |
+| api34 (SDK 34) | platform çiziyor | 420dpi | **153,90 dp** | — |
+| api36 (SDK 36) | platform çiziyor | 420dpi | **153,90 dp** | 0,00% |
+
+En büyük fark **0,10 dp = %0,065**. Eşik %20'ydi; **bildirilecek bir sapma yok,
+düzeltme gerekmedi.** `generate_icons.py` çalıştırılmadı, hiçbir ikon varlığına
+dokunulmadı.
+
+Ölçülen 154,00 ile beklenen 154,37 arasındaki 0,37 dp, kenar yumuşatması: sınır
+kutusu yalnızca altın eşiğini geçen pikselleri sayıyor.
+
+---
+
+### Doğrulama — soğuk açılış, RELEASE build, beşer koşu
+
+`adb shell am force-stop` → `logcat -c` → `am start -W`, sayılmayan bir ısınma
+açılışından sonra. Her hücrede `Displayed` satırı `TotalTime` ile birebir aynı çıktı.
+
+| Cihaz | 16g tabanı (min/medyan/max) | **16h** (min/medyan/max) | medyan farkı |
+|---|---|---|---|
+| api24 | 432 / **501** / 525 | 355 / **403** / 443 | **−98 ms** |
+| api29 | *(16g'de ölçülmedi)* | 543 / **567** / 656 | yeni taban |
+| api34 | 583 / **596** / 1397 | 499 / **563** / 576 | **−33 ms** |
+
+16h ham TotalTime değerleri:
+- api24: 413, 443, 403, 355, 391
+- api29: 567, 656, 561, 543, 618
+- api34: 550, 499, 563, 576, 564
+
+**Süre artmadı; iki cihazda da düştü.** Düşüşe yorum yüklemiyorum: ölçüm boş
+veritabanıyla ve emülatörde yapıldı, aradaki fark koşu içi dağılımın genişliğiyle
+aynı mertebede.
+
+> api34'te ilk ölçüm seti emülatör boot sonrası hâlâ oturuyordu (2122, 1988, 1189,
+> 570, 710 — açık bir düşüş trendi). O set atıldı, yük oturduktan sonra tekrarlandı.
+
+---
+
+### Doğrulama — splash → uygulama geçişinde üçüncü renk yok
+
+Ardışık kareler yakalanıp her karenin **baskın rengi** ölçüldü. 16g'nin boş karesi
+pikselin %99,75'i tek renkti, yani baskın renk bu soruyu cevaplayacak kadar keskin
+bir ölçüt.
+
+**Koyu temada zemin hiç değişmiyor:**
+
+| Cihaz | Dizi |
+|---|---|
+| api34 | başlatıcı → `#0D1A14` → `#0D1A14` (dört bağımsız açılış) |
+| api29 | başlatıcı → `#0D1A14` (%94,9) → `#0D1A14` (%64,7) |
+| api24 | başlatıcı → `#0D1A14` (%94,7) → `#0D1A14` (%56,4) |
+| api36 | başlatıcı → `#0D1A14` (%96,8) → `#0D1A14` (%73,5) |
+
+Oranın düşmesi zeminin değişmesi değil, üstüne kart ve metin gelmesi.
+
+**Açık temada tek adım var, araya giren renk yok:**
+
+| Cihaz | Dizi |
+|---|---|
+| api34 | `#0D1A14` (%97,0) → `#C8D7CC` → `#D3E2D8` |
+| api29 | `#0D1A14` (%94,9) → `#65736C` → `#D3E2D8` |
+| api36 | `#0D1A14` (%96,8) → `#65736C` → `#D3E2D8` |
+
+Aradaki değerler bağımsız bir üçüncü renk değil, **çapraz geçiş karesi**. Kanıt:
+`#0D1A14` → `#D3E2D8` doğrusu üzerinde her kanal için aynı `t` çıkıyor.
+
+| Ara renk | t (R, G, B) | kanallar arası sapma |
+|---|---|---|
+| `#C8D7CC` | 0,944 / 0,945 / 0,939 | **0,0062** |
+| `#65736C` | 0,444 / 0,445 / 0,449 | **0,0045** |
+
+**Beyaz kare taraması** — dört cihaz, iki tema, yakalanan **83 kare**, durum çubuğu
+bandı kırpılarak `#FAFAFA`/`#FFFFFF` oranı:
+
+| Grup | Kare | En yüksek beyaz oranı |
+|---|---|---|
+| api34 açık / koyu | 15 / 12 | %10,2 / %8,1 |
+| api29 açık / koyu | 8 / 8 | %9,8 / %1,5 |
+| api24 açık / koyu | 8 / 8 | %9,8 / %7,7 |
+| api36 açık / koyu | 12 / 12 | %10,0 / %0,3 |
+
+Hiçbir karede %10,2'yi geçmiyor. 16g'de ölçülen boş kare **%99,75** (api34) ve
+**%87,4** (api24) beyazdı. Boş beyaz kare kalktı.
+
+---
+
+### Doğrulama — kapı üst sınırı
+
+Geçici bir yama `MainActivity`'deki kapı koşulunun ilk yan tümcesini 5 sn boyunca
+`true` tuttu — yani "tercih hiç gelmedi" hâli taklit edildi. Repository'ye ve
+ViewModel'e dokunulmadı; takılan bir okumanın `true` tutacağı koşul zaten
+MainActivity'nin sahibi olduğu koşul. Yama tur sonunda kaldırıldı.
+
+| Cihaz | Kapının açıldığı an | `themeActuallyRead` | simüle takılma hâlâ aktif mi |
+|---|---|---|---|
+| api34 | **t+1258 ms** | **false** | evet |
+| api34 | t+1122 ms | true | evet |
+| api34 | t+1003 ms | true | evet |
+| api24 | t+1013 ms | true | evet |
+| api36 | t+1009 ms | true | evet |
+
+Birinci satır kanıtın kendisi: tercih gerçekten okunmamıştı **ve** simüle takılma
+hâlâ "okunmadı" diyordu; kapıyı açan tek şey son tarih olabilirdi.
+
+---
+
+### Doğrulama — testler, lint, R8, boyut
+
+| Ölçüt | Sonuç |
+|---|---|
+| `testDebugUnitTest --rerun-tasks` | **330 test, 0 başarısız, 0 hata** |
+| `connectedDebugAndroidTest` (api34) | **19 test, 0 başarısız, 0 hata, 1 atlanan** |
+| `lintDebug` | 22 bulgu — **hepsi 16h öncesinden**, dokunulan dosyalarda sıfır |
+| `assembleRelease` | geçti |
+| R8 keep kuralı | **gerekmedi** |
+| Release APK | 2 178 560 → **2 184 114 B** (+5 554 B, **+%0,25**) |
+
+Atlanan enstrümantasyon testi
+`PaymentReminderWorkerTest.reminderWorker_notificationsDisabled_succeedsWithoutNotifying`;
+sebebi kendi `assumeFalse("notifications are enabled…")`'ı ve 16h öncesinde de
+atlanıyordu — bu turun sonucu değil.
+
+Keep kuralı gerekmemesinin sebebi tahmin değil: AAR'ın `proguard.txt`'si
+*"Intentionally empty proguard rules to indicate this library is safe to shrink"*
+diyor ve `app/proguard-rules.pro` hâlâ **sıfır** `-keep` satırı taşıyor.
+
+> Not: promptta taban 2,03 MiB deniyordu; 16g'nin commit'inden (`1c2f55e`) yeniden
+> üretilen APK 2 178 560 B = 2,0776 MiB ölçüldü. Yukarıdaki fark bu ikisi arasında,
+> aynı makinede, aynı yapılandırmayla.
+
+---
+
+### Doğrulama — tema regresyonu
+
+Uygulamanın kendi ayar ekranından sürüldü (API 29'da `cmd uimode night` yok, ama
+Faz 14 tercihi var ve ölçülen o).
+
+| Adım | api34 | api29 |
+|---|---|---|
+| Tema = Açık | `#D3E2D8`, çökme yok | `#D3E2D8`, çökme yok |
+| Tema = Koyu | `#0D1A14`, çökme yok | `#0D1A14`, çökme yok |
+| Tema = Sistemi takip et | `#D3E2D8`, çökme yok | `#D3E2D8`, çökme yok |
+| Duvar kâğıdı renkleri aç/kapa | Açık ↔ Kapalı, çökme yok | *"Android 12 ve üzeri gerekir"* — beklenen |
+| Döndürme (yatay ↔ dikey) | `#0D1A14`, çökme yok | `#0D1A14`, çökme yok |
+
+**api29 / gezinme çubuğu yok** (`subtrack_narrow_api29`, `hw.mainKeys=yes`):
+`dumpsys window` uygulamaya `app=720x1280` veriyor, yani tam ekran — çubuk için
+ayrılmış boşluk yok. Tema değişiminden sonra alt kenarın son 24 pikseli koyu temada
+%93,8 `#0D1A14`, açık temada %89,0 `#D3E2D8`; artık bir çubuk gölgesi ya da boşluk
+yok. Durum çubuğu bandı iki temada da yukarıdaki kontrast değerleriyle çiziliyor.
+
+---
+
+### Ekran görüntüleri
+
+`docs/screenshots/phase-16h/` altında sekiz dosya:
+`splash-{light,dark}-api{24,29,34,36}.png`.
+
+api24'ün iki dosyası **birebir aynı** (MD5 `5F14EA3F7FA53E9AF450B436E0988164`).
+Bu bir kopyalama hatası değil, sonucun kendisi: splash'ta temaya bağlı tek piksel
+yok, iki çekim aynı dakikaya denk geldiği için saat de aynı. Diğer üç cihazda
+çekimler farklı dakikalara denk geldiğinden dosyalar ayrışıyor.
+
+Splash karelerinin bir kısmı, güvenilir yakalanabilmesi için yukarıdaki geçici
+gecikme yamasıyla alındı: splash'ın **pikselleri** aynı, yalnızca ekranda kalma
+süresi uzun. Renk dizisi ölçümlerinin tamamı gerçek build ile yapıldı (api36'nın
+dizisi hem gecikmeli hem gerçek build ile ayrı ayrı doğrulandı).
+
+---
+
+### AAB BAYATLADI
+
+**`AndroidManifest.xml` ve tema değişti; mevcut AAB artık bu kodu temsil etmiyor.
+Faz 16g yeniden koşulmalı.** Bu turda AAB **üretilmedi.**
+
+---
+
+### Kapsam dışı — bildiriliyor, yapılmadı
+
+1. **`docs/ARCHITECTURE.md` §23 bayatladı.** 1922–1945 satırları "Açılışta ilk kare
+   TUTULUYOR" başlığı altında `MainActivity`'deki `OnPreDrawListener`'ı anlatıyor;
+   o dinleyici bu turda kaldırıldı. Mekanizma değişti, karar değişmedi. CLAUDE.md §7
+   ARCHITECTURE güncellemesi istiyor, ama bu turun görev listesinde yok — kararı
+   kullanıcıya bırakıyorum.
+2. **`mipmap-anydpi-v26/ic_launcher.xml` ve `ic_launcher_round.xml` yorumları
+   bayat.** İkisi de işaretin 65,78dp olduğunu yazıyor; 16d onu %88'e indirdi ve
+   gerçek değer 57,888dp. DOKUNMA listesindeki dosyalar, elleşmedim.
+3. **Emülatör ANR'ı.** api34'te duman testi sırasında "Process system isn't
+   responding" çıktı; o an arka planda R8 koşuyordu. Build bittikten sonra aynı
+   açılış temiz geçti ve sonraki 5+5 ölçümde tekrarlamadı. Uygulama kaynaklı
+   görünmüyor ama "kesin değil" diye işaretliyorum.
+
+**Değişen dosyalar**
+- `gradle/libs.versions.toml` — `splashscreen = "1.2.0"` ve kütüphane girdisi
+- `app/build.gradle.kts` — `implementation(libs.androidx.core.splashscreen)`
+- `app/src/main/res/values/themes.xml` — `Theme.SubTrack.Starting`
+- `app/src/main/AndroidManifest.xml` — yalnızca activity'nin `android:theme` satırı
+- `app/src/main/java/com/elinacn/subtrack/MainActivity.kt` — `installSplashScreen()`,
+  `keepSplashScreenUntilThemeIsRead()`, eski pre-draw kapısı silindi,
+  geçici durum çubuğu stili `dark`
+- `docs/screenshots/phase-16h/` — sekiz açılış karesi
+
+**Karşılaşılan sorunlar**
+- İlk `packageDebug` bir kez `IncrementalSplitterRunnable` hatasıyla düştü, ikinci
+  koşuda geçti; dosya kilidi, koddan bağımsız.
+- `connectedDebugAndroidTest` ilk denemede `INSTALL_FAILED_UPDATE_INCOMPATIBLE`
+  verdi — cihazda release kuruluydu, debug imzasıyla çakıştı. Kaldırıldı, geçti.
+- Splash penceresi gerçek build'de `screencap`'in kare başına ~250–300 ms'sinden
+  kısa; yakalama döngüsü `am start` ile paralel çevrildi ve ikon karesi için geçici
+  gecikme yaması kullanıldı.
+
+**Sonraki faz için not**
+- 16g yeniden koşulup AAB yeniden üretilmeli.
+- Asıl yargı OPPO A15s / Android 10 / 423dp üzerinde verilecek. Bu turda API 29
+  emülatörü 360dp'ydi; genişlik farkı splash'ı etkilemez (ikon ekran merkezinde ve
+  ekran genişliğinden bağımsız 154 dp) ama gerçek cihazda bakılması yine de anlamlı.
+
+---
+
 ## [Ölçüm — soğuk açılış] Teşhis Turu — 2026-09-20
 
 **Durum:** Tamamlandı — **hiçbir davranış değiştirilmedi.** Bu tur yalnızca ölçüm
