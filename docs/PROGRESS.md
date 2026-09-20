@@ -27,6 +27,356 @@ Her faz sonunda **en üste** yeni kayıt eklenir. Eski kayıtlar silinmez.
 
 ---
 
+## [Ölçüm — soğuk açılış] Teşhis Turu — 2026-09-20
+
+**Durum:** Tamamlandı — **hiçbir davranış değiştirilmedi.** Bu tur yalnızca ölçüm
+ve teşhis; optimizasyon, splash ekleme veya bağımlılık ekleme yapılmadı. Ölçüm
+için `SubTrackApplication.kt` ve `MainActivity.kt` içine geçici log konuldu,
+tur sonunda `git checkout --` ile geri alındı ve `git status` temiz bırakıldı.
+
+---
+
+### Ölçüm ortamı
+
+| | api34 | api24 | api36 |
+|---|---|---|---|
+| AVD | `subtrack_wide_api34` | `subtrack_min_api24` | `subtrack_edge_api36` |
+| Android | 14 (SDK 34) | 7.0 (SDK 24) | 16 (SDK 36) |
+| Ekran | 1080×2400 @420dpi | 720×1280 @320dpi | 1080×2400 @420dpi |
+| ABI / çekirdek / RAM | x86_64 / 4 / 2 GB | x86_64 / 4 / 2 GB | x86_64 / 4 / 2 GB |
+
+- **Aynı anda tek emülatör** çalıştırıldı. İki emülatör aynı CPU'yu paylaşınca
+  soğuk açılış sayıları bozuluyor; her cihaz ölçülürken diğerleri kapalıydı.
+- Ölçüm sırasında Gradle çalışmadı. Derlemeler ölçümlerden ayrı yapıldı.
+- Animasyon ölçekleri **değiştirilmedi** (`window_animation_scale = 1.0`,
+  `transition_animation_scale = 1.0`).
+- Yöntem: `adb shell am force-stop` → `logcat -c` → 3 sn bekle →
+  `adb shell am start -W -n com.elinacn.subtrack/.MainActivity`.
+- Her hücrede **sayılmayan bir ısınma açılışı** var: ilk açılış `subtrack.db` ve
+  `settings.preferences_pb` dosyalarını yaratıyor ve tek başına bir aykırı değer
+  oluyor (api34 release: ısınma **3110 ms**, sonraki koşular 583–618 ms).
+- **Veritabanı her ölçümde boştu** (temiz kurulum). Gerçek kullanıcı verisiyle
+  ilk kare daha uzun sürer; aşağıdaki sayılar bir **taban** değeridir.
+
+---
+
+### Görev 1–2 — Soğuk açılış tablosu (iki build × iki cihaz, beşer ölçüm)
+
+`am start -W` çıktısı, ms:
+
+| Cihaz | Build | ham TotalTime | min | **medyan** | max |
+|---|---|---|---|---|---|
+| api34 | release | 1397, 583, 596, 618, 587 | 583 | **596** | 1397 |
+| api34 | debug | 4032, 3156, 3142, 3185, 3774 | 3142 | **3185** | 4032 |
+| api24 | release | 432, 525, 465, 509, 501 | 432 | **501** | 525 |
+| api24 | debug | 677, 794, 601, 600, 654 | 600 | **654** | 794 |
+
+WaitTime, ms:
+
+| Cihaz | Build | ham WaitTime | min | **medyan** | max |
+|---|---|---|---|---|---|
+| api34 | release | 1411, 594, 630, 622, 593 | 593 | **622** | 1411 |
+| api34 | debug | 4040, 3157, 3145, 3189, 3777 | 3145 | **3189** | 4040 |
+| api24 | release | 436, 531, 471, 514, 505 | 436 | **505** | 531 |
+| api24 | debug | 682, 801, 605, 605, 660 | 605 | **660** | 801 |
+
+**İki build arasındaki fark (medyan TotalTime):**
+
+| Cihaz | release | debug | oran |
+|---|---|---|---|
+| api34 | 596 | 3185 | **5,34×** |
+| api24 | 501 | 654 | **1,31×** |
+
+Oranın cihazdan cihaza bu kadar değişmesinin sebebi ölçüldü — `dumpsys package`
+çıktısındaki dexopt durumu:
+
+| Cihaz | Build | dexopt durumu |
+|---|---|---|
+| api34 | release | `[status=verify] [reason=install]` |
+| api34 | debug | `[status=run-from-apk]`, `[location is error]` |
+| api24 | release | `compilation_filter=interpret-only, status=kOatUpToDate` |
+| api24 | debug | `compilation_filter=interpret-only, status=kOatUpToDate` |
+
+api34'te debug build `run-from-apk` durumunda: dex her açılışta yeniden
+çıkartılıp doğrulanıyor, üstelik **main thread'de**. api24'te iki build de
+kurulumda `interpret-only` odex almış, bu yüzden fark 1,31× ile kalıyor.
+
+> ARCHITECTURE §"Açılış performansı release build'de ölçülür" bu projede
+> debug/release oranını **~9,5×** (OPPO CPH2179, Android 10) diye kaydetmişti.
+> api34'teki ölçüm 5,34×, api24'teki 1,31×. Oran cihaza ve dexopt durumuna bağlı;
+> belgedeki "yargıya varmadan önce release'de ölç" kuralı geçerli, ama tek bir
+> sabit oran yok.
+
+---
+
+### Görev 3 — logcat `Displayed` ↔ rapor karşılaştırması
+
+Soğuk koşuların **20'sinin 20'sinde** `Displayed` satırı `TotalTime` ile birebir
+aynı çıktı. Örnekler:
+
+```
+api34 release run 2:  TotalTime: 583
+  ActivityTaskManager: Displayed com.elinacn.subtrack/.MainActivity for user 0: +583ms
+api34 debug   run 1:  TotalTime: 4032
+  ActivityTaskManager: Displayed com.elinacn.subtrack/.MainActivity for user 0: +4s32ms
+api24 release run 3:  TotalTime: 465
+  ActivityManager: Displayed com.elinacn.subtrack/.MainActivity: +465ms
+```
+
+Yani `am start -W`'nin TotalTime'ı ile sistemin kendi ölçtüğü süre **aynı olayı**
+ölçüyor: ilk karenin çizildiği an. İkisi arasında açıklanması gereken bir sapma yok.
+
+---
+
+### Görev 4 — Sıcak açılış (home tuşu → geri dönüş)
+
+Process **öldürülmedi**; her koşuda `pidof` ile hayatta olduğu doğrulandı
+(api34 release'de beş koşu boyunca pid 6179 sabit). `am start -W` `LaunchState: HOT`
+raporluyor.
+
+| Cihaz | Build | ham TotalTime | min | **medyan** | max |
+|---|---|---|---|---|---|
+| api34 | release | 434, 148, 161, 145, 152 | 145 | **152** | 434 |
+| api34 | debug | 343, 194, 199, 202, 181 | 181 | **199** | 343 |
+| api24 | release | 33, 34, 25, 27, 33 | 25 | **33** | 34 |
+| api24 | debug | 33, 35, 29, 23, 35 | 23 | **33** | 35 |
+
+**Soğuk ↔ sıcak farkı (medyan):**
+
+| Cihaz | Build | soğuk | sıcak | fark | soğuğun sıcak olmayan kısmı |
+|---|---|---|---|---|---|
+| api34 | release | 596 | 152 | 444 ms | %74,5 |
+| api34 | debug | 3185 | 199 | 2986 ms | %93,8 |
+| api24 | release | 501 | 33 | 468 ms | %93,4 |
+| api24 | debug | 654 | 33 | 621 ms | %95,0 |
+
+**Bu farkın söylediği şey:** debug ile release'in **sıcak** süreleri neredeyse eşit
+(api34: 199 ↔ 152; api24: 33 ↔ 33), ama **soğuk** süreleri api34'te 5,34× ayrışıyor.
+Activity oluşturma, composition ve çizim iki build'de de benzer maliyette; ayrışma
+tamamen process kurulumunda — sınıf yükleme ve dex doğrulama tarafında.
+
+Sıcak açılışta `Displayed` satırı hiç yazılmıyor; activity yeniden yaratılmadığı
+için sistemin sayacak bir "ilk kare"si yok. Bu beklenen davranış.
+
+---
+
+### Görev 5 — Ana iş parçacığı taraması
+
+İki bağımsız yöntem kullanıldı:
+
+1. **atrace** (kod değişikliği gerektirmeyen sistem izi):
+   `atrace --async_start -c -b 60000 -a com.elinacn.subtrack am wm view gfx res dalvik database disk sched`
+2. **Geçici log** (`SubTrackApplication.kt` + `MainActivity.kt`, tur sonunda kaldırıldı):
+   her adımın `SystemClock.uptimeMillis()` farkı ve `Thread.currentThread().name`'i,
+   artı `StrictMode.ThreadPolicy` ile `detectDiskReads().detectDiskWrites().penaltyLog()`.
+
+#### 5a — Geçici log ile ölçülen adımlar (release build, üç soğuk açılış)
+
+**api34** (o üç açılışın TotalTime'ı: 715 / 633 / 770 ms — enstrümanlı build
+temiz build'den bir miktar yavaş; yetkili sayılar Görev 1 tablosundadır):
+
+| Adım | L1 | L2 | L3 | İş parçacığı |
+|---|---|---|---|---|
+| `super.onCreate()` — Hilt grafı + alan enjeksiyonu | 2 | 2 | 1 | **main** |
+| `reminderScheduler.schedule()` — WorkManager kurulum + enqueue | 6 | 4 | 2 | **main** |
+| `snapshotRecorder.start()` | 1 | 1 | 2 | **main** |
+| **`Application.onCreate` TOPLAM** | **9** | **7** | **5** | **main** |
+| Application.onCreate çıkışı → Activity.onCreate girişi | 39 | 50 | 31 | — |
+| `super.onCreate()` (Activity) | 2 | 1 | 0 | **main** |
+| `enableEdgeToEdge()` | 23 | 11 | 11 | **main** |
+| `setContent { }` (dönüş anı) | 1 | 1 | 1 | **main** |
+| **`MainActivity.onCreate` TOPLAM** | **26** | **13** | **12** | **main** |
+| onCreate çıkışı → ilk `onPreDraw` (ilk composition + ölçüm + yerleşim) | 122 | 115 | 186 | **main** |
+| **tema kapısının pencereyi tuttuğu süre** | **205** | **212** | **173** | **main** |
+| kapı açıldı → ilk gerçek çizim | 3 | 1 | 3 | **main** |
+| reddedilen `onPreDraw` sayısı | 1 | 2 | 1 | — |
+
+**api24** (TotalTime: 383 / 426 / 428 ms):
+
+| Adım | L1 | L2 | L3 | İş parçacığı |
+|---|---|---|---|---|
+| `super.onCreate()` — Hilt | 7 | 9 | 22 | **main** |
+| `reminderScheduler.schedule()` — WorkManager | 27 | 14 | 19 | **main** |
+| `snapshotRecorder.start()` | 3 | 4 | 5 | **main** |
+| **`Application.onCreate` TOPLAM** | **37** | **27** | **46** | **main** |
+| Application çıkışı → Activity girişi | 27 | 36 | 30 | — |
+| `super.onCreate()` (Activity) | 3 | 3 | 5 | **main** |
+| `enableEdgeToEdge()` | 10 | 6 | 10 | **main** |
+| `setContent { }` (dönüş anı) | 5 | 3 | 6 | **main** |
+| **`MainActivity.onCreate` TOPLAM** | **18** | **12** | **21** | **main** |
+| onCreate çıkışı → ilk `onPreDraw` | 183 | 177 | 178 | **main** |
+| **tema kapısının tuttuğu süre** | **0** | **50** | **0** | **main** |
+| reddedilen `onPreDraw` sayısı | 0 | 2 | 0 | — |
+
+api24'te üç açılışın ikisinde `frame.firstPreDraw` anında `themeKnown=true` idi —
+DataStore okuması ilk composition'dan **önce** bitmiş, kapı hiç kapanmamış.
+api34'te üç açılışın üçünde de kapı kapandı ve 173–212 ms tuttu.
+
+#### 5b — Dört soruya doğrudan cevap
+
+| Soru | Cevap | Kanıt |
+|---|---|---|
+| **Hilt grafının kurulumu** | main thread, **1–2 ms** (api34) / **7–22 ms** (api24) | Geçici log: `app.super.onCreate[Hilt graph+inject]=2ms thread=main` |
+| **Room'un ilk açılışı main thread'de mi?** | **Hayır.** Açılış yolunda main thread'de hiç disk okuma/yazma yok | `StrictMode` `detectDiskReads()+detectDiskWrites()+penaltyLog()` ile **0 ihlal** (api34 ve api24). atrace'te iş `WM.task-1` ve `DefaultDispatcher-worker-*` üzerinde; process'te `arch_disk_io_0..3` iş parçacıkları var |
+| **DataStore'un ilk okuması main thread'de mi?** | **Hayır.** Aynı StrictMode kanıtı; okuma DataStore'un kendi IO scope'unda | 0 StrictMode ihlali. Okumanın *bittiği* an main thread'de görünür hale geliyor: `frame.gateOpen` |
+| **WorkManager başlatıcısı: Startup provider mı, manuel mi?** | **Manuel.** `androidx.work.WorkManagerInitializer` manifest'te `tools:node="remove"` ile kaldırılmış; WorkManager ilk `getInstance()` çağrısında kuruluyor | atrace'te `Startup` bloğunun içinde yalnızca `ProcessLifecycleInitializer` (8,24 ms), `ProfileInstallerInitializer` (2,04 ms) ve `EmojiCompatInitializer` var — WorkManager yok. Kurulum bizim `reminderScheduler.schedule()` çağrımızda, main thread'de, 2–6 ms (api34) / 14–27 ms (api24) |
+
+WorkManager kurulduktan sonraki işini kendi iş parçacıklarına atıyor:
+`WM-ForceStopRunnable` ve `WM-SystemJobScheduler: Scheduling work ID …` satırları
+`WM.task-1` üzerinde; main thread'de yalnızca
+`WM-Schedulers: Created SystemJobScheduler` görünüyor.
+
+#### 5c — atrace: ana iş parçacığının tam dökümü (api34)
+
+Bölüm süreleri, ms. **atrace'in kendisi ölçümü şişirir** — buradaki sayılar
+oranları ve sıralamayı gösterir; yetkili toplamlar Görev 1'deki `am start -W`
+tablolarıdır.
+
+| Bölüm | release | debug |
+|---|---|---|
+| `ActivityThreadMain` | 19,84 | 66,73 |
+| **`bindApplication`** | **238,08** | **1349,40** |
+| ├ `setSystemFontMap` | 48,44 | — |
+| ├ `ResourcesManager#applyConfigurationToResources` | 45,73 | 3,47 |
+| ├ `OpenDexFilesFromOat` | **41,75** | **617,84** |
+| │  └ içinde `Extract dex file` + `Verify dex file` | (yok) | 243,8 + 359,4 |
+| ├ `ResourcesManager#getResources` | 34,63 | 11,17 |
+| └ `Startup` (androidx.startup provider) | 13,21 | 72,32 |
+| **`activityStart`** | **143,58** | **326,55** |
+| └ `performCreate:MainActivity` | 78,62 | 195,76 |
+| `activityResume` | 41,43 | 13,94 |
+| **ilk `Choreographer#doFrame`** | **498,03** | **1782,29** |
+| └ `Compose:recompose` (ilk kare içinde) | 69,48 | — |
+| └ `measure` / `AndroidOwner:onMeasure` | 286,98 | — |
+| └ `TextStringSimpleNode::measure` (26 çağrı toplamı) | 169,7 | — |
+| └ `TextLayout:initLayout` (26 çağrı toplamı) | 127,8 | — |
+
+Debug'daki `bindApplication` şişkinliğinin **%46'sı** tek bir kalemden geliyor:
+dex'in çıkartılıp doğrulanması (617,84 ms), ki bu `run-from-apk` durumunun
+doğrudan sonucu. Debug'ın ilk `doFrame`'i de 1782 ms; içi ağırlıkla Compose
+sınıflarının `VerifyClass` çağrıları — release'de bu sınıflar kurulumda
+doğrulanmış olduğu için o maliyet yok.
+
+#### 5d — Tema kapısı izde de görünüyor
+
+Release izinde ana iş parçacığındaki `Choreographer#doFrame` bölümleri:
+
+```
+  t+ 517.6ms  dur= 498.03ms  Choreographer#doFrame 292094   cizim_yapildi=False
+  t+1368.3ms  dur=  36.77ms  Choreographer#doFrame 292338   cizim_yapildi=False
+  t+1410.5ms  dur= 128.77ms  Choreographer#doFrame 292698   cizim_yapildi=True
+```
+
+İlk **iki** kare hiç çizim üretmiyor. `MainActivity.holdFirstFrameUntilThemeIsRead()`
+tercih okunana kadar `onPreDraw`'dan `false` döndürüyor; ilk gerçek çizim üçüncü
+karede oluyor. Bu, tasarlandığı gibi çalışan bir davranış (ARCHITECTURE §"Açılışta
+ilk kare TUTULUYOR") — ama maliyeti artık ölçülü: api34'te 173–212 ms.
+
+---
+
+### Görev 6 — Açılış anında ekranda ne var
+
+Ekran görüntüleri **repoya eklenmedi** (bu turun kuralı `git status`'un temiz
+kalması). Dosyalar oturumun geçici klasöründe, kullanıcıya ayrıca iletildi:
+`1_api34_sistem_splash.png`, `2_api34_splash_sonrasi_bos_kare.png`,
+`3_api36_sistem_splash.png`, `4_api24_acilis_ani.png`.
+
+| # | Cihaz | Ne görünüyor | Piksel kanıtı |
+|---|---|---|---|
+| 1 | api34 | **Sistem splash'ı**: `#FAFAFA` zemin, ortada uygulama işareti (koyu zümrüt daire + altın para halkası) | merkez piksel `(13, 26, 20)`; merkez 300×300 kutusunda `(212, 175, 55)` = **#D4AF37** 40.766 piksel; zemin `(250, 250, 250)` 2.445.101 piksel |
+| 2 | api34 | **Splash'tan sonra, uygulama çizilmeden önce: ikonsuz, tamamen boş beyaz kare** | 2.592.000 pikselin 2.585.447'si (**%99,75**) `(250, 250, 250)`; merkez 300×300 kutusunda **tek bir renk** var |
+| 3 | api36 | Sistem splash'ı, api34 ile aynı: `#FAFAFA` zemin + aynı işaret (kare sönümlenme anında yakalandığı için renkler açılmış) | merkez `(57, 67, 62)`, işaret altını `(219, 189, 91)` 40.766 piksel — api34'teki piksel sayısıyla birebir aynı |
+| 4 | api24 | **Sistem splash'ı yok** (Android 12 öncesi). Yalnızca pencere arka planı: ikonsuz, markasız düz beyaz | 921.600 pikselin 805.186'sı `(250, 250, 250)`; gövde tek renk, kalanı sistem çubukları |
+
+`#FAFAFA` bir tercih değil, miras: `Theme.SubTrack`'in ebeveyni
+`android:Theme.Material.Light.NoActionBar` ve temada `windowSplashScreenBackground`,
+`windowSplashScreenAnimatedIcon` veya `postSplashScreenTheme` tanımlı değil. Sistem
+splash'ı bu yüzden `windowBackground`'ı ve `android:icon`'u kullanıyor.
+
+Uygulamanın kendi zemini `#D3E2D8` (`EmeraldBackdrop`, ölçüldü: `(211, 226, 216)`).
+Yani kullanıcının gördüğü sıra şu:
+
+- **api34 / api36:** `#FAFAFA` + ikon → **`#FAFAFA`, ikonsuz, boş** → `#D3E2D8` uygulama
+- **api24:** `#FAFAFA`, ikonsuz, boş → `#D3E2D8` uygulama
+
+---
+
+### Kapsam dışı — düzeltilmedi, karar kullanıcıya bırakıldı
+
+Bu turda hiçbiri değiştirilmedi. Sıralama etkiye göre:
+
+1. **Splash ile uygulama arasında boş beyaz kare var.** api34'te tema kapısı
+   pencereyi 173–212 ms tutuyor ve o süre boyunca ekranda ikonsuz `#FAFAFA`
+   duruyor (ekran görüntüsü 2). Sistem splash'ı ikonu gösterip kayboluyor, sonra
+   marka taşımayan boş bir beyaz geliyor. "Geç açılıyor" hissinin en olası kaynağı
+   bu: süre değil, **boşluğun görünür olması.**
+2. **`Theme.SubTrack`'te splash kuralı yok.** `windowSplashScreenBackground` ve
+   `postSplashScreenTheme` tanımsız; splash zemini `Theme.Material.Light`'tan
+   geliyor ve uygulamanın kendi zemini (`#D3E2D8`) ile aynı değil, dolayısıyla
+   splash → uygulama geçişi bir renk sıçraması.
+3. **İlk karedeki en büyük tek kalem metin yerleşimi.** api34 release izinde
+   `TextStringSimpleNode::measure` 26 çağrıda 169,7 ms, `TextLayout:initLayout`
+   26 çağrıda 127,8 ms. Ölçüm boş veritabanıyla yapıldı; liste doluyken bu artar.
+4. **Baseline profile kurulmuyor.** logcat: `ProfileInstaller: Skipping profile
+   installation for com.elinacn.subtrack`. api34'te dexopt `status=verify`
+   seviyesinde kalıyor. Play üzerinden kurulumda durum farklı olabilir;
+   emülatördeki bu ölçüm AOT derlenmemiş bir kurulumu temsil ediyor.
+5. **Ölçüm artefaktı, davranış değil:** her koşuda `am force-stop` kullanıldığı için
+   `WM-ForceStopRunnable: Application was force-stopped, rescheduling.` tetikleniyor
+   ve WorkManager fazladan iş yapıyor. Normal kullanımda bu her açılışta olmaz —
+   yani gerçek soğuk açılış bu tablodan bir miktar **daha hızlı** olabilir.
+6. **`enableEdgeToEdge()` api34'te 11–23 ms**, `Application.onCreate`'in tamamından
+   (5–9 ms) daha pahalı. Küçük, ama açılış yolundaki en pahalı tek kendi çağrımız.
+
+---
+
+### Ne yavaş değil
+
+Rapor edilen gecikmenin kaynağı **olmayan** şeyler, ölçülerek elendi:
+
+- `Application.onCreate` bütünüyle **5–9 ms** (api34) / **27–46 ms** (api24).
+- Hilt grafının kurulumu **1–2 ms** (api34).
+- WorkManager kurulumu + enqueue **2–6 ms** (api34); Startup provider'dan
+  çıkarılmış olması çalışıyor ve bir maliyet doğurmuyor.
+- Room ve DataStore main thread'e hiç dokunmuyor — **0 StrictMode ihlali**.
+- `MainActivity.onCreate` **12–26 ms** (api34).
+
+Soğuk açılışın büyük kısmı process kurulumunda (`bindApplication`, dex, kaynaklar)
+ve ilk composition'da geçiyor; bunların ikisi de bizim `onCreate` gövdelerimizin
+dışında.
+
+---
+
+**Değişen dosyalar**
+- `docs/PROGRESS.md` — bu kayıt. **Başka hiçbir dosya değişmedi**; ölçüm için
+  eklenen geçici log `SubTrackApplication.kt` ve `MainActivity.kt`'den geri alındı,
+  `git status` temiz.
+
+**Commit'ler**
+- (yok — bu tur yalnızca ölçüm; commit kararı kullanıcıda)
+
+**Karşılaşılan sorunlar**
+- `adb` PATH'te değil; SDK'dan tam yolla çağrıldı. Git Bash `/sdcard/...` yollarını
+  Windows yoluna çevirdiği için `adb pull` başarısız oluyordu — `MSYS_NO_PATHCONV=1`
+  ve hedef için Windows yolu kullanıldı.
+- Bash kabuğunda `JAVA_HOME` boş; Android Studio'nun JBR'si (`openjdk 21.0.9`)
+  elle ayarlandı.
+- API 24'ün `date` komutu `%3N` desteklemiyor; ekran görüntüsü zaman damgaları
+  `/proc/uptime` üzerinden alındı.
+- `screencap` bir kare için ~230–300 ms harcıyor; splash penceresi bundan kısa
+  olduğu için doğrudan yakalanamadı. Yakalama döngüsü `am start` ile paralel
+  çevrildi ve api24/api36'da `pm clear` ile ilk açılış uzatıldı — kare böyle yakalandı.
+
+**Sonraki faz için not**
+- Karar verilecek şey bir optimizasyon değil, bir **görünürlük** sorusu: splash ile
+  ilk kare arasındaki 173–212 ms'lik boşlukta ekranda ne duracağı.
+- Süreyi kısaltmak istenirse tabloya göre en büyük iki kalem `bindApplication`
+  (238 ms) ve ilk `doFrame` (498 ms); ikisi de `Application.onCreate` kodunda değil.
+- Ölçümler boş veritabanıyla yapıldı. Kullanıcı verisiyle tekrar ölçmek, özellikle
+  metin yerleşimi kalemi için, ayrı bir tur ister.
+
+---
+
 ## [Faz 16d düzeltme] İşaret %88 Küçültüldü — 2026-09-20
 
 **Durum:** Tamamlandı — **uygulama kodu, renkler, para sayısı, açı aralığı ve
