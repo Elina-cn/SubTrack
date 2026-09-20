@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Icon colours, and only icon colours.
+
+  Everything the app draws takes its colour from MaterialTheme.colorScheme, which is built in
+  Color.kt and swaps roles between the light and dark schemes. The icons cannot: the launcher,
+  the status bar and the Play Store draw them, not Compose, and none of those has a theme to
+  ask. So the two brand values are pinned here, once, and the vector drawables reference them
+  by name rather than repeating a hex literal per path.
+
+  These two happen to hold the same values as EmeraldNight and GoldBright in Color.kt. The
+  duplication is deliberate and one-directional: a future adjustment to a theme colour must not
+  silently redraw the app's mark, and the mark must not constrain the theme. See ARCHITECTURE §27.
+-->
+<resources>
+
+    <!-- The ground. Fixed in both schemes: the icon does not follow the system theme. -->
+    <color name="ic_launcher_ground">#FF0D1A14</color>
+
+    <!-- The coins. 8.50:1 against the ground, well past the 3:1 a graphical object needs. -->
+    <color name="ic_launcher_coin">#FFD4AF37</color>
+
+    <!--
+      The Android 13+ themed-icon layer. The launcher replaces this with a colour drawn from the
+      user's wallpaper, so the value only shows through if a launcher forgets to tint. Black is
+      the convention for that layer.
+    -->
+    <color name="ic_launcher_monochrome">#FF000000</color>
+
+    <!-- The status bar flattens the notification icon to a silhouette and tints it itself. -->
+    <color name="ic_notification_tint">#FFFFFFFF</color>
+
+</resources>

@@ -6,39 +6,39 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
     <path
-        android:fillColor="@color/ic_launcher_coin"
+        android:fillColor="@color/ic_launcher_monochrome"
         android:pathData="M59.3534,33.5289 A7.3636,7.3636 0 0,1 48.6466,33.5289 A7.5888,7.5888 0 0,0 46.8358,26.7706 A7.3636,7.3636 0 0,1 61.1642,26.7706 A7.5888,7.5888 0 0,0 59.3534,33.5289 Z" />
     <path
-        android:fillColor="@color/ic_launcher_coin"
+        android:fillColor="@color/ic_launcher_monochrome"
         android:pathData="M68.8717,38.9482 A7.3636,7.3636 0 0,1 59.5994,33.5948 A7.5888,7.5888 0 0,0 61.4103,26.8366 A7.3636,7.3636 0 0,1 73.8191,34.0008 A7.5888,7.5888 0 0,0 68.8717,38.9482 Z" />
     <path
-        android:fillColor="@color/ic_launcher_coin"
+        android:fillColor="@color/ic_launcher_monochrome"
         android:pathData="M74.4052,48.4006 A7.3636,7.3636 0 0,1 69.0518,39.1283 A7.5888,7.5888 0 0,0 73.9992,34.1809 A7.3636,7.3636 0 0,1 81.1634,46.5897 A7.5888,7.5888 0 0,0 74.4052,48.4006 Z" />
     <path
-        android:fillColor="@color/ic_launcher_coin"
+        android:fillColor="@color/ic_launcher_monochrome"
         android:pathData="M74.4711,59.3534 A7.3636,7.3636 0 0,1 74.4711,48.6466 A7.5888,7.5888 0 0,0 81.2294,46.8358 A7.3636,7.3636 0 0,1 81.2294,61.1642 A7.5888,7.5888 0 0,0 74.4711,59.3534 Z" />
     <path
-        android:fillColor="@color/ic_launcher_coin"
+        android:fillColor="@color/ic_launcher_monochrome"
         android:pathData="M69.0518,68.8717 A7.3636,7.3636 0 0,1 74.4052,59.5994 A7.5888,7.5888 0 0,0 81.1634,61.4103 A7.3636,7.3636 0 0,1 73.9992,73.8191 A7.5888,7.5888 0 0,0 69.0518,68.8717 Z" />
     <path
-        android:fillColor="@color/ic_launcher_coin"
+        android:fillColor="@color/ic_launcher_monochrome"
         android:pathData="M59.5994,74.4052 A7.3636,7.3636 0 0,1 68.8717,69.0518 A7.5888,7.5888 0 0,0 73.8191,73.9992 A7.3636,7.3636 0 0,1 61.4103,81.1634 A7.5888,7.5888 0 0,0 59.5994,74.4052 Z" />
     <path
-        android:fillColor="@color/ic_launcher_coin"
+        android:fillColor="@color/ic_launcher_monochrome"
         android:pathData="M61.1642,81.2294 A7.3636,7.3636 0 0,1 46.8358,81.2294 A7.5888,7.5888 0 0,0 48.6466,74.4711 A7.3636,7.3636 0 0,1 59.3534,74.4711 A7.5888,7.5888 0 0,0 61.1642,81.2294 Z" />
     <path
-        android:fillColor="@color/ic_launcher_coin"
+        android:fillColor="@color/ic_launcher_monochrome"
         android:pathData="M46.5897,81.1634 A7.3636,7.3636 0 0,1 34.1809,73.9992 A7.5888,7.5888 0 0,0 39.1283,69.0518 A7.3636,7.3636 0 0,1 48.4006,74.4052 A7.5888,7.5888 0 0,0 46.5897,81.1634 Z" />
     <path
-        android:fillColor="@color/ic_launcher_coin"
+        android:fillColor="@color/ic_launcher_monochrome"
         android:pathData="M34.0008,73.8191 A7.3636,7.3636 0 0,1 26.8366,61.4103 A7.5888,7.5888 0 0,0 33.5948,59.5994 A7.3636,7.3636 0 0,1 38.9482,68.8717 A7.5888,7.5888 0 0,0 34.0008,73.8191 Z" />
     <path
-        android:fillColor="@color/ic_launcher_coin"
+        android:fillColor="@color/ic_launcher_monochrome"
         android:pathData="M26.7706,61.1642 A7.3636,7.3636 0 0,1 26.7706,46.8358 A7.5888,7.5888 0 0,0 33.5289,48.6466 A7.3636,7.3636 0 0,1 33.5289,59.3534 A7.5888,7.5888 0 0,0 26.7706,61.1642 Z" />
     <path
-        android:fillColor="@color/ic_launcher_coin"
+        android:fillColor="@color/ic_launcher_monochrome"
         android:pathData="M26.8366,46.5897 A7.3636,7.3636 0 0,1 34.0008,34.1809 A7.5888,7.5888 0 0,0 38.9482,39.1283 A7.3636,7.3636 0 0,1 33.5948,48.4006 A7.5888,7.5888 0 0,0 26.8366,46.5897 Z" />
     <path
-        android:fillColor="@color/ic_launcher_coin"
+        android:fillColor="@color/ic_launcher_monochrome"
         android:pathData="M48.4006,33.5948 A7.3636,7.3636 0 0,1 39.1283,38.9482 A7.5888,7.5888 0 0,0 34.1809,34.0008 A7.3636,7.3636 0 0,1 46.5897,26.8366 A7.5888,7.5888 0 0,0 48.4006,33.5948 Z" />
 </vector>

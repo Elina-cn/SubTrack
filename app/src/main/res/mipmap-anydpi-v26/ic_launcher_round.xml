@@ -1,6 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  The mark is a ring of twelve gold coins. It sits inside a 65.78dp circle on the 108dp canvas,
+  which clears Material's 66dp key-line safe circle, so no launcher mask - circle, squircle or
+  rounded square - can cut into it.
+
+  The monochrome layer is a separate file rather than a reuse of the foreground because the
+  themed-icon renderer keeps only the alpha channel: the gaps between coins are drawn as real
+  holes, never as ground-coloured strokes, which is the only reason the ring survives being
+  flattened to one colour. See ARCHITECTURE §27.
+-->
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
     <background android:drawable="@drawable/ic_launcher_background" />
     <foreground android:drawable="@drawable/ic_launcher_foreground" />
-    <monochrome android:drawable="@drawable/ic_launcher_foreground" />
+    <monochrome android:drawable="@drawable/ic_launcher_monochrome" />
 </adaptive-icon>

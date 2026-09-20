@@ -31,3 +31,6 @@ local.properties
 *.pfx
 # Firebase/Google service configuration carries project ids and client keys
 google-services.json
+# Byte-code left behind by the icon generator under tools/
+__pycache__/
+*.pyc
