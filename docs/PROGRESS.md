@@ -27,6 +27,151 @@ Her faz sonunda **en üste** yeni kayıt eklenir. Eski kayıtlar silinmez.
 
 ---
 
+## [Faz 16d] Uygulama İkonu — On İki Para Halkası — 2026-09-20
+
+**Durum:** Tamamlandı — **uygulama kodu değişmedi**, yalnızca kaynaklar,
+varlıklar ve belgeler.
+
+**Yapılanlar**
+
+*Görev 1 — mevcut durumun envanteri*
+
+`res/` altında bulunanlar ve akıbetleri:
+
+| Dosya | Neydi | Ne oldu |
+|---|---|---|
+| `drawable/ic_launcher_background.xml` | şablon: `#3DDC84` yeşil + ızgara çizgileri | **yeniden yazıldı** (düz zemin) |
+| `drawable/ic_launcher_foreground.xml` | şablon: Android robotu, `aapt:attr` gradyanlarıyla | **yeniden yazıldı** (on iki para) |
+| `drawable/ic_notification.xml` | Faz 10b'nin geçici çan silueti | **yeniden yazıldı** |
+| `mipmap-anydpi-v26/ic_launcher.xml` | şablon `<adaptive-icon>` | monochrome kendi dosyasını gösteriyor |
+| `mipmap-anydpi-v26/ic_launcher_round.xml` | aynısı | aynısı |
+| `mipmap-{m,h,xh,xxh,xxxh}dpi/ic_launcher.webp` | şablon raster | **silindi** (5 dosya) |
+| `mipmap-{m,h,xh,xxh,xxxh}dpi/ic_launcher_round.webp` | şablon raster | **silindi** (5 dosya) |
+
+Manifest `@mipmap/ic_launcher` ve `@mipmap/ic_launcher_round`'a işaret ediyor;
+`PaymentReminderNotifier.kt:106` `R.drawable.ic_notification` kullanıyor.
+**Üçü de olduğu gibi kaldı** — isimler korunduğu için manifeste ve koda
+dokunmak gerekmedi. `ic_launcher_monochrome.xml` ve `values/colors.xml` yeni.
+Şablondan kalan **on `.webp`** silindi, yerlerine on PNG geldi.
+
+*Görev 2 — geometri, ölçekleme ve güvenli alan*
+
+Verilen 220 birimlik tanım 108dp viewport'a `k = 108/220 = 0,490909` ile
+çevrildi:
+
+| Değer | 220 birim | 108dp |
+|---|---|---|
+| Merkez | 110 | 54 |
+| Para yarıçapı | 15 | 7,3636 |
+| Halka yarıçapı | 52 | 25,5273 |
+| Ayrım | 4 | 1,9636 |
+| Komşu kesme yarıçapı | 15,45859 | 7,58876 |
+| İşaret yarıçapı (52+15) | 67 | 32,8909 |
+
+Komşu para merkezleri arası `2 × 52 × sin(15°) = 26,9172` birim; iki yarıçap
+30, yani paralar **3,0828 birim örtüşüyor**. Isırık yarıçapı
+`(26,9172 + 4) / 2 = 15,45859` seçilerek görünen kenarlar arasında tam 4 birim
+kaldı — on iki paranın on ikisi de aynı biçimde, simetrik.
+
+Güvenli alan hesabı: 108dp tuvalde maskelenen alan 72dp → 36dp yarıçap →
+**73,33 birim**; Material'ın 66dp anahtar dairesi → 33dp → **67,22 birim**.
+İşaretin dış sınırı **67 birim**, yani dar olan sınıra bile giriyor:
+**65,78dp çap, 66dp daireye 0,218dp payla.**
+
+*Görev 3 — bildirim ikonu ölçüldü, sonra yeniden çizildi*
+
+İşaret 24dp'ye olduğu gibi indirilip **gerçek piksel boyutlarında
+rasterlendi** (24/36/48/63/72 px). 4 birimlik ayrım orada **0,657dp** ediyor:
+mdpi'de 0,66 px, hdpi'de 0,99 px. Görüntülerde halka xhdpi altında gri bir
+simide dönüşüyordu.
+
+İki seçenek de denendi: **(a)** on iki parayı küçültüp aralarını açmak — çok
+okunaklı ama işaret "yükleniyor" çemberine dönüşüyor; **(b)** altı paraya
+inmek — dokusu duruyor ama on iki ayın anlamı gidiyor. Seçilen yol
+**ayrımı kalınlaştırmak**: on iki para kaldı, ayrım **1,3dp** oldu (yaklaşık
+iki katı) ve işaret 24dp tuvalde **22dp canlı alana** çizildi.
+Halka yarıçapı 8,54dp, para yarıçapı 2,46dp.
+
+*Görev 4 — mağaza karosu*
+
+`docs/store/icon-512.png`: **512×512**, 32 bit RGBA, **alfa her pikselde 255**,
+köşeler ve merkez `(13, 26, 20)` = `#0D1A14`, paralar `(212, 175, 55)` =
+`#D4AF37`, 49.143 bayt. Maske yok, yuvarlatma yok, şeffaf kenar yok.
+
+*Görev 5 — üç cihazda doğrulama*
+
+| Ölçüm | api24 | api34 | api36 |
+|---|---|---|---|
+| Başlatıcı maskesi (`max/min`, 720 ışın) | yok (PNG) | **1,022 = daire** | **1,019 = daire** |
+| Karo | 60,00dp | 51,43dp | 60,19dp |
+| İşaret | 52,7dp | 47,30dp | 55,01dp |
+| Maskeye pay | — | **2,06dp** | **2,59dp** |
+| Durum çubuğunda işaret | 15,00dp | 13,71dp | 12,95dp |
+| Sayılan ayrım | **12/12** | **12/12** | **12/12** |
+| Ayrım genişliği | 2,06–2,14 px | 0,49–1,89 px | 1,43–1,83 px |
+
+API 24'te çizilen gerçekten PNG yedeği: köşe yuvarlaması çapraz/eksen oranı
+**1,251** ölçüldü, üreticinin çizdiği `0,1875 × kenar` yuvarlaması **1,2588**
+verir; ayrıca işaret/karo oranı 0,88 (adaptive ikonda 0,914).
+
+**Temalı ikon (monochrome) api34 ve api36'da elle açılıp doğrulandı.** İkisinde
+de on iki para ayrı ayrı duruyor, halka diske dönmüyor. API 36 ayrıca maske
+şeklini yazıyla da söylüyor: *Wallpaper & style → Icons* → "Circle, default".
+
+**Değişen dosyalar**
+- `tools/icon/generate_icons.py` — **yeni.** Bütün varlıkları tek tanımdan üretir
+- `app/src/main/res/values/colors.xml` — **yeni.** İki marka değeri + iki tint
+- `app/src/main/res/drawable/ic_launcher_background.xml` — düz zemin
+- `app/src/main/res/drawable/ic_launcher_foreground.xml` — on iki para
+- `app/src/main/res/drawable/ic_launcher_monochrome.xml` — **yeni.** Aynı yollar, tek renk
+- `app/src/main/res/drawable/ic_notification.xml` — ayrı çizim, geniş ayrım
+- `app/src/main/res/mipmap-anydpi-v26/ic_launcher{,_round}.xml` — monochrome katmanı
+- `app/src/main/res/mipmap-*/ic_launcher{,_round}.png` — **10 yeni**, 10 `.webp` silindi
+- `docs/store/icon-512.png` — **yeni.** Play Console karosu
+- `docs/screenshots/phase-16d/` — 18 görüntü
+- `.gitignore` — `__pycache__/` ve `*.pyc` (yeni Python aracı için)
+- `docs/ARCHITECTURE.md` — §27, `docs/ROADMAP.md`, `docs/TESTING.md`, bu kayıt
+
+**Commit'ler**
+
+- `3839450` feat: draw the app icon as a ring of twelve coins
+- `0b5f982` feat: redraw the notification icon from the coin ring
+- `b5ca7be` feat: add the 512x512 store icon and the three-device icon screenshots
+- (bu kayıt) docs: record the icon geometry and its verification on three devices
+
+**Karşılaşılan sorunlar**
+
+- **Yol verisi elle yazılamazdı.** Isırılmış para dört yaylı kapalı bir yol ve
+  SVG yay bayrakları (`large-arc`, `sweep`) gözle seçilemiyor. Üretici bayrakları
+  yayın orta noktasını sınayarak seçiyor; sonuç, aynı geometrinin bağımsız bir
+  maske-çıkarma render'ıyla piksel piksel karşılaştırılarak doğrulandı —
+  mürekkebin **%1,3'ü** kadar fark, yani yalnızca kenar yumuşatma.
+- **Maske şekli ölçümü ilk turda yanıldı.** "Arka plan rengine benzemeyen
+  piksel" testi API 36'nın gradyanlı çekmece arkaplanında köşelerde tetikleniyor
+  ve daire `max/min = 1,26` (yuvarlatılmış kare) okunuyordu. Parlaklık eşiğine
+  geçilince ikisi de 1,02'ye indi. Yanlış ölçüm **belgeye girmeden** düzeltildi.
+- **`./gradlew :app:connectedDebugAndroidTest` bildirim ekran görüntüsü için
+  işe yaramıyor:** Gradle tur bitince iki APK'yı da kaldırıyor, bildirim de
+  paketle birlikte gidiyor. İki APK elle kurulup `am instrument` çağrıldı.
+- **API 24'te eski bir kurulum imza çakışması verdi**
+  (`INSTALL_FAILED_UPDATE_INCOMPATIBLE`); önce `uninstall` gerekti.
+- **Temalı ikonlar yalnızca ana ekranda uygulanıyor**, çekmecede değil — ve
+  `google_apis_playstore` imajları root kabul etmediği için tercih dosyadan
+  yazılamıyor. Ayar arayüzden açıldı, uygulama çekmeceden ana ekrana
+  `input motionevent` ile sürüklendi (`input swipe` kaydırma sanılıyor).
+- **API 36 açılışında "System UI isn't responding" çıktı**; beklenip yeniden
+  denendi (TESTING.md'de zaten kayıtlı bir davranış).
+
+**Sonraki faz için not**
+- Özellik grafiği (1024×500) **bu fazda üretilmedi**, ayrı bir iş olarak duruyor.
+- Mağaza karosu `docs/store/` altında duruyor ama Play Console'a **yüklenmedi**;
+  Console'da görünen kırpması orada bir kez daha bakılmalı.
+- İkon varlıklarından herhangi biri değişecekse elle düzenlenmez:
+  `python tools/icon/generate_icons.py` çalıştırılır. Betiğin başındaki
+  sabitler tasarımın kendisidir.
+
+---
+
 ## [Faz 16g] Release AAB ve Foreground Service Tipi Denetimi — 2026-09-19
 
 **Durum:** Tamamlandı — **üretim kodu değişmedi**, yalnızca belge.

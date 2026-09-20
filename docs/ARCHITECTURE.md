@@ -2354,3 +2354,148 @@ Her iki cihaza da **üç** parça kuruldu — Play'in teslim modeli birebir:
 > API 24 cihaz gerçekten kurulup çalıştı — teslim doğru varyantı seçiyor.
 
 ---
+
+## 27. Uygulama İkonu — On İki Para Halkası
+
+Faz 16d. Şablon ikonu (yeşil kare + Android robotu) gitti; yerine 14a'nın
+paletinden gelen marka işareti kondu: **koyu zümrüt zemin üzerinde halka
+biçiminde dizilmiş on iki altın para.** Halka aylık döngüyü, on iki parça yılın
+aylarını, paraların örtüşmesi hem birikimi hem pul dokusunu anlatıyor.
+
+Bu bölüm dört kararı kayda geçiriyor: geometrinin ne olduğu, ikonun neden
+**temaya uymadığı**, paraların arasındaki ayrımın neden **boya değil boşluk**
+olduğu ve bildirim ikonunun neden **ayrı bir çizim** olduğu.
+
+### Geometri — tek tanım, 220 birimlik tuval
+
+İşaret bir kere, 220 birimlik kare bir tuvalde tanımlanıyor; bütün hedefler
+oradan ölçekleniyor. Ölçek çarpanı 108dp tuval için `k = 108/220 = 0,490909`.
+
+| Değer | 220 birim | 108dp viewport |
+|---|---|---|
+| Merkez | 110 | **54** |
+| Para yarıçapı | 15 | **7,3636** |
+| Paranın merkeze uzaklığı | 52 | **25,5273** |
+| Paralar arası ayrım | 4 | **1,9636** |
+| Komşu kesme yarıçapı | 15,45859 | **7,58876** |
+| İşaretin dış sınırı (52+15) | 67 | **32,8909** |
+| Ayrım hattıyla (52+15+2) | 69 | **33,8727** |
+| Güvenli alan sınırı | 73 | **35,8364** |
+
+**Paralar örtüşüyor, ve bu kasıtlı.** İki komşu paranın merkezleri arasındaki
+uzaklık `2 × 52 × sin(15°) = 26,9172` birim; iki para yarıçapı ise 30. Yani
+paralar **3,0828 birim** iç içe geçiyor. Örtüşme işaretin kendisi — birikim ve
+pul dokusu oradan geliyor.
+
+Her para, kendi diskinden komşularının açtığı iki ısırığın çıkarılmasıyla
+çiziliyor. Isırık yarıçapı `(pitch + ayrım) / 2 = 15,45859` seçilerek iki
+paranın görünen kenarları arasında **tam olarak 4 birim** zemin bırakılıyor,
+üstelik iki tarafa da simetrik. Sonuç dört yaylı kapalı bir yol: paranın kendi
+çemberinden iki yay, komşuların kesme çemberlerinden iki yay.
+
+### Güvenli alan — hesap
+
+Adaptive icon 108dp tuvalde çizilir, başlatıcı ortadaki **72dp**'yi maskeler.
+Material'ın anahtar çizgisi bundan daha dar: içteki **66dp çaplı daire**.
+
+```
+72dp maske  -> 36dp yarıçap -> 36 / 0,490909 = 73,33 birim
+66dp anahtar -> 33dp yarıçap -> 33 / 0,490909 = 67,22 birim
+```
+
+İşaretin dış sınırı 67 birim, yani **67 < 67,22**: işaret dar olan sınıra bile
+sığıyor. 108dp karşılığıyla: işaret **65,78dp** çapında, 66dp'lik daireye
+**0,218dp** payla giriyor. Promptun verdiği 73 birimlik sınır 72dp maskenin
+karşılığı (71,67dp) ve orada pay 4,26dp. Yani hiçbir maske — daire, squircle
+veya yuvarlatılmış kare — işareti kesemiyor.
+
+### İkon temayı takip ETMİYOR
+
+Uygulamanın her yeri `MaterialTheme.colorScheme`'den renk alıyor ve açık/koyu
+şemada roller yer değiştiriyor (§12). İkon bunu **yapamaz ve yapmamalı**:
+
+- **Yapamaz.** İkonu başlatıcı, durum çubuğu ve Play çiziyor; hiçbirinin
+  soracağı bir Compose teması yok.
+- **Yapmamalı.** Marka işareti sabittir. Açık temada da aynı koyu zümrüt zemin
+  kalıyor.
+
+Altın zemin üstünde **8,50:1** — grafik nesne için gereken 3:1'in çok üstünde.
+(Aynı altın beyaz üstünde 2,10:1, yani §12'nin "altın mürekkep olamaz" kuralı
+burada da geçerli; ikonda altın mürekkep değil, koyu zemin üstünde duran
+**dolgu**.)
+
+### Renkler `colors.xml`'de, `Color.kt`'de değil
+
+İki marka değeri yeni bir `app/src/main/res/values/colors.xml` dosyasında
+duruyor; vektörler onlara `@color/ic_launcher_ground` ve
+`@color/ic_launcher_coin` diye başvuruyor. Hardcoded renk yasağı vektör
+drawable'lar için de geçerli ve karşılığı budur: hex değeri **bir kez**, kaynak
+tablosunda.
+
+`Color.kt`'ye sabit **eklenmedi.** Değerler `EmeraldNight` ve `GoldBright` ile
+birebir aynı, ama bu çoğaltma bilinçli ve tek yönlü: ileride bir tema rengi
+ayarlanırken uygulamanın işareti sessizce değişmemeli, ve işaret de temayı
+kısıtlamamalı. `Color.kt` Compose temasının paleti; ikon o sistemin dışında.
+
+### Ayrım boya değil, boşluk — monochrome bu yüzden çalışıyor
+
+Paraların arasındaki 4 birimlik ayrımı zemin renginde bir hat olarak boyamak
+ön planda çalışırdı. **Monochrome katmanında çalışmazdı.** Android 13+ temalı
+ikonlarda sistem katmanın yalnızca **alfa kanalını** alıp tek renge boyuyor;
+boyanmış bir ayrım da paralarla aynı rengi alır ve halka düz bir diske döner.
+
+Bu yüzden ısırıklar gerçek delik: ayrım yerinde hiçbir şey çizilmiyor.
+Aynı yol verisi hem ön planda hem monochrome'da kullanılabiliyor.
+`ic_launcher_monochrome.xml` ayrı bir dosya (tek düz renk, brifingin istediği
+gibi) ama aynı üreticiden çıkıyor, yani ikisi ayrışamaz.
+
+### Bildirim ikonu neden ayrı bir çizim
+
+Durum çubuğu ikonu uygulama ikonunun küçültülmüş hâli **değil**. İşareti 24dp
+tuvale olduğu gibi indirince 4 birimlik ayrım **0,657dp**'ye düşüyor:
+
+| Yoğunluk | Ayrım | Para çapı |
+|---|---|---|
+| mdpi (1×) | 0,66 px | 4,93 px |
+| hdpi (1,5×) | 0,99 px | 7,39 px |
+| xhdpi (2×) | 1,31 px | 9,85 px |
+| 420dpi (2,625×) | 1,72 px | 12,93 px |
+
+xhdpi altında ayrım kapanıyor; gerçek piksellerde denendi ve halka gri bir
+simide dönüşüyor. İki çıkış yolu vardı — **ayrımı kalınlaştırmak** veya **para
+sayısını azaltmak.** Kalınlaştırmak seçildi: **on iki, işaretin anlamının
+kendisi** (ayda bir para). Altıya inmek dokuyu korur, anlamı kaybederdi.
+
+Bildirim ikonu bu yüzden on iki parayı koruyup ayrımı yaklaşık **iki katına**
+(1,3dp) çıkarıyor ve bedelini işareti 24dp tuvalde **22dp'lik canlı alana**
+çizerek ödüyor:
+
+| Değer | 24dp viewport |
+|---|---|
+| Merkez | 12 |
+| Paranın merkeze uzaklığı | 8,54 |
+| Para yarıçapı | 2,46 |
+| Ayrım | 1,3 |
+| İşaret yarıçapı | 11,0 |
+
+Isırık genişlediği için paralar hafifçe badem biçimi alıyor; bu boyutta
+görünmüyor. Ölçümler `TESTING.md`'de, cihaz görüntüleri
+`docs/screenshots/phase-16d/` altında.
+
+### Raster varlıklar ve üretici
+
+API 26 altında adaptive icon yok, başlatıcı `mipmap-*/ic_launcher.png` ve
+`ic_launcher_round.png` dosyalarını olduğu gibi çiziyor — maske de
+uygulanmıyor, yuvarlatma dosyanın içinde olmak zorunda. Kare karo
+`0,1875 × kenar` köşe yarıçapıyla, yuvarlak karo daire olarak üretiliyor.
+
+Bu karolarda işaret karonun **%88'ini** kaplıyor. Sayı keyfi değil: adaptive
+ikonda işaret 72dp maskenin 65,78dp'sini, yani %91,4'ünü dolduruyor; aynı
+görünürlüğü maskesiz karoda tutturmak için gereken oran bu. Play'in 512×512
+karosu da aynı %88'i kullanıyor, böylece üç yüzey aynı görünüyor.
+
+Bütün varlıklar `tools/icon/generate_icons.py` tarafından tek tanımdan
+üretiliyor: vektörler, beş yoğunlukta PNG ve mağaza karosu. Elle düzenlenen
+dosya yok — vektörlerin başında da bunu söyleyen bir yorum var.
+
+---

@@ -457,12 +457,25 @@ Aylık toplamın zaman içindeki anlık görüntüleri. `PROJECT_SPEC.md` §1'de
 
 ## ⬜ Faz 16 — Play Store Hazırlığı
 
-- [ ] Uygulama ikonu (adaptive) ve marka kimliği — **Faz 14a'nın paletine göre:**
-      koyu zümrüt + altın, ve altının mürekkep olarak kullanılamayacağı kuralı
-      ikonda da geçerli (§12). Ekran görüntüleri `docs/screenshots/phase-14a/`
-      altında. **Bildirim ikonu da bu işin parçası:**
-      `res/drawable/ic_notification.xml` Faz 10b'de konan geçici bir siluet,
-      marka çalışmasıyla birlikte yenilenecek.
+- [x] **Uygulama ikonu (adaptive) ve marka kimliği** — Faz 16d. Şablon ikonu
+      (yeşil kare + Android robotu) gitti; işaret 14a'nın paletinden:
+      **koyu zümrüt `#0D1A14` zemin üzerinde on iki altın `#D4AF37` para**,
+      halka biçiminde. Altın burada mürekkep değil **dolgu**, zemin üstünde
+      **8,50:1** (§12 kuralı korunuyor). İşaret 220 birimlik tek bir tanımdan,
+      `tools/icon/generate_icons.py` ile üretiliyor: iki vektör katman +
+      monochrome, beş yoğunlukta PNG yedeği, 512×512 mağaza karosu.
+      108dp tuvalde işaret **65,78dp**, Material'ın 66dp anahtar dairesine
+      0,218dp payla giriyor — hiçbir maske kesmiyor (api34 ve api36'da
+      ölçüldü: ikisi de **daire**, pay 2,06dp ve 2,59dp). **Şablondan kalan on
+      `.webp` silindi.** Ayrıntı `ARCHITECTURE.md` §27, doğrulama yöntemi
+      `TESTING.md`, görüntüler `docs/screenshots/phase-16d/`.
+- [x] **Bildirim ikonu yenilendi** — Faz 16d. Faz 10b'nin geçici çan silueti
+      gitti; durum çubuğu artık aynı işareti taşıyor ama **ayrı bir çizim**
+      olarak. Ölçüm gerekçesi: işareti 24dp'ye olduğu gibi indirince paralar
+      arası 4 birimlik ayrım **0,657dp**'ye düşüyor ve xhdpi altında kapanıyor.
+      Para sayısını azaltmak yerine **ayrım iki katına** (1,3dp) çıkarıldı —
+      on iki, işaretin anlamının kendisi. Üç cihazda on iki ayrımın da
+      göründüğü doğrulandı.
 - [x] **Release imzalama yapılandırması, keystore güvenliği** — Faz 16c.
       Dört değer (`storeFile`, `storePassword`, `keyAlias`, `keyPassword`)
       **önce `local.properties`'ten**, yoksa ortam değişkenlerinden okunuyor;

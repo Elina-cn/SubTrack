@@ -1571,6 +1571,124 @@ adb shell pm clear com.elinacn.subtrack
 
 ---
 
+## İkon Doğrulama (Başlatıcı, Temalı İkon, Durum Çubuğu)
+
+Faz 16d'de kuruldu. İkon üç yerde ayrı ayrı çiziliyor — başlatıcının maskesi
+altında, Android 13+ temalı ikon olarak ve durum çubuğunda beyaz siluet
+olarak — ve üçü birbirinin yerine geçmiyor. Hepsi **piksel ölçümüyle**
+doğrulanıyor, göz kararıyla değil.
+
+### Kurulum
+
+İkonun tazelenmesi için paketi yeniden kurmak yetiyor; başlatıcının önbelleğini
+temizlemek gerekmiyor. Eski bir faz farklı bir anahtarla imzalanmış bir sürüm
+bırakmışsa `install` **`INSTALL_FAILED_UPDATE_INCOMPATIBLE`** diyor — önce
+kaldırın:
+
+```bash
+adb uninstall com.elinacn.subtrack
+adb uninstall com.elinacn.subtrack.test
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+```
+
+### Başlatıcı maskesi — hangi şekil, işaret kesiliyor mu
+
+Uygulama çekmecesini açıp ekran görüntüsü alın, sonra karonun siluetini
+merkezden 720 ışınla tarayın. **`max/min` oranı şekli söyler:** daire 1,00
+civarı, yuvarlatılmış kare ~1,26, düz kare 1,414.
+
+> **Tuzak:** "arka plan rengine benzemeyen piksel" testi API 36'nın
+> **gradyanlı** çekmece arkaplanında yanlış sonuç veriyor — köşelerde arka plan
+> yeterince kayıyor ve oran 1,26 çıkıyor, yani daire yuvarlatılmış kare gibi
+> okunuyor. Karo koyu, çekmece açık: **parlaklık eşiği** kullanın
+> (`sum(rgb) < 3×140`), arka planla karşılaştırma değil.
+
+Ölçülen (Faz 16d):
+
+| Cihaz | maske `max/min` | şekil | karo | işaret | pay |
+|---|---|---|---|---|---|
+| api34 | 1,022 | daire | 51,43dp | 47,30dp | 2,06dp |
+| api36 | 1,019 | daire | 60,19dp | 55,01dp | 2,59dp |
+
+Android 16 bunu ayrıca **yazıyla** da söylüyor: uzun basış → *Wallpaper &
+style* → **Icons** sayfası "Circle, default" diyor ve orada beş şekil seçeneği
+var. API 34'te böyle bir sayfa yok, ölçüm tek yol.
+
+### API 24 — PNG yedeği gerçekten kullanılıyor mu
+
+API 24'te adaptive icon yok. Karonun **ölçeği ve köşe yuvarlaması** hangi
+varlığın çizildiğini ele veriyor:
+
+- `mipmap-xhdpi/ic_launcher.png` (96 px) yükleniyor, Launcher3 onu karo
+  boyutuna (density 2,0'da 120 px = 60dp) ölçekliyor.
+- Köşe: çapraz erişim / eksen erişimi oranı **1,251** ölçüldü; üreticinin
+  çizdiği `0,1875 × kenar` yuvarlaması **1,2588** verir. Yani yuvarlatma
+  sistemden değil, dosyadan geliyor — API 24 maske uygulamıyor.
+- İşaret/karo oranı 0,88 çıkarsa PNG, 0,914 çıkarsa adaptive icon çiziliyor
+  demektir. API 24'te 0,88, API 26+'da 0,914 bekleyin.
+
+### Temalı ikon (API 33+) — monochrome katmanı
+
+Temalı ikonlar **yalnızca ana ekranda** uygulanıyor; uygulama çekmecesinde
+ikonlar normal kalıyor. Yani önce uygulamayı ana ekrana taşımak gerekiyor.
+
+`google_apis_playstore` imajları **root kabul etmiyor**, bu yüzden
+Launcher3'ün `themed_icons` tercihini dosyadan yazmak mümkün değil; ayar
+arayüzden açılıyor:
+
+- **API 34:** ana ekranda uzun basış → *Wallpaper & style* → aşağı kaydır →
+  **Themed icons** anahtarı.
+- **API 36:** ana ekranda uzun basış → *Wallpaper & style* → **Icons** →
+  **Themed icons** anahtarı → **Apply**.
+
+Uygulamayı çekmeceden ana ekrana sürüklemek `input swipe` ile olmuyor
+(kaydırma sanılıyor); `input motionevent` ile basıp bekleyip taşımak gerekiyor:
+
+```bash
+adb shell "input motionevent DOWN 158 2040; sleep 1; \
+  input motionevent MOVE 220 1750; input motionevent MOVE 350 1350; \
+  input motionevent MOVE 450 1000; sleep 1; input motionevent UP 450 1000"
+```
+
+**Ne aranıyor:** paraların arasındaki ayrımların **hâlâ görünüyor** olması.
+Kontrol sayısaldır: para halkasının üstünde bir daire boyunca dolaşıp koyu
+koşuları sayın, **12** çıkmalı. Ayrım boyanmış olsaydı sistem onu paralarla
+aynı renge boyar ve sayı 0 olurdu.
+
+### Bildirim ikonu — durum çubuğunda
+
+Bildirim, günlük işin gövdesini çalıştıran enstrümantasyon testiyle
+gönderiliyor:
+
+```bash
+adb shell am instrument -w \
+  -e class 'com.elinacn.subtrack.reminder.PaymentReminderWorkerTest#reminderWorker_datedSubscriptions_notifiesOnlyTheOnesInsideTheWindow' \
+  com.elinacn.subtrack.test/androidx.test.runner.AndroidJUnitRunner
+```
+
+> **`./gradlew :app:connectedDebugAndroidTest` bunun yerine geçmiyor.** Gradle
+> tur bitince iki APK'yı da **kaldırıyor**, paketle birlikte bildirim de
+> gidiyor; ekran görüntüsü alınacak bir şey kalmıyor. İki APK'yı elle kurup
+> `am instrument` çağırmak gerekiyor. Bildirimin durduğu
+> `adb shell cmd notification list | grep subtrack` ile doğrulanır.
+
+Durum çubuğu ikonu **24dp tuvalinden küçük** çiziyor — ölçülen: api24'te
+15,00dp, api34'te 13,71dp, api36'da 12,95dp. Ayrımın bu kadar geniş olmasının
+sebebi bu. Kontrol yine sayma: on iki koyu koşu.
+
+| Cihaz | işaret | ayrım genişliği |
+|---|---|---|
+| api24 (density 2,0) | 15,00dp | 2,06–2,14 px |
+| api34 (420dpi) | 13,71dp | 0,49–1,89 px |
+| api36 (420dpi) | 12,95dp | 1,43–1,83 px |
+
+> **API 36'nın durum çubuğu açık zeminli, ikonlar beyaz.** Basit bir parlaklık
+> eşiği bütün arka planı ikon sanıyor; `min(r,g,b) > 240` ile beyaza yakın
+> pikselleri ayırın.
+
+---
+
 ## Faza Özel Testler
 
 Sabit liste geçtikten sonra çalıştırılır. Claude Code her faz sonunda bu
