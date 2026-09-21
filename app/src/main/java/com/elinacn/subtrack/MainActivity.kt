@@ -45,16 +45,25 @@ class MainActivity : ComponentActivity() {
         // explicit on every release, and is what finally lets the insets reach Compose. See
         // ARCHITECTURE section 16.
         //
-        // The status bar style here is provisional and deliberately not `auto`. It follows the
-        // window that is actually on screen for these frames, and since phase 16h that window is
-        // the splash, whose background is the icon's own ground (#0D1A14) in both schemes. `dark`
-        // means "the background behind me is dark", so the icons are drawn light and stay
-        // readable across the hold. It was `light` until 16h, which was right while the launch
-        // window came from Theme.SubTrack and was white; against the splash it would draw dark
-        // icons on a near-black ground. The effect inside the composition replaces this as soon
-        // as the stored theme arrives.
+        // The status bar style here is provisional, and on the ordinary path it never reaches a
+        // frame: SystemBarsFollowTheTheme rewrites the flag while the splash is still the window
+        // on screen, so what the user sees at the handover is the same either way. Phase 16h-2
+        // read the window's own appearance to check that - with `dark` and the app light, the app
+        // window was born carrying the wrong answer and was corrected ~350 ms later, still behind
+        // the splash.
+        //
+        // What this value does answer for is the one path where the correction never comes: the
+        // gate's 1000 ms deadline expiring with the preference still unread, which leaves the app
+        // drawing in ThemeMode.Default - "follow the system" - and the window on whatever was set
+        // here. Only a style that also follows the system can agree with that, which is why this
+        // is `auto` and no longer `dark`. Measured in 16h-2 with the read stalled: `dark` with the
+        // system on light gave a white band with white icons, 1,00:1, and stayed there for as long
+        // as the read was out; `auto` gave 5,74:1. With the system on dark both read 11,91:1.
+        //
+        // It does not decide the splash either way - that is a separate window, and its icons come
+        // from Theme.SubTrack.Starting rather than from here. See ARCHITECTURE section 23.
         enableEdgeToEdge(
-            statusBarStyle = SystemBarStyle.dark(Color.TRANSPARENT)
+            statusBarStyle = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT)
         )
         setContent {
             val themeState by viewModel.themeState.collectAsStateWithLifecycle()
