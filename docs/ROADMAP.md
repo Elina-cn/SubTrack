@@ -547,6 +547,20 @@ Aylık toplamın zaman içindeki anlık görüntüleri. `PROJECT_SPEC.md` §1'de
       sayıyor, bu yüzden ikisi çakışmıyor — bayrak API 24-29'un, `imePadding()`
       API 30+'ın yarısı. Klavye tablosunun her satırı üç cihazda yeniden
       ölçüldü (`TESTING.md`); ölçümler `ARCHITECTURE.md` §16'da.
+- [x] **Açılış ekranı ve durum çubuğu tamamlandı** — Faz 16h (+16h-1, 16h-2).
+      Kapı `core-splashscreen` 1.2.0'a bağlandı: tema tercihi okunana kadar
+      ekranda duran şey artık boş beyaz launch penceresi değil, ikonun kendi
+      `#0D1A14` zemini üzerindeki işaret — 16g'nin ölçtüğü 173-212 ms'lik
+      `#FAFAFA` kare kalktı. 16h-1 durum çubuğu ikonlarının **kimden**
+      geldiğini ölçtü: devir boyunca sahibi splash penceresi ve
+      `Theme.SubTrack.Starting` (bant iki temada da 17,87:1), `onCreate`'teki
+      stil değil. 16h-2 o stili `SystemBarStyle.dark` → **`auto`** yaptı;
+      kazanç yalnızca kapının 1000 ms son tarihi dolup tercih hiç gelmeyen
+      yolda görülüyor — sistem açıkken `dark` 1,00:1 (beyaz üstüne beyaz ikon)
+      veriyordu, `auto` 5,74:1. Splash'tan uygulamaya devirde ~350 ms'lik bir
+      rampa ölçüldü ve **kabul edildi** (platform davranışı; gerekçe ve
+      reddedilen üç seçenek §23'te). Ölçümler `ARCHITECTURE.md` §23, kayıt ve
+      ekran görüntüleri `PROGRESS.md`'deki 16h / 16h-1 / 16h-2 girdileri.
 - [x] **Test paketi sıra bağımsız hâle geldi ve tam regresyon turu atıldı** —
       Faz 16b. Paket dört cihazda, iki koşum yöntemiyle, arka arkaya iki kez
       geçiyor; 117 maddelik liste dört cihazda eksiksiz sürüldü (468 hücre).

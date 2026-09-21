@@ -153,9 +153,13 @@ class MainActivity : ComponentActivity() {
  *
  * Nothing is applied until [isThemeKnown], and that matters: the first composition runs against the
  * defaults while the preference is still being read, and applying those defaults would set the bars
- * from a value the app is about to discard. The launch window's own style, set in `onCreate`,
- * covers that gap - the same gap the first-frame gate holds the app's own drawing across, so the
- * two are answering for the same frames rather than fighting over them.
+ * from a value the app is about to discard. Nothing of the app is on screen across that gap either
+ * - it is the same gap the first-frame gate holds the splash over - and phase 16h-2 measured who
+ * owns the status bar while it lasts: the splash window, from `Theme.SubTrack.Starting`, not the
+ * style `onCreate` set. What that style answers for is the app's own window once the splash is
+ * gone, which on the ordinary path means the handful of frames before this effect rewrites the
+ * flag, and on the one path where the rewrite never comes - the gate's 1000 ms deadline expiring
+ * with the preference still unread - means every frame after. See ARCHITECTURE section 23.
  *
  * The two bars get different styles, and that is measured rather than tidy. Below API 29 androidx
  * fills a bar with the scrim it was handed instead of leaving it to the system, so a scrim is not

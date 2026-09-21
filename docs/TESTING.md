@@ -193,7 +193,7 @@ yazıldı. İki ayrı şey var ve karıştırılmamalı:
 | #34–#37, #41–#45 | geçerli değil | geçerli değil | ölçülür | ölçülür | Çalışma zamanı bildirim izni API 33+. API 24/29'da bu yolu #46 ve #40 kapsıyor |
 | #40, #46 | ölçülür | ölçülür | geçerli değil | geçerli değil | Karşı yön: API 33+ cihazda izin diyaloğu çıkar, bu iki madde API < 33 içindir. **#40 API 24'te 16b'de düşmüştü, 16b hotfix'inde düzeltildi** — açılan ekran orada uygulama detay sayfasıdır, bildirim ekranı değil |
 | #39 | geçerli değil | ölçülür | ölçülür | ölçülür | Bildirim kanalları API 26+; Android 7.0'da kanal kavramı yok |
-| #107, #109 | **ölçülemedi** | **ölçülemedi** | ölçülür | ölçülür | Sistem koyu teması: API 24'te `cmd uimode` "No shell command implementation" der; API 29'da komut çalışır ama "Night mode: no" döndürüp değeri yazmaz, `settings put secure ui_night_mode 2` de tutmaz |
+| #107, #109 | **ölçülemedi** | ölçülür — yeniden başlatmayla | ölçülür | ölçülür | Sistem koyu teması: API 24'te `cmd uimode` "No shell command implementation" der. API 29'da `cmd uimode` cevap verir ama `mNightModeLocked=true` olduğu için değeri uygulamaz; 16h-2'de çalışan yol bulundu — `settings put secure ui_night_mode` + `reboot`, "Koyu tema" başlığında |
 | #111, #112, #113 | geçerli değil | geçerli değil | ölçülür | ölçülür | Duvar kâğıdı renkleri API 31+ |
 | #114 | ölçülür | ölçülür | geçerli değil | geçerli değil | Karşı yön: satırın devre dışı hâli yalnızca API < 31'de görülür |
 | #84, #95, #104 | kısmen | kısmen | kısmen | kısmen | Erişilebilirlik **ağacı** okunabiliyor ve maddelerin "tek odak durağı" yarısı böyle ölçülüyor. TalkBack hiçbir imajda kurulu değil; #104'ün "Sil" özel eylemi `uiautomator dump` biçiminde hiç taşınmıyor |
@@ -678,15 +678,40 @@ adb shell cmd uimode night yes
 adb shell cmd uimode night no
 ```
 
-**API 29'da çalışmıyor** — komut "Night mode: no" döndürüp değeri yazmıyor,
-`settings put secure ui_night_mode 2` de tutmuyor.
+**API 29'da `cmd uimode` iş görmüyor.** Komut "Night mode: yes" diye cevap
+veriyor, ama `dumpsys uimode` satırı değişmiyor — sebebi 16h-2'de okundu:
+`mNightModeLocked=true`. Kilitli olduğu için servis kabuktan gelen değeri
+uygulamıyor ve sessizce eski durumda kalıyor.
+
+**Çalışan yol: ayarı yaz, cihazı yeniden başlat.** Değer `Settings.Secure`'da
+duruyor ve açılışta okunuyor:
+
+```bash
+adb -s emulator-5554 shell settings put secure ui_night_mode 2   # 2 = koyu, 1 = açık
+adb -s emulator-5554 reboot
+adb -s emulator-5554 wait-for-device
+adb -s emulator-5554 shell dumpsys uimode | grep -i "mNightMode\|mCurUiMode"
+```
+
+Yeniden başlatma **şart**: değeri yazdıktan hemen sonra `dumpsys` hâlâ eski
+satırı veriyor. `adb shell stop; adb shell start` ile çerçeveyi tek başına
+döndürmek bu imajda mümkün değil ("must be root"), yani tam `reboot` gerekiyor.
+
+Doğrulama satırı okunurken bakılacak yer `mCurUiMode`: **`0x21` koyu, `0x11`
+açık.** `mNightMode=2 (yes)` / `1 (no)` aynı şeyi söylüyor. `mComputedNightMode`
+her iki durumda da `false` kalıyor, ona bakılmaz.
+
+**Her ölçümden önce `dumpsys uimode` ile doğrulayın.** 16h-2'nin ilk turunda bu
+atlandı ve dört hücre yanlış sistem temasıyla ölçülüp atıldı; hücreler yeniden
+koşuldu.
 
 **API 24'te komut hiç yok** — `cmd uimode night yes` "No shell command
 implementation" der (servis kayıtlı, kabuk arayüzü yok). Sistem geneli koyu tema
 zaten Android 10 ile geldi, yani Android 7.0'da böyle bir ayar **yoktur**.
 
-Sonuç: *sistem temasını değiştirmeyi* gerektiren maddeler (#107, #109) yalnızca
-`subtrack_wide_api34` ve `subtrack_edge_api36` üzerinde ölçülür.
+Sonuç: *sistem temasını değiştirmeyi* gerektiren maddeler (#107, #109)
+`subtrack_wide_api34` ve `subtrack_edge_api36` üzerinde doğrudan, API 29'da
+yukarıdaki yeniden başlatmalı yolla ölçülür; API 24'te ölçülemez.
 
 **Ama koyu temanın kendisi dört cihazda da ölçülebilir.** Faz 14b'den sonra
 uygulamanın kendi **Ayarlar → Tema → Koyu** seçeneği sistemden bağımsız çalışıyor;
