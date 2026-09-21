@@ -864,9 +864,8 @@ ikonlar temayı takip edebildiği için `background` çubuğu uygulamanın devam
 yapar. API 29'dan itibaren ikisi de şeffaf, kontrastı sistem zorlar.
 
 **Açılıştaki ilk kare.** `onCreate`'teki ilk `enableEdgeToEdge` çağrısı durum
-çubuğunu `SystemBarStyle.dark` ile kurar (16h'ye kadar `light`'tı; o zaman
-ekrandaki pencere `Theme.SubTrack`'in beyaz arka planıydı, şimdi splash'ın
-`#0D1A14`'ü). Bu değer **yukarıdaki tabloyu kurmuyor**: uygulamanın kararlı
+çubuğunu `SystemBarStyle.auto` ile kurar (16h'ye kadar `light`, 16h ile `dark`,
+16h-2'den beri `auto`). Bu değer **yukarıdaki tabloyu kurmuyor**: uygulamanın kararlı
 karelerindeki ikon rengini `SystemBarsFollowTheTheme` belirliyor, ve splash
 karelerindeki ikon rengini uygulamanın penceresi değil sistemin başlatma
 penceresi belirliyor. İki pencerenin nasıl ayrıştığı, hangi bayrağın neyi
@@ -2000,10 +1999,10 @@ Yani `dark` → bayrak **kapalı** → ikonlar beyaz; `light` → bayrak açık 
 ikonlar koyu. Bayrak **`window.decorView`'a**, yani uygulamanın kendi
 penceresine yazılıyor; başka bir pencereye ulaşamaz.
 
-**1. Uygulama penceresi — bayrağı composable koyuyor.** `onCreate`'teki
-`SystemBarStyle.dark` geçicidir ve kararlı hiçbir kareye ulaşmaz: tercih gelir
-gelmez `SystemBarsFollowTheTheme` `enableEdgeToEdge`'i `auto(...) { darkTheme }`
-ile yeniden çağırıp bayrağı temaya bağlar. Bu turda dört durumda hem bayrak hem
+**1. Uygulama penceresi — bayrağı composable koyuyor.** `onCreate`'teki stil
+(16h'de `dark`, 16h-2'den beri `auto`) geçicidir ve kararlı hiçbir kareye
+ulaşmaz: tercih gelir gelmez `SystemBarsFollowTheTheme` `enableEdgeToEdge`'i
+`auto(...) { darkTheme }` ile yeniden çağırıp bayrağı temaya bağlar. Bu turda dört durumda hem bayrak hem
 piksel okundu. Bant = ekranın üst `statusBars.top` şeridi (api29'da 48 px,
 api34'te 128 px); "ikon çekirdeği" bandın zeminden parlaklıkça **en uzak**
 pikseli, koordinatıyla birlikte:
@@ -2033,10 +2032,10 @@ satırı hiç basılmıyor — yani ikonlar beyaz, ki splash zemini `#0D1A14` ol
 için doğru cevap. Ölçülen: splash karesinde bant `#0D1A14` üstünde `#FFFFFF`,
 **17,87:1**, api29 ve api34'te aynı.
 
-Yani **splash'ın okunur olmasını sağlayan şey `SystemBarStyle.dark` değil,
-splash temasının kendisi.** `dark` yine de yanlış değil: başlatma penceresinden
-uygulamanın penceresine geçilen ve temanın henüz bilinmediği karelerde ekranda
-duran zemin koyudur.
+Yani **splash'ın okunur olmasını sağlayan şey `onCreate`'teki stil değil,
+splash temasının kendisi.** 16h'nin `dark` tercihi de bu yüzden bir şey
+kazandırmıyordu; 16h-2 onu `auto` ile değiştirdi ve gerekçesi bu başlıkta
+değil, aşağıdaki son tarih yolunda.
 
 > **16h'nin iki sayısı yanlış kareye yazılmış.** 16h kaydı "api29'da koyu temada
 > bant 11,91:1, açık temada 5,74:1" diyerek bunları `SystemBarStyle.dark`
@@ -2055,14 +2054,148 @@ yeniden koşuyor. Ölçüldü: ayarlardan açık → koyu → açık, süreç ay
 adımda yukarıdaki tablonun değerine oturuyor. Ekran görüntüleri
 `docs/screenshots/phase-16h-1/themeswitch-*`.
 
-**Açılışta ölçülen bir geçiş penceresi var; bu turda ölçüldü, düzeltilmedi.**
-api34, açık tema, ham kare dizisinde splash'tan uygulamaya devirde iki ardışık
-kare `#F1F2F1` üstünde beyaz ikon (**1,12:1**) ve `#FFFFFF` üstünde beyaz ikon
-(**1,00:1** — bantta zeminden farklı tek piksel yok) okunuyor; üçüncü kareden
-itibaren 5,74:1'e oturuyor. Yakalama çözünürlüğü ~85 ms/kare, yani süre
-100–250 ms mertebesinde. api29'un aynı yerinde ölçülen en düşük değer
-**4,04:1**. Koyu temada böyle bir kare yok — geçici stil ile nihai stilin aynı
-şeyi söylediği yer orası. Kararı kullanıcı verecek.
+**Açılışta ölçülen bir geçiş penceresi var.** 16h-1'de bulundu, 16h-2'de
+mekanizması çözüldü ve **kabul edildi**; aşağıdaki iki başlık onun kaydı.
+
+> **16h-1'in api29 sayısı yanlış.** O tur "api29'un aynı yerinde ölçülen en
+> düşük değer **4,04:1**" diyor. Kaba örneklemenin sonucu: 16h-2 aynı yeri üç
+> tekrarla yeniden ölçtüğünde api29 da **1,00:1**'e iniyor (`#FFFFFF` üstünde
+> `#FFFFFF`). Kusur iki cihazda da aynı, api29'da daha hafif değil.
+
+### Devir rampası — bilinen, kabul edilmiş davranış
+
+**Kusur.** Uygulama **açık** temadayken, splash'tan uygulamaya devirde durum
+çubuğu ikonları kısa süre görünmez oluyor. En kötü kare **1,00:1** — bantta
+zeminden farklı tek piksel yok — ve bu api29 ile api34'te aynı. Süre, ham kare
+dizisinde iki örnek arası ~100 ms iken 200–350 ms mertebesinde ölçüldü. Sistem
+temasından bağımsız: sistem açıkken de koyuyken de aynı.
+
+**Mekanizma — zemin anında değişiyor, ikon tonu rampalıyor.** Devir boyunca
+durum çubuğunun sahibi splash penceresi; onun cevabı "arkamdaki zemin koyu"
+olduğu için ikonlar beyaz (bir önceki başlıktaki 2. madde). Splash düşünce
+zemin **tek karede** uygulamanın beyaz yüzeyine dönüyor, ama SystemUI ikon
+tonunu beyazdan `#666666`'ya bir animasyonla götürüyor ve o animasyon beyaz
+yüzey ekrana geldikten **sonra** yürüyor. Aradaki kareler önce beyaz üstünde
+beyaz, sonra beyaz üstünde giderek koyulaşan gri.
+
+Rampanın ham kare dizisi — api34, açık uygulama teması, sistem açık, release
+build; dosyalar `docs/screenshots/phase-16h-2/handover-api34-light-*.png`:
+
+| Dosya | t | Bant zemini | İkon çekirdeği | Kontrast |
+|---|---|---|---|---|
+| `-1` | +1847 ms | `#0D1A14` (splash) | `#FFFFFF` | 17,87:1 |
+| `-2` | +1908 ms | `#202C26` (çapraz geçiş) | `#FFFFFF` | 14,49:1 |
+| `-3` | +2114 ms | `#565F5B` (çapraz geçiş) | `#FFFFFF` | 6,60:1 |
+| `-4` | +2273 ms | `#C7CAC9` (çapraz geçiş) | `#FFFFFF` | **1,65:1** |
+| `-5` | +2295 ms | `#FFFFFF` | `#FFFFFF` | **1,00:1** |
+| `-6` | +2553 ms | `#FFFFFF` | `#6D6D6D` | 5,17:1 |
+| `-7` | +2565 ms | `#FFFFFF` | `#666666` | 5,74:1 |
+
+Dizide iki örnek daha var, ama dosyaları bir öncekiyle **bayt bayt aynı**
+olduğu için depoya alınmadı: t+2241 ms `-3` ile, t+2398 ms `-5` ile aynı. Yani
+1,00:1 tek bir kare değil, en az 100 ms duran bir hâl. Tek bir zincirin
+çözemediği ara tonlar tekrarlardan toplandı; iki cihaz ve iki stil birlikte
+aynı eğriyi veriyor: `#FFFFFF` 1,00 → `#D3D3D3` 1,50 → `#BCBCBC` 1,90 →
+`#A9A9A9` 2,35 → `#9A9A9A` 2,81 → `#8A8A8A` 3,45 → `#6D6D6D` 5,17 → `#666666`
+5,74.
+
+Kareler tek bir açılıştan, cihazın kendi saatiyle damgalanmış birkaç paralel
+yakalama döngüsünden geliyor: `screencap` bu emülatörde ~200 ms sürüyor, tek
+döngü rampayı çözemeyecek kadar kaba.
+
+**Koyu uygulama temasında yok.** Ölçülen en kötü kare iki cihazda da
+**11,91:1** (api29'da bir koşuda çapraz geçiş karesi 8,65:1). Orada
+uygulamanın yüzeyi de koyu, yani rampanın gideceği yer beyazın kendisi.
+
+**Neden kodla kapatılmadı.** Üç yol da çıkmaz:
+
+- **Devri geciktirmek çözmüyor.** Rampa splash penceresi düşünce başlıyor.
+  Splash ne kadar tutulursa tutulsun zemin düştüğü anda değişiyor, ikon tonu
+  sonradan rampalıyor; gecikme kusuru ötelemekten başka bir şey yapmıyor.
+- **Açık temada açık splash zemini sorunu taşıyor, çözmüyor.** Splash
+  uygulamanın kendi tercihini okumadan çiziliyor — Android 10'da sistem
+  temasını izliyor. "Sistem koyu + uygulama açık" kombinasyonu kör kalırdı,
+  "sistem açık + uygulama koyu" ise yeni bir kör pencere açardı. Üstelik
+  §27'nin "ikon sistem temasına göre değişmez" kararını ve tek işaret
+  varyantını bozmak demek.
+- **`SystemBarStyle` ile kapatılamaz.** Bayrak uygulamanın penceresine
+  yazılıyor ve o pencere devir anında zaten doğru bayrağı taşıyor (aşağıdaki
+  başlık). Rampa SystemUI'ın kendi animasyonu; uygulamanın ulaşabileceği bir
+  yerde değil.
+
+Koyu splash'tan açık arayüze geçişte bu, genel platform davranışı. Kullanıcı
+fiziksel cihazda fark etmedi. **Karar: kusur kabul edildi, kodla
+kapatılmayacak.**
+
+### `onCreate`'teki geçici stil `auto` — karar son tarih yoluna ait
+
+16h-2'ye kadar `SystemBarStyle.dark(TRANSPARENT)`'tı, artık
+`SystemBarStyle.auto(TRANSPARENT, TRANSPARENT)`. Gerekçe **normal açılış
+değil**, son tarih yolu.
+
+**Normal açılışta iki stil arasında fark yok — ölçüldü.** İki cihaz × dört
+kombinasyon × iki stil, her hücre üç tekrar, release build. "İlk karelerin en
+kötüsü" splash karesinden itibaren, launcher kareleri hariç:
+
+| Cihaz | Sistem | Uygulama | `dark` — üç koşu | `auto` — üç koşu | Kararlı |
+|---|---|---|---|---|---|
+| api29 | açık | açık | 1,64 · 2,12 · 2,24 | 2,43 · **1,00** · 1,90 | 5,74:1 |
+| api29 | açık | koyu | 8,65 · 11,91 · 11,91 | 11,91 · 11,91 · 11,91 | 11,91:1 |
+| api29 | koyu | açık | 1,94 · 1,50 · 2,61 | **1,00** · 1,47 · 1,45 | 5,74:1 |
+| api29 | koyu | koyu | 11,91 · 11,91 · 11,91 | 11,91 · 11,91 · 11,91 | 11,91:1 |
+| api34 | açık | açık | 1,08 · 1,02 · 1,02 | 5,74 · **1,00** · 1,03 | 5,74:1 |
+| api34 | açık | koyu | 11,91 · 11,91 · 11,91 | 11,91 · 11,91 · 11,91 | 11,91:1 |
+| api34 | koyu | açık | 1,04 · 1,02 · 1,12 | 1,02 · 1,03 · 1,01 | 5,74:1 |
+| api34 | koyu | koyu | 11,91 · 11,91 · 11,91 | 11,91 · 11,91 · 11,91 | 11,91:1 |
+
+Açık hücrelerdeki tek tek sayılar stil farkı değil **örnekleme fazı**: rampa
+sürekli ve her koşuda başka bir noktasına denk geliniyor, o yüzden bir hücrenin
+en düşük değeri stile değil şansa bağlı — nitekim iki stil de bazı koşularda
+1,00:1'e, bazılarında 2'nin üstüne denk geliyor. Anlamlı olan, iki stilin
+topladığı ton kümesinin aynı eğri olması ve hiçbir stilin diğerinde olmayan bir
+kareyi üretmemesi. Koyu uygulama temasının hiçbir hücresi ise 8,65:1'in altına
+inmiyor. Yani `auto`'nun normal açılışta ne kazandırdığı ne kaybettirdiği var;
+kazanç aşağıdaki son tarih yolunda.
+
+**Sebebi pencere bayrağında görünüyor.** `dumpsys window` ile açılış boyunca
+okunan appearance, api34, uygulama açık temada:
+
+| Stil | Uygulama penceresi doğduğunda | Sonra |
+|---|---|---|
+| `dark` | `apr=LIGHT_NAVIGATION_BARS` (t+256 ms) — durum çubuğu bayrağı **yok** | t+601 ms'de `LIGHT_STATUS_BARS` ekleniyor |
+| `auto` | `apr=LIGHT_STATUS_BARS LIGHT_NAVIGATION_BARS` (t+192 ms) | değişmiyor |
+
+`dark` yanlış bayrakla doğup ~350 ms sonra düzeliyor, ama o 350 ms boyunca
+ekrandaki pencere hâlâ splash — bayrak bir kareye ulaşmıyor. Devir anına
+gelindiğinde iki stil de aynı bayrağı taşıyor; tablonun aynı çıkmasının sebebi
+bu. Uygulama **koyu** temadayken durum aynanın öbür tarafı: bu sefer `auto`
+doğarken yanlış cevabı veriyor (sistem açıkken `LIGHT_STATUS_BARS`), o da bir
+kareye ulaşmıyor — koyu satırlarda hiçbir bozulma ölçülmedi.
+
+**Farkı yaratan yer: son tarih yolu.** Tercih 1000 ms'de gelmezse kapı
+açılıyor ve uygulama `ThemeMode.Default` ile çiziyor. O yolda
+`SystemBarsFollowTheTheme` henüz hiçbir şey uygulamamış oluyor (`isThemeKnown`
+false), yani pencere `onCreate`'teki değerde **kalıyor**. `Default` sistemi
+izlediğine göre onunla anlaşan tek stil de sistemi izleyen stil. Tercih
+okuması 5 s geciktirilerek ölçüldü (geçici kod, turun sonunda kaldırıldı);
+aşağıdaki değerler kapı açıldıktan sonra, tercih hâlâ gelmemişken:
+
+| Cihaz | Sistem | `dark` | `auto` |
+|---|---|---|---|
+| api29 | açık | `#FFFFFF` üstünde `#FFFFFF` — **1,00:1**, okuma gelene kadar sürüyor | **5,74:1** |
+| api29 | koyu | 11,91:1 | 11,91:1 |
+| api34 | açık | **1,00:1**, sürüyor | **5,74:1** |
+| api34 | koyu | 11,91:1 | 11,91:1 |
+
+Buradaki 1,00:1 rampanın geçici çukuru değil: ölçüm penceresinin sonuna kadar
+(api34'te t+3,9 s) hiç değişmiyor, çünkü onu değiştirecek çağrı hiç gelmiyor.
+Ekran görüntüleri
+`docs/screenshots/phase-16h-2/deadline-api34-dark-syslight.png` ve
+`...-auto-syslight.png` — gövde iki dosyada da `#D3E2D8`, fark yalnızca durum
+çubuğunda.
+
+Navigasyon çubuğu stiline dokunulmadı; `onCreate` zaten yalnızca durum
+çubuğunu veriyor.
 
 ### Para birimi: HER YERDE SEMBOL
 

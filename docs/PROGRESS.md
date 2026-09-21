@@ -27,6 +27,145 @@ Her faz sonunda **en üste** yeni kayıt eklenir. Eski kayıtlar silinmez.
 
 ---
 
+## [Faz 16h-2] Devir Rampası Kabul Edildi, Son Tarih Yolu Kapatıldı — 2026-09-21
+
+**Durum:** Tamamlandı
+
+**Neden**
+
+16h-1'in "kapsam dışı, karar bekliyor" maddesi karara bağlandı. İki iş var ve
+birbirinden bağımsız: **açılış devrindeki görünmez durum çubuğu kusuru kabul
+edildi** (kod değişmedi, belgelendi), **ayrı bir gerçek hata kapatıldı**
+(`onCreate`'teki geçici stil `dark` → `auto`).
+
+16h-1'in bu konudaki teşhisi ölçümle çürüdü. O kayıt görünmezliğin sebebini
+"geçici `SystemBarStyle.dark`'ın uygulama penceresinin ilk karelerinde hâlâ
+yürürlükte olması" diye yazıyor. Değil: `dumpsys window` ile okunduğunda `dark`
+uygulama penceresine yanlış bayrakla doğuyor ama ~350 ms sonra, **hâlâ splash
+ekrandayken** düzeliyor; devir anına gelindiğinde iki stil de doğru bayrağı
+taşıyor. Görünmezliğin sebebi başka: zemin tek karede beyaza dönüyor, SystemUI
+ikon tonunu ise bir animasyonla götürüyor.
+
+---
+
+### Görev 1 — kusurun mekanizması ve kabulü
+
+Devir boyunca durum çubuğunun sahibi splash penceresi; cevabı "zemin koyu"
+olduğu için ikonlar beyaz. Splash düşünce zemin **anında** uygulamanın beyaz
+yüzeyine dönüyor, ikon tonu ise beyazdan `#666666`'ya rampalıyor ve rampa beyaz
+yüzey ekrana geldikten sonra yürüyor. En kötü kare **1,00:1**, süre 200–350 ms,
+**yalnızca açık uygulama temasında**, sistem temasından bağımsız, api29 ve
+api34'te aynı.
+
+**Kabul edildi, kodla kapatılmayacak.** Devri geciktirmek çözmüyor (rampa
+splash düşünce başlıyor); açık splash zemini sorunu taşıyor, çözmüyor (splash
+uygulamanın tercihini okumadan çiziliyor, ayrıca §27'nin tek ikon varyantı
+kararını bozar); `SystemBarStyle` ile de kapatılamaz (rampa SystemUI'ın kendi
+animasyonu). Gerekçeler ve ölçüm ARCHITECTURE **§23**'te, "Devir rampası —
+bilinen, kabul edilmiş davranış" başlığı altında.
+
+**16h-1'in api29 sayısı düzeltildi.** O kayıt api29'da en düşük değerin
+4,04:1 olduğunu, yani orada görünmezlik ölçülmediğini söylüyordu. Üç tekrarlı
+ince örneklemede api29 da **1,00:1**'e iniyor. Düzeltme §23'e yazıldı; 16h-1
+kaydının kendi metni, eski kayıtlar silinmez kuralı gereği olduğu gibi duruyor.
+
+---
+
+### Görev 2 — `onCreate`'teki stil `auto`
+
+Tercih 1000 ms'de gelmezse kapı açılıyor ve uygulama `ThemeMode.Default` ile
+çiziyor. O yolda `SystemBarsFollowTheTheme` hiçbir şey uygulamamış oluyor
+(`isThemeKnown` false), pencere `onCreate`'teki değerde kalıyor. `Default`
+sistemi izlediğine göre onunla anlaşan tek stil de sistemi izleyen stil.
+
+Tercih okuması geçici olarak 5 s geciktirilip ölçüldü (yama turun sonunda
+kaldırıldı; `MainViewModel` depoda değişmedi). Kapı açıldıktan sonra, tercih
+hâlâ gelmemişken:
+
+| Cihaz | Sistem | `dark` | `auto` |
+|---|---|---|---|
+| api29 | açık | **1,00:1**, okuma gelene kadar sürüyor | **5,74:1** |
+| api29 | koyu | 11,91:1 | 11,91:1 |
+| api34 | açık | **1,00:1**, sürüyor | **5,74:1** |
+| api34 | koyu | 11,91:1 | 11,91:1 |
+
+Normal açılışta fark yok: iki cihaz × dört kombinasyon × iki stil, her hücre üç
+tekrar. Açık temanın hücrelerinde iki stil de aynı rampayı, aynı ton kümesiyle
+örnekliyor — tek tek sayılar örnekleme fazına göre oynuyor, ikisi de bazı
+koşularda 1,00:1'e iniyor. Koyu temanın hiçbir hücresi 8,65:1'in altına
+inmiyor. Kararlı durum her yerde açıkta 5,74:1 / koyuda 11,91:1. Tam tablo
+§23'te.
+
+---
+
+### Doğrulama
+
+- `testDebugUnitTest --rerun-tasks` — **330 test, 0 hata, 0 atlanan.**
+- `connectedDebugAndroidTest` (api34) — **19 test, 0 hata, 1 atlanan** (bilinen
+  `PaymentReminderWorkerTest.reminderWorker_notificationsDisabled_*`).
+- `lintDebug --rerun-tasks` — **22 bulgu**, hepsi uyarı, yeni bulgu yok.
+- `assembleDebug --rerun-tasks` ve `assembleRelease` geçti; release APK
+  **2.184.114 B** — taban değerle birebir aynı, `auto` boyutu değiştirmiyor.
+- Splash karesi iki cihazda da **17,87:1**; api34 splash karesinin gövde
+  istatistiği 16h-1'in depodaki dosyasıyla aynı (`#0D1A14` %96,8).
+- api24 (minSdk) kararlı durum: uygulama açık temada `#656565` üstünde beyaz
+  bant **5,83:1**, koyu temada `#FFFFFF` üstünde `#1F3D2D` **11,91:1** — ikisi
+  de okunur.
+- AAB üretilmedi; 16g ayrı tur.
+
+---
+
+### Ekran görüntüleri
+
+`docs/screenshots/phase-16h-2/` altında dokuz dosya:
+`handover-api34-light-{1..7}.png` (rampanın ham kare dizisi, §23'teki tablonun
+kanıtı) ve `deadline-api34-{dark,auto}-syslight.png` (son tarih yolunda iki
+stilin yan yana görüntüsü).
+
+---
+
+### Kapsam dışı — bildiriliyor, yapılmadı
+
+1. **`SystemBarsFollowTheTheme` KDoc'undaki bir cümle tam doğru değil.**
+   "The launch window's own style, set in `onCreate`, covers that gap" diyor;
+   §23 o boşluğu kapatan şeyin splash temasının kendisi olduğunu 16h-1'de
+   ölçmüştü. Bu turda değiştirilmedi — ifade 16h-1'den beri aynı ve kusur
+   `auto`'ya geçişten doğmuyor.
+2. **AAB hâlâ bayat.** 16h ve bu turdaki `MainActivity` değişikliği mevcut
+   AAB'de yok. 16g yeniden koşulmalı.
+
+**Değişen dosyalar**
+- `app/src/main/java/com/elinacn/subtrack/MainActivity.kt` — `onCreate`'teki
+  durum çubuğu stili `SystemBarStyle.dark` → `SystemBarStyle.auto`, gerekçe
+  yorumu yeniden yazıldı
+- `docs/ARCHITECTURE.md` — §23'e "Devir rampası" ve "`onCreate`'teki geçici
+  stil `auto`" başlıkları; 16h-1'in api29 sayısının düzeltmesi; §16 ve §23'teki
+  bayat `SystemBarStyle.dark` referansları
+- `docs/PROGRESS.md` — bu kayıt
+- `docs/screenshots/phase-16h-2/` — dokuz kare
+
+**Commit'ler**
+- `4008032` fix: follow the system for the provisional status bar style
+- *(bu kayıt)* docs: record the accepted handover ramp and the auto decision
+
+**Karşılaşılan sorunlar**
+- `cmd uimode night` api29 imajında iş görmüyor (`mNightModeLocked=true`).
+  Sistem teması `settings put secure ui_night_mode` + **yeniden başlatma** ile
+  sürüldü ve her ölçümden önce `dumpsys uimode` ile doğrulandı. İlk turda bu
+  fark edilmeden dört hücre yanlış sistem temasıyla ölçüldü; o veriler atıldı,
+  hücreler yeniden koşuldu.
+- Emülatörde `screencap` ~150–200 ms sürüyor, rampa ise ondan kısa. Tek zincir
+  yetmediği için açılış, cihaz saatiyle damgalanmış birkaç paralel cihaz-içi
+  yakalama döngüsüyle örneklendi (~60–100 ms/kare). Sekizden fazla döngüde
+  cihaz tıkanıp damgaların sırası bozuluyor; beş döngüde kalındı.
+- Release APK'da `run-as` yok, tema tercihi yine ayar ekranından sürüldü
+  (16h-1'deki gibi). Ölçüm ekranındaki etiketler `values-en`'den geliyor.
+
+**Sonraki faz için not**
+- 16g yeniden koşulup AAB yeniden üretilmeli.
+
+---
+
 ## [Faz 16h-1] Durum Çubuğu Açıklandı, Bayat Belge ve Yorumlar Düzeltildi — 2026-09-20
 
 **Durum:** Tamamlandı
