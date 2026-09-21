@@ -1,0 +1,196 @@
+<resources>
+
+    <string name="app_name">SubTrack</string>
+    <string name="my_subscriptions">Aboneliklerim</string>
+    <string name="total_monthly">Aylık Toplam</string>
+    <string name="total_yearly">Yıllık Toplam</string>
+    <string name="add_subscription">Abonelik Ekle</string>
+
+    <!-- Add sheet -->
+    <string name="add_subscription_title">Yeni Abonelik Ekle</string>
+    <string name="subscription_name_label">Abonelik Adı</string>
+    <string name="subscription_price_label">Fiyat (Örn: 159.99)</string>
+    <string name="currency_label">Para Birimi</string>
+    <string name="save">Kaydet</string>
+
+    <!-- Spoken currency names; the chips themselves show the ISO 4217 code. -->
+    <string name="currency_try">Türk Lirası</string>
+    <string name="currency_usd">Amerikan Doları</string>
+    <string name="currency_eur">Euro</string>
+    <string name="currency_gbp">İngiliz Sterlini</string>
+
+    <!-- Subscription row -->
+    <string name="delete">Sil</string>
+    <!-- Spoken as one phrase; the row is a single stop for a screen reader. Ad, tutar. -->
+    <string name="subscription_row_description">%1$s, %2$s</string>
+    <!-- Spoken form of the dashboard card. Etiket, tutar (+ çevrim notu). -->
+    <string name="dashboard_description">%1$s, %2$s</string>
+    <string name="dashboard_description_converted">%1$s, %2$s. %3$s</string>
+
+    <!-- Shown under the total only when the list holds more than one currency. -->
+    <string name="total_converted_note">Farklı para birimleri sabit kurla %1$s cinsine çevrildi</string>
+
+    <!-- Validation -->
+    <string name="error_name_empty">Abonelik adı boş olamaz</string>
+    <string name="error_price_empty">Fiyat boş olamaz</string>
+    <string name="error_price_invalid">Geçerli bir sayı girin</string>
+    <string name="error_price_not_positive">Fiyat sıfırdan büyük olmalı</string>
+    <string name="error_price_too_large">Fiyat %1$,d\'dan küçük olmalı</string>
+    <string name="error_price_too_many_decimals">En fazla iki ondalık basamak girin</string>
+
+    <!-- Failures -->
+    <string name="error_save_failed">Abonelik kaydedilemedi</string>
+    <string name="error_delete_failed">Abonelik silinemedi</string>
+
+    <!-- Undo -->
+    <string name="subscription_deleted">Abonelik silindi</string>
+    <string name="undo">Geri al</string>
+
+
+    <!-- Status -->
+    <string name="loading">Yükleniyor</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Ayarlar</string>
+    <string name="navigate_back">Geri</string>
+    <string name="main_currency_label">Ana Para Birimi</string>
+    <string name="main_currency_description">Aylık toplam bu para biriminde gösterilir.</string>
+    <string name="error_setting_save_failed">Ayar kaydedilemedi</string>
+    <!-- Theme -->
+    <string name="theme_mode_title">Tema</string>
+    <string name="theme_mode_system">Sistemi takip et</string>
+    <string name="theme_mode_light">Açık</string>
+    <string name="theme_mode_dark">Koyu</string>
+    <string name="dynamic_color_title">Duvar kâğıdı renkleri</string>
+    <string name="dynamic_color_on">Açık — renkler duvar kâğıdından geliyor</string>
+    <string name="dynamic_color_off">Kapalı — uygulamanın kendi paleti</string>
+    <string name="dynamic_color_unsupported">Android 12 ve üzeri gerekir</string>
+    <!-- Exchange rates -->
+    <string name="exchange_rates_title">Döviz Kurları</string>
+    <string name="exchange_rates_row_description">Toplamın hesaplandığı kurları elle düzenleyin</string>
+    <string name="exchange_rates_description">Kurlar elle girilir; uygulama internetten kur çekmez. Her satır, bir birim yabancı paranın kaç %1$s ettiğini söyler.</string>
+    <!-- Ör: 1 USD = … TRY -->
+    <string name="rate_field_label">1 %1$s = … %2$s</string>
+    <string name="rate_anchor_note">%1$s çıpadır: diğer kurlar ona göre yazılır, bu yüzden düzenlenemez.</string>
+    <string name="rates_updated_at">Son düzenleme: %1$s</string>
+    <string name="rates_never_edited">Kurlar hiç düzenlenmedi. Uygulamayla gelen değerler bir tahmindir, doğrulanmadı.</string>
+    <string name="reset_rates">Varsayılana dön</string>
+    <string name="reset_rates_confirm_title">Kurlar sıfırlansın mı?</string>
+    <string name="reset_rates_confirm_message">Girdiğiniz kurlar silinecek ve uygulamayla gelen değerler kullanılacak.</string>
+    <string name="reset_rates_confirm">Sıfırla</string>
+    <string name="cancel">Vazgeç</string>
+
+    <!-- Rate validation -->
+    <string name="error_rate_empty">Kur boş olamaz</string>
+    <string name="error_rate_invalid">Geçerli bir sayı girin</string>
+    <string name="error_rate_not_positive">Kur sıfırdan büyük olmalı</string>
+    <string name="error_rate_too_many_decimals">En fazla dört ondalık basamak girin</string>
+    <string name="error_rate_too_large">Kur %1$s\'dan küçük olmalı</string>
+    <string name="error_rates_save_failed">Kurlar kaydedilemedi</string>
+    <!-- Next payment date -->
+    <string name="next_payment_date_label">Sonraki Ödeme (isteğe bağlı)</string>
+    <string name="pick_date">Tarih seç</string>
+    <string name="clear_date">Tarihi temizle</string>
+    <string name="date_not_set">Seçilmedi</string>
+    <!-- Spoken form of the date field: etiket, değer. -->
+    <string name="next_payment_date_description">%1$s, %2$s</string>
+    <string name="due_today">Bugün ödenecek</string>
+    <string name="error_date_too_far">Tarih en fazla %1$d yıl ileri olabilir</string>
+    <!-- Turkish keeps the noun singular after a numeral - "1 gün", "5 gün" - so the two forms are
+         the same word for word. CLDR still gives tr a "one" category and lint requires it, so both
+         are spelled out and both carry the identical string. -->
+    <plurals name="days_until_payment">
+        <item quantity="one">%1$d gün kaldı</item>
+        <item quantity="other">%1$d gün kaldı</item>
+    </plurals>
+
+    <!-- Payment reminder notification -->
+    <string name="notification_channel_name">Ödeme hatırlatmaları</string>
+    <string name="notification_channel_description">Bugün ve yarın ödenecek abonelikler için günlük hatırlatma</string>
+    <!-- Neutral on purpose: one notification can cover a payment due today and one due tomorrow. -->
+    <plurals name="notification_title">
+        <item quantity="one">Ödeme hatırlatması: %1$d abonelik</item>
+        <item quantity="other">Ödeme hatırlatması: %1$d abonelik</item>
+    </plurals>
+    <!-- Ad — durum -->
+    <string name="notification_entry">%1$s — %2$s</string>
+    <string name="notification_entry_separator">", "</string>
+    <string name="notification_due_today">bugün</string>
+    <string name="notification_due_tomorrow">yarın</string>
+    <!-- Payment reminder settings row -->
+    <string name="reminder_notifications_title">Ödeme hatırlatmaları</string>
+    <string name="reminder_notifications_on">Açık</string>
+    <string name="reminder_notifications_can_request">Kapalı — açmak için dokunun</string>
+    <string name="reminder_notifications_settings_only">Kapalı — sistem ayarlarından açılmalı</string>
+    <!-- Başlık ve durum tek bir odak durağı olarak okunur. -->
+    <string name="settings_row_description">%1$s, %2$s</string>
+    <string name="reminder_rationale_title">Hatırlatmalara izin verin</string>
+    <string name="reminder_rationale_message">Ödeme günü yaklaşan abonelikleriniz için günde en fazla bir bildirim gönderilir. Başka hiçbir şey için bildirim almazsınız.</string>
+    <string name="reminder_rationale_confirm">İzin iste</string>
+    <!-- Empty state -->
+    <string name="empty_subscriptions_title">Henüz abonelik yok</string>
+    <string name="empty_subscriptions_message">Eklemek için + düğmesine dokun</string>
+    <!-- Başlık ve alt satır tek odak durağı olarak okunur. -->
+    <string name="empty_state_description">%1$s, %2$s</string>
+    <!-- Billing period -->
+    <string name="billing_period_label">Ödeme Periyodu</string>
+    <string name="period_monthly">Aylık</string>
+    <string name="period_yearly">Yıllık</string>
+    <string name="period_weekly">Haftalık</string>
+    <!-- Category -->
+    <string name="category_label">Kategori</string>
+    <string name="category_entertainment">Eğlence</string>
+    <string name="category_productivity">Üretkenlik</string>
+    <string name="category_health">Sağlık</string>
+    <string name="category_other">Diğer</string>
+    <!-- Satırın okunan hâline bir bilgi daha ekler: (mevcut cümle), yeni bilgi. -->
+    <string name="subscription_row_description_more">%1$s, %2$s</string>
+    <!-- Category filter -->
+    <string name="filter_all">Tümü</string>
+    <string name="empty_category_title">Bu kategoride abonelik yok</string>
+    <string name="empty_category_message">Başka bir kategori seç</string>
+    <!-- Statistics -->
+    <string name="statistics_title">İstatistik</string>
+    <string name="empty_statistics_title">Henüz istatistik yok</string>
+    <string name="empty_statistics_message">Bir abonelik ekleyince dağılım burada çıkar</string>
+    <string name="statistics_by_category">Kategori Dağılımı</string>
+    <!-- Türkçede yüzde işareti sayıdan önce gelir: %45 -->
+    <string name="statistics_percent">%%%1$d</string>
+    <!-- Bir dağılım satırının tek odak durağı olarak okunan hâli: kategori, tutar, oran. -->
+    <string name="statistics_category_description">%1$s, %2$s, yüzde %3$d</string>
+    <string name="statistics_most_expensive">En Pahalı Abonelikler</string>
+    <!-- Aylara bölünmüş maliyet, kartın gösterdiği fiyat değil. -->
+    <string name="statistics_monthly_cost">ayda %1$s</string>
+    <!-- Bir "en pahalı" satırının tek odak durağı olarak okunan hâli: ad, periyot, aylik maliyet. -->
+    <string name="statistics_cost_description">%1$s, %2$s, ayda %3$s</string>
+
+    <!-- Aylık trend -->
+    <string name="statistics_trend">Aylık Trend</string>
+    <!-- Sıfır ve tek aylık hâlin ikisi için de doğru olan tek cümle. -->
+    <string name="statistics_trend_collecting">Trend için en az iki ay gerekiyor. Her ayın toplamı kaydediliyor; ikinci ay dolduğunda grafik burada çıkar.</string>
+    <!-- Grafiğin ölçeğinin tepesi: penceredeki en yüksek ay. -->
+    <string name="statistics_trend_scale">en yüksek %1$s</string>
+    <!-- Grafiğin tek odak durağı olarak okunan hâli; %1$s aylık liste. -->
+    <string name="statistics_trend_description">Aylık trend: %1$s</string>
+    <!-- Ay, tutar -->
+    <string name="statistics_trend_point">%1$s %2$s</string>
+    <!-- O ay için satır yok — "0,00" ile karıştırılmamalı. -->
+    <string name="statistics_trend_point_missing">%1$s kayıt yok</string>
+    <string name="statistics_trend_separator">", "</string>
+    <!-- Both forms are identical, for the reason spelled out at days_until_payment. -->
+    <plurals name="statistics_trend_other_currency">
+        <item quantity="one">Başka para biriminde kaydedilen %1$d ay gösterilmiyor</item>
+        <item quantity="other">Başka para biriminde kaydedilen %1$d ay gösterilmiyor</item>
+    </plurals>
+    <!-- Geçen aya göre değişim: yön sözcükle yazılıyor, renkle değil. -->
+    <string name="statistics_change_up">Geçen aya göre %1$s arttı</string>
+    <string name="statistics_change_down">Geçen aya göre %1$s azaldı</string>
+    <string name="statistics_change_same">Geçen aya göre değişmedi</string>
+
+    <!-- Düzenleme ekranı -->
+    <string name="edit_subscription_title">Aboneliği Düzenle</string>
+    <string name="edit_subscription">Düzenle</string>
+    <string name="error_load_failed">Abonelik yüklenemedi</string>
+    <string name="subscription_missing_title">Bu abonelik artık yok</string>
+    <string name="subscription_missing_message">Silinmiş olabilir. Geri dönüp listeye bakın.</string>
+</resources>
