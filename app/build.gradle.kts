@@ -87,6 +87,27 @@ android {
     buildFeatures {
         compose = true
     }
+    androidResources {
+        // The app speaks two languages; its libraries speak dozens. Material3's date picker and
+        // the AndroidX strings it pulls in ship translations for every locale Google supports, so
+        // a German device used to get a German date picker inside an otherwise English app. This
+        // drops every library locale that is not one of ours, which also shrinks the bundle.
+        // `defaultConfig.resourceConfigurations` and `resConfigs()` are the old spelling and are
+        // deprecated in AGP 9 in favour of this one; CLAUDE.md section 4 bans deprecated APIs.
+        localeFilters += listOf("en", "tr")
+    }
+    bundle {
+        language {
+            // Once the filter above has run, the only locale-qualified resources left are our own
+            // Turkish strings - tens of kilobytes, not megabytes. Splitting them off buys almost
+            // nothing and costs correctness: a language split is delivered for the locales the
+            // device had at install time, so a user who adds Turkish afterwards keeps seeing
+            // English until Play sends the extra split. Packaging both languages in the base means
+            // the device's own resource resolution picks the right one the moment the setting
+            // changes, with nothing to download. See ARCHITECTURE section 28.
+            enableSplit = false
+        }
+    }
 }
 
 ksp {
