@@ -27,6 +27,238 @@ Her faz sonunda **en üste** yeni kayıt eklenir. Eski kayıtlar silinmez.
 
 ---
 
+## [Faz 16g-2] Yayın Adayı AAB Yeniden Üretildi ve Üç Cihazda Sürüldü — 2026-09-21
+
+**Durum:** Tamamlandı. Kaynak koda dokunulmadı; bu tur ölçümdür.
+
+**Neden**
+
+16h serisi manifesti (`Theme.SubTrack.Starting`), temayı ve bağımlılıkları
+(`core-splashscreen` 1.2.0) değiştirdi. 16g'de üretilen AAB bunların hiçbirini
+taşımıyordu, yani Play'e yüklenecek şey bayattı.
+
+### Bölüm A — 16h'den kalan üç belge artığı
+
+1. **`SystemBarsFollowTheTheme` KDoc'u düzeltildi.** "The launch window's own
+   style, set in `onCreate`, covers that gap" cümlesi §23 ile çelişiyordu.
+   Ölçülen gerçek: devir boyunca durum çubuğunun sahibi splash penceresi ve
+   `Theme.SubTrack.Starting`; `onCreate`'teki `auto` stili uygulama
+   penceresini kapsıyor — normal yolda devirden sonraki birkaç kare, kapının
+   1000 ms son tarihi dolarsa **her** kare. Yalnızca yorum değişti.
+2. **TESTING.md'ye api29 sistem koyu tema yöntemi.** `cmd uimode night` bu
+   imajda cevap veriyor ama uygulamıyor (`mNightModeLocked=true`); çalışan yol
+   `settings put secure ui_night_mode <2|1>` + `adb reboot`, doğrulaması
+   `dumpsys uimode` (`mCurUiMode` `0x21` koyu / `0x11` açık). `adb shell stop;
+   start` bu imajda mümkün değil ("must be root"), yani tam yeniden başlatma
+   gerekiyor. 16h-2'nin ilk turunda bu atlandığı için dört hücrenin yanlış
+   sistem temasıyla ölçülüp atıldığı da not edildi.
+3. **ROADMAP'e Faz 16h satırı.** 16g'den sonraki boşluk kapandı; satır
+   PROGRESS'in 16h/16h-1/16h-2 kayıtlarına ve ARCHITECTURE §23'e yönlendiriyor.
+
+### Bölüm B — yayın adayı AAB
+
+**Üretim.** `./gradlew :app:bundleRelease`, commit **`f30e6c5`** üzerinde
+(Bölüm A commit'i). Çıktı `app/build/outputs/bundle/release/app-release.aab`,
+**4.657.988 B**. Commit edilmedi (`*.aab` `.gitignore`'da), `git status` temiz.
+
+**İmza — eşleşti.** `keytool -printcert -jarfile` sertifikası:
+
+| Alan | Değer |
+|---|---|
+| Sahip | `CN=ElinaDorothea, OU=Development, O=SubTrack, L=Denizli, ST=Denizli, C=TR` |
+| SHA-256 | `fce85346c7e1a09e68bf86428cb8061bb22f6989c1c35711e4499fb111d26da0` |
+| SHA-1 | `cb926a75daf595ceda04c6268e2d9be678e80e8a` |
+| Algoritma | SHA384withRSA, 2048-bit RSA |
+| Geçerlilik | 2026-09-17 → 2054-02-02 |
+
+Parmak izi 16g'de kaydedilen yükleme anahtarıyla **birebir aynı**; program
+olarak karşılaştırıldı. `jarsigner -verify` → `jar verified.`
+
+**Sürüm — AAB'nin kendi manifestinden okundu**, build dosyasından değil:
+
+```
+bundletool dump manifest --bundle app-release.aab
+→ android:versionCode="1" android:versionName="1.0"
+  minSdkVersion="24" targetSdkVersion="36" compileSdkVersion="36"
+```
+
+**Üç cihaza kurulum — parça sayısı 16g ile aynı.** `bundletool build-apks` +
+`install-apks`, her cihazda **üç parça**:
+
+| Cihaz | `pm path` | `dumpsys package` |
+|---|---|---|
+| `subtrack_min_api24` | `base.apk` + `split_config.en.apk` + `split_config.x86_64.apk` | versionCode=1 versionName=1.0 minSdk=24 |
+| `subtrack_narrow_api29` | aynı üç parça | versionCode=1 versionName=1.0 minSdk=29 |
+| `subtrack_wide_api34` | aynı üç parça | versionCode=1 versionName=1.0 minSdk=32 |
+
+`minSdk` sütunu cihaza göre değişiyor çünkü bundletool base APK'nın SDK'ya
+göre budanmış varyantını gönderiyor; AAB'nin kendi `uses-sdk`'sı 24.
+
+**Boyut — fark iki kaynağa ayrıldı.** 16g'nin 4.598.466 B'ıyla arasındaki
+**+59.522 B** (%1,29) tek başına `core-splashscreen` değil: o ölçümden sonra
+16d ikonları da değişti. Ara nokta ölçüldü — `047cb0b` (ikonlar girmiş,
+splashscreen girmemiş) ayrı bir worktree'de aynı yapılandırmayla derlendi:
+
+| Commit | AAB | Fark | Kaynak |
+|---|---|---|---|
+| 16g | 4.598.466 B | — | — |
+| `047cb0b` | 4.648.781 B | **+50.315 B** | 16d ikon işi (on iki para halkası + bildirim ikonu) |
+| `f30e6c5` | 4.657.988 B | **+9.207 B** | `core-splashscreen` 1.2.0 + 16h kodu |
+
+Yani splashscreen'in bedeli ~9 KB; artışın beşte dördü ikonlardan geliyor.
+
+### Dil parçası riski — ölçüldü, düzeltilmedi
+
+**`localeConfig` manifestte YOK.** AAB'nin birleşik manifestinde
+`android:localeConfig` geçmiyor ve `res/xml/` altında `locales_config.xml`
+yok. Sonucu cihazda doğrulandı: api34'te Ayarlar → Uygulamalar → SubTrack
+sayfasında **"Dil" satırı çıkmıyor**. Yani kullanıcı API 33+'ta sistem
+ayarlarından uygulamanın dilini **seçemiyor**; uygulamanın kendi dil ayarı da
+yok. Bu duruma ulaşmanın tek yolu `cmd locale set-app-locales`.
+
+**Yön 1 — cihaz yalnızca `tr-TR`, uygulama EN'e çevrildi.** Cihaz dili
+Ayarlar'dan tek dile indirildi (`persist.sys.locale=tr-TR`), **sonra**
+`build-apks --connected-device` ile üretildi:
+
+```
+pm path → base.apk + split_config.tr.apk + split_config.x86_64.apk
+```
+
+`split_config.en` **kurulmadı**. `cmd locale set-app-locales … --locales en`
+kabul edildi (`Locales for com.elinacn.subtrack for user 0 are [en]`) ama
+**metinler Türkçe kaldı** — yalnızca sayı biçimi değişti (`₺0,00` → `₺0.00`).
+Yani riskin mekanizması gerçek.
+
+**Yön 2 — cihaz yalnızca `en-US`, uygulama TR'ye çevrildi.** Bu sefer
+`split_config.en` kuruldu, ve sonuç **yine İngilizce**: uygulama dili `tr-TR`
+verilse de metinler çevrilmedi. Sebep parça değil kaynak niteleyicisi —
+Türkçe metinler nitelikisiz `values/`'ta, yani çözümlemede **son** sıradaki
+yedek. Dil listesi `[tr-TR, en-US]` olunca `values-en` kazanıyor.
+
+**Sonuç:** uygulama dili tercihinin metinlere etkisi **iki yönde de yok**.
+Kullanıcıya açık bir yol olmadığı için (localeConfig yok, uygulama içi dil
+seçici yok) bugün kullanıcıya ulaşan bir kusur değil. Karar kullanıcının;
+build yapılandırmasına ve kaynaklara dokunulmadı.
+
+### Regresyon — karar kuralının ikinci dalı
+
+PROGRESS'e bakıldı: 117 maddelik listenin **son tam koşusu Faz 16b**
+(2026-09-16), **debug build üzerinde** ve **R8 öncesinde** — `isMinifyEnabled`
+bir gün sonra 16c'de açıldı. Yani kuralın ikinci dalı geçerli:
+**api34'te 117 maddenin tamamı**, api29 ve api24'te alt küme.
+
+**api34 — 117 madde, AAB'den kurulan build üzerinde.**
+
+| Sonuç | Madde |
+|---|---|
+| **geçti (108)** | #1–#39, #41–#45, #47–#49, #51–#74, #76–#83, #85–#94, #96–#103, #106–#113, #115–#117 |
+| **kısmen (4)** | #50 (açılışta sekiz ardışık dump'ın hiçbirinde boş durum yok; ilk kare hâlâ örneklenemiyor), #84, #95, #104 (ağaç tarafı doğru, TalkBack imajda yok) |
+| **ölçülemedi (2)** | #75, #105 — ikisi de `run-as` istiyor, release APK'da yok (`package not debuggable`) |
+| **geçerli değil (3)** | #40, #46 (API < 33), #114 (API < 31) |
+
+Ölçülen sayılardan bazıları: #11 toplam **219,89**; #63 **243,33**; #64 yıllık
+**2.920,00**; #22 kur 50'ye çekilince **643,33**; #21 ana para birimi USD →
+**$12,87**; #79 yüzdeler **79+15+6 = 100** ve **70+30 = 100**; #85 çubuk
+`#D4AF37` / iz `#3A5A48` = **3,65:1**; #15 arka plan `#0D1A14` / kart
+`#1F3D2D` = **1,50:1**, vurgu altın `#D4AF37`, **hiçbir yerde mor yok**
+(1025 örneklenmiş renkte sıfır); #113 duvar kâğıdı paletinde çubuk `#B2C5FF`
+/ iz `#45464F` = **5,50:1**.
+
+Tarih maddeleri cihaz saatine (21 Eylül 2026) göre yeniden hesaplanıp
+doğrulandı: #27 **19 gün**, #29/#69 **20 gün**, #70 haftalık **4 gün** ve
+yıllık **355 gün**, #71 (çıpa 3 Ocak 2024) **2 gün**, #72 (çıpa 31 Ocak 2026)
+**9 gün** — adım adım kırpılsaydı 7 çıkardı, yani madde hâlâ ayırt ediyor.
+
+Trend maddeleri saat ay ay ileri alınarak sürüldü (Eki → Kas → *(Ara
+atlandı)* → Oca → Şub → Mar): #87 iki sütun, #88 yalnızca **son altı ay**
+(Eylül düşüyor), #89 Aralık yuvası duruyor ama **hiçbir şey çizilmiyor**,
+#90 Şubat'ta **yalnızca iz**, #91 iki yönde de cümle (`₺428.50 less` /
+`₺200.00 more`), #92 "Unchanged", #93 karşılaştırma **hiç yok**, #94 para
+birimi değişince "4 months recorded in another currency are not shown".
+
+Bildirim api34'te gerçekten tetiklendi (saat 08:30'a alınıp uygulama
+açıldıktan sonra 09:05'e alınıp iş zorlandı): `Payment reminder: 1
+subscription` / `NotifyMe — today`.
+
+**api29 ve api24 — alt küme (açılış, tema, bildirim, klavye).**
+
+| Alan | Madde | api29 | api24 |
+|---|---|---|---|
+| Açılış | #1, #12, #47, #110 | geçti | geçti |
+| Tema | #15, #85, #106, #108 | geçti | geçti |
+| Tema | #107, #109 | geçti | geçerli değil (Android 7.0'da sistem koyu teması yok) |
+| Tema | #114 | geçti | geçti |
+| Bildirim | #33, #38, #40, #46 | geçti | geçti |
+| Bildirim | #39 | geçti | geçerli değil (kanallar API 26+) |
+| Klavye | #26 | geçti | geçti |
+
+#110 ikisinde de kare kare ölçüldü ve **16h'nin asıl sınavı budur:** koyu tema
+saklıyken, sistem açıkken, açılış kareleri sırayla launcher → splash
+(`#0D1A14` zemin + `#D4AF37` işaret, iki kare) → devir → uygulama koyu
+(`#0D1A14` / `#1F3D2D` / `#14523A`). **Yanlış temada tek kare yok**, api24 dahil.
+
+#85 üç cihazda da aynı sayıyı veriyor: `#D4AF37` / `#3A5A48`. #26 ikisinde de
+klavye açıkken (`mInputShown=true`) tek fiskede hem Kaydet hem "Varsayılana
+dön"e ulaşılıyor; api29'da Kaydet `[329,1044][391,1084]`, 16b'nin kaydettiği
+dar cihaz koordinatıyla aynı satırda.
+
+Bildirim api29 ve api24'te de tetiklendi, ikisinde de aynı metin. Üç cihazda
+`logcat -b crash` **boş (0 satır)**.
+
+**Fiziksel cihaz (B8) yapılamadı** — `P7KROVRSVWYTW869` bu oturum boyunca
+`adb devices`'ta hiç görünmedi. AAB'den kurulan build ona kurulmadı.
+
+**Otomatik doğrulamalar**
+
+| Komut | Sonuç |
+|---|---|
+| `testDebugUnitTest --rerun-tasks` | **330 test, 0 hata, 0 atlanan** |
+| `connectedDebugAndroidTest` (api34) | **19 test, 0 hata, 1 atlanan** |
+| `lintDebug --rerun-tasks` | **22 bulgu**, hepsi uyarı (12 `GradleDependency`, 3 `InlinedApi`, 3 `PluralsCandidate`, 2 `NewerVersionAvailable`, 1 `RedundantLabel`, 1 `AndroidGradlePluginVersion`) |
+| `assembleDebug` (Bölüm A sonrası) | geçti, yeni uyarı yok |
+
+**Değişen dosyalar**
+- `app/src/main/java/com/elinacn/subtrack/MainActivity.kt` — yalnızca
+  `SystemBarsFollowTheTheme` KDoc'u
+- `docs/TESTING.md` — api29 koyu tema yöntemi; #107/#109 satırı güncellendi
+- `docs/ROADMAP.md` — Faz 16h satırı
+- `docs/PROGRESS.md` — bu kayıt
+
+**Commit'ler**
+- `f30e6c5` docs: correct the status bar KDoc and record what 16h left open
+- *(bu kayıt)* docs: record the rebuilt release AAB and its verification round
+
+**Karşılaşılan sorunlar**
+- **Tarih maskesi cihaz diline bağlı.** api34 `en-US`'teyken seçicinin metin
+  girişi `MM/DD/YYYY` istiyor; `11092026` 9 Kasım olarak ayrıştırıldı ve bir
+  çıpa yanlış kuruldu. TESTING.md yalnızca `DD.MM.YYYY` / `DDMM/YYYY`
+  maskelerini yazıyor. Ölçüm düzeltilip yeniden koşuldu.
+- **16g'nin klavye tuzağı aynen tekrarlandı.** Ad alanına yazdıktan sonra
+  eski koordinatla dokunmak para birimini EUR'ya atlattı — TESTING.md bunu
+  16g'den beri yazıyor. Dokunuş sırası, her alandan sonra yeniden dump
+  alacak şekilde değiştirildi.
+- **api29'da sistem temasını canlı *kapatmak* mümkün, açmak değil.** Ayarlar →
+  Ekran → Koyu tema anahtarı koyudan açığa geçişi anında yapıyor (aynı pid);
+  ters yön `mNightModeLocked=true` yüzünden tutmuyor, oraya yeniden başlatma
+  gerekiyor. #109 bu sayede api29'da **canlı** ölçüldü.
+- **`install-apks` sessizce düşebiliyor.** MSYS altında jar yolu bozulunca
+  komut hiçbir şey kurmadan dönüyor; her kurulum `pm path` ile doğrulandı.
+- Enstrümantasyonda atlanan test
+  **`MonthlySnapshotDaoTest.observeAll_emptyTable_emitsAnEmptyList`**; 16b
+  kaydındaki atlanan test (`reminderWorker_notificationsDisabled_…`) bu turda
+  koştu. Atlanan **sayısı** değişmedi (1), atlanan **madde** bildirim
+  durumuna göre değişiyor.
+
+**Sonraki faz için not**
+- AAB Play'e yüklenmeye hazır: imza doğru, sürüm doğru, üç cihazda üç parça
+  geliyor. Fiziksel cihaz turu (B8) hâlâ açık.
+- Dil parçası bulgusu karar bekliyor: Türkçe metinleri `values-tr`'ye almak
+  ve `localeConfig` eklemek iki ayrı karar, ikisi de bu turda **yapılmadı**.
+- TESTING.md iki eksik taşıyor: tarih maskesinin cihaz diline bağlı olduğu,
+  ve api29'da koyu temayı **kapatmanın** yeniden başlatma gerektirmediği.
+
+---
+
 ## [Faz 16h-2] Devir Rampası Kabul Edildi, Son Tarih Yolu Kapatıldı — 2026-09-21
 
 **Durum:** Tamamlandı
