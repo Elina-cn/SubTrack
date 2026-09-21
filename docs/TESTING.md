@@ -531,6 +531,22 @@ saatini ileri almayı gerektirir ve o hâlâ yapılamıyor; ölçtüğü özelli
 doğru ("Girilen tarih: 25 Eylül 2037 Cuma"). Maskeye değil, seçicinin başlığında
 yazan ayrıştırılmış tarihe bakılır.
 
+### Tarih seçicinin metin maskesi cihaz diline bağlı
+
+Metin giriş modundaki maske cihazın **birinci** diline göre kuruluyor. 16i'de
+`subtrack_wide_api34` üzerinde ölçüldü: dil listesi `[en-US]` iken 11 Eylül 2026
+alanda **`09/11/2026`** diye duruyor, yani **MM/DD/YYYY**. Türkçe cihazda aynı
+tarih `11.09.2026`, yani DD.MM.YYYY (API 24'te ipucu `DDMM/YYYY`, yukarıya bakın).
+
+Sonucu: **aynı rakam dizisi iki dilde farklı tarih üretir.** `11092026` Türkçe
+cihazda 11 Eylül, İngilizce cihazda 9 Kasım olur — ikisi de geçerli, yani test
+sessizce yanlış tarihi kaydeder. Tarih giren her madde, rakamları cihazın o anki
+diline göre sıralamalı. Dili satır satır değiştiren turlarda (dil matrisi) bu
+özellikle tuzak: maske dille birlikte değişiyor, betik değişmiyor.
+
+Kontrol: kalem ikonuyla metin moduna geçtikten sonra alanda duran **hazır
+değere** bakın; mevcut tarih zaten o cihazın maskesiyle yazılıdır.
+
 ### "Geri al"a dokunmak: dump'la yetişilmez, tek shell satırıyla yapılır
 
 Snackbar `Short` süreyle (≈4 sn) duruyor. `uiautomator dump` + `exec-out cat`
@@ -696,6 +712,22 @@ adb -s emulator-5554 shell dumpsys uimode | grep -i "mNightMode\|mCurUiMode"
 Yeniden başlatma **şart**: değeri yazdıktan hemen sonra `dumpsys` hâlâ eski
 satırı veriyor. `adb shell stop; adb shell start` ile çerçeveyi tek başına
 döndürmek bu imajda mümkün değil ("must be root"), yani tam `reboot` gerekiyor.
+
+**Ama Ayarlar arayüzü yeniden başlatma istemiyor — iki yönde de.** 16i'de
+`subtrack_narrow_api29` üzerinde ölçüldü. `am start -a
+android.settings.DISPLAY_SETTINGS` ile açılan ekranda "Dark theme" anahtarına
+dokunmak durumu **anında** çeviriyor, `mNightModeLocked=true` olmasına rağmen:
+
+| Dokunuş | `mNightMode` | `mCurUiMode` | `settings get secure ui_night_mode` |
+|---|---|---|---|
+| kapatma | `2 (yes)` → `1 (no)` | `0x21` → `0x11` | `2` → `1` |
+| açma | `1 (no)` → `2 (yes)` | `0x11` → `0x21` | `1` → `2` |
+
+Aynı turda `cmd uimode night no` yine iş görmedi: "Night mode: yes" yazıp durumu
+`2` / `0x21`'de bıraktı. **Yani kilitli olan kabuk komutudur, ayarın kendisi
+değil.** Yeniden başlatmalı yol yalnızca ekrana dokunmadan, betikten sürmek
+gerektiğinde gerekiyor; elle ölçümde anahtar hem daha hızlı hem iki yönde de
+çalışıyor. Anahtarın merkezi `subtrack_narrow_api29`'da `641,465`.
 
 Doğrulama satırı okunurken bakılacak yer `mCurUiMode`: **`0x21` koyu, `0x11`
 açık.** `mNightMode=2 (yes)` / `1 (no)` aynı şeyi söylüyor. `mComputedNightMode`
@@ -1188,8 +1220,10 @@ adb shell cmd locale set-app-locales com.elinacn.subtrack --locales en-US
 adb shell cmd locale set-app-locales com.elinacn.subtrack --locales ""     # geri al
 ```
 
-`values/` Türkçe (varsayılan), `values-en/` İngilizce. Emülatörün sistem dili
-İngilizce olduğu için **dil verilmezse uygulama İngilizce açılır**.
+`values/` **İngilizce** (varsayılan), `values-tr/` Türkçe — ikisi Faz 16i'de yer
+değiştirdi, gerekçesi `ARCHITECTURE.md` §28. Emülatörün sistem dili İngilizce
+olduğu için **dil verilmezse uygulama İngilizce açılır**; 16i'den önce de öyle
+açılıyordu ama sebebi `values-en/` klasörüydü, bugün varsayılanın kendisi.
 
 ### Koyu tema
 
@@ -1406,14 +1440,18 @@ java -jar bundletool-all-1.18.3.jar install-apks \
 > yapılmadığı hâlde çıktı yanıltıcı olabilir, bu yüzden **her zaman**
 > `pm path` ile doğrulanır.
 
-### 5. Kurulumu doğrula — üç parça gelmeli
+### 5. Kurulumu doğrula — iki parça gelmeli
 
 ```bash
 adb -s <serial> shell pm path com.elinacn.subtrack
 ```
 
-Beklenen: `base.apk`, `split_config.<dil>.apk`, `split_config.<abi>.apk`.
-**Tek satır dönerse bölünme çalışmamıştır.** Sürüm de buradan okunur:
+Beklenen: `base.apk` ve `split_config.<abi>.apk`. **Dil parçası artık yok** —
+Faz 16i'de `bundle { language { enableSplit = false } }` ile kapatıldı ve iki dil
+de `base`'e girdi (`ARCHITECTURE.md` §28). 16i'den önce üçüncü bir
+`split_config.<dil>.apk` da gelirdi; bugün gelirse yapılandırma geri düşmüş
+demektir. **Tek satır dönerse ABI bölünmesi çalışmamıştır.** Sürüm de buradan
+okunur:
 
 ```bash
 adb -s <serial> shell dumpsys package com.elinacn.subtrack | grep -E "versionCode|versionName"

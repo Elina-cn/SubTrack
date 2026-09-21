@@ -561,6 +561,19 @@ Aylık toplamın zaman içindeki anlık görüntüleri. `PROJECT_SPEC.md` §1'de
       rampa ölçüldü ve **kabul edildi** (platform davranışı; gerekçe ve
       reddedilen üç seçenek §23'te). Ölçümler `ARCHITECTURE.md` §23, kayıt ve
       ekran görüntüleri `PROGRESS.md`'deki 16h / 16h-1 / 16h-2 girdileri.
+- [x] **Varsayılan kaynak dili İngilizce oldu, dil paketlemesi yeniden
+      kuruldu** — Faz 16i. 16g'nin B6 ölçümü bir yayın engeli buldu: Türkçe
+      metinler nitelikisiz `values/` içinde olduğu için, dil listesinde ne `tr`
+      ne `en` bulunan **her** cihaz uygulamayı Türkçe görüyordu — uygulama tüm
+      ülkelerde yayınlanacak. Aynı mekanizmanın ters yüzü olarak `[tr, en]`
+      listeli bir Türk kullanıcıya İngilizce gidiyordu. `values/` artık
+      İngilizce, `values-tr/` Türkçe; hiçbir çeviri değişmedi, iki dosya bütün
+      hâlinde yer değiştirdi. Kütüphane dilleri `androidResources.localeFilters`
+      ile `en` + `tr`'ye indirildi (Material3'ün tarih seçicisi Almanca cihazda
+      Almanca geliyordu), dil parçası kapatıldı ve iki dil de `base`'e girdi.
+      `localeConfig` bilerek eklenmedi: dil seçimi bir özellik, bu bir düzeltme
+      turu. Karar ve dil matrisi `ARCHITECTURE.md` §28, kayıt `PROGRESS.md`'deki
+      16i girdisi.
 - [x] **Test paketi sıra bağımsız hâle geldi ve tam regresyon turu atıldı** —
       Faz 16b. Paket dört cihazda, iki koşum yöntemiyle, arka arkaya iki kez
       geçiyor; 117 maddelik liste dört cihazda eksiksiz sürüldü (468 hücre).

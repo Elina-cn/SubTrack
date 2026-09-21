@@ -2560,26 +2560,46 @@ hâlinde gereken izin odur. Kaldırmak bugün ölçülmemiş bir risk alır, bug
 
 ### AAB içeriği — ne taşıyor
 
-`./gradlew :app:bundleRelease` → `app/build/outputs/bundle/release/app-release.aab`,
-**4.598.466 B**. 16c'nin universal APK'sı 2.127.430 B idi; bundle **2,16 kat**
-büyük ve bu beklenen durum: AAB bütün ABI'leri, dilleri ve yoğunlukları
-**bölünmemiş** taşıyor, Play kullanıcıya bunlardan yalnızca cihaza uyanları
-gönderiyor.
+`./gradlew :app:bundleRelease` → `app/build/outputs/bundle/release/app-release.aab`.
+Üç ölçüm var ve karıştırılmamalı: 16g'de **4.598.466 B**, 16h'nin açılış ekranı
+ve ikonlarıyla yeniden üretildiğinde **4.657.988 B**, Faz 16i'nin dil
+filtresinden sonra **~4.575.35 KB**, yani yaklaşık **−82,6 KB**.
+
+Son rakam **bayt bayt sabit değil**: 16i'de altı derleme ölçüldü ve sonuç
+4.575.344 ile 4.575.353 arasında, ±5 bayt oynadı. Oynama içerikten gelmiyor —
+iki derlemenin **148 girdisi de** boyut ve CRC olarak birebir eşleşti, fark
+yalnızca imza bloğunun uzunluğunda. Bu yüzden bir turun AAB'si "şu kadar bayt
+olmalı" diye doğrulanmaz; doğrulanacak şey imzanın parmak izi, sürüm ve
+içeriktir. Her turun kendi ölçtüğü tam rakam `PROGRESS.md`'de. 16c'nin universal APK'sı
+2.127.430 B idi; bundle hâlâ iki katından büyük ve bu beklenen durum: AAB bütün
+ABI'leri ve yoğunlukları **bölünmemiş** taşıyor, Play kullanıcıya bunlardan
+yalnızca cihaza uyanları gönderiyor. **Diller artık bölünmüyor** — 16i'den beri
+iki dil de her cihaza gidiyor (§28).
 
 | | İçerik |
 |---|---|
 | Modül | Tek `base` — dinamik özellik modülü yok |
 | ABI | `arm64-v8a`, `armeabi-v7a`, `x86`, `x86_64` (iki `.so`: `libandroidx.graphics.path`, `libdatastore_shared_counter`) |
 | Yoğunluk | `mdpi`, `hdpi`, `xhdpi`, `xxhdpi`, `xxxhdpi` + `anydpi-v26` |
-| Dil | Kaynak tablosunda **86 locale** |
+| Dil | Kaynak tablosunda **tek nitelikli locale: `tr`**, artı nitelikisiz varsayılan (İngilizce). 16i'den önce 86 idi |
 | Base manifest | `versionCode=1`, `versionName=1.0`, `minSdk=24`, `targetSdk=36` |
 
-**86 dil beklenmedik değil.** Uygulamanın **kendi** metinleri tam olarak iki
-yapılandırmada: varsayılan (Türkçe) ve `en`. Kaynak tablosunda doğrulandı —
-`string/my_subscriptions` yalnızca `(default) "Aboneliklerim"` ve
-`locale:"en" "My Subscriptions"` taşıyor. Kalan 84 locale AndroidX ve
-Material'ın kendi çevirileri (`string/autofill` gibi). Play dil bölünmesi
-yaptığı için kullanıcıya yalnızca kendi dili gidiyor.
+**86 dil 16i'de ikiye indi.** Uygulamanın **kendi** metinleri her zaman iki
+yapılandırmadaydı; 16i'den önce bunlar varsayılan (Türkçe) ve `en`, bugün
+varsayılan (İngilizce) ve `tr`. Kalan 84 locale AndroidX ve Material'ın kendi
+çevirileriydi (`string/autofill` gibi) ve `androidResources.localeFilters` ile
+düştüler (§28). Ölçüm: `bundletool dump resources` çıktısında artık **tek**
+`locale:` niteliği var, `tr`.
+
+Play'in dil bölünmesine de artık başvurulmuyor. `bundletool dump config`
+bunu doğruluyor:
+
+```json
+"splitsConfig": { "splitDimension": [ { "value": "LANGUAGE", "negate": true } ] }
+```
+
+`negate: true`, o boyutta bölme **yapılmayacak** demek; iki dil de `base`'de
+gidiyor. Gerekçesi §28'de.
 
 ### Kurulabilirlik — APK testi bunun yerine geçmiyor
 
@@ -2592,12 +2612,16 @@ bundletool build-apks --bundle=app-release.aab --output=subtrack.apks --ks=…
 bundletool install-apks --apks=subtrack.apks --device-id=…
 ```
 
-Her iki cihaza da **üç** parça kuruldu — Play'in teslim modeli birebir:
+16g'de her iki cihaza da **üç** parça kurulmuştu:
 
-| Cihaz | `pm path` çıktısı |
+| Cihaz | `pm path` çıktısı (16g) |
 |---|---|
 | `subtrack_min_api24` | `base.apk`, `split_config.en.apk`, `split_config.x86_64.apk` |
 | `subtrack_wide_api34` | `base.apk`, `split_config.en.apk`, `split_config.x86_64.apk` |
+
+**16i'den sonra iki parça bekleniyor**: `base.apk` + `split_config.<abi>.apk`.
+Dil parçası üretilmiyor, yani `split_config.en.apk` satırı düşüyor. Bu turun
+cihaz cihaz `pm path` çıktıları `PROGRESS.md`'deki 16i girdisinde.
 
 > **`dumpsys package` API 34'te `minSdk=32` diyor.** Bu bir çelişki değil:
 > bundletool SDK'ya göre birkaç **varyant** üretiyor (`base-*_2`, `_3`
@@ -2792,3 +2816,176 @@ Bütün varlıklar `tools/icon/generate_icons.py` tarafından tek tanımdan
 dosya yok — vektörlerin başında da bunu söyleyen bir yorum var.
 
 ---
+
+## 28. Yerelleştirme — Varsayılan Dil, Dil Filtresi ve Dil Parçası
+
+Faz 16i'de kuruldu. Bu bölüm **hangi cihazda hangi dilin çıktığını** anlatır;
+metnin kendisi değil, metnin seçilme yolu.
+
+### Android dili nasıl seçer
+
+Kaynak çözümlemesi Android 7.0'dan (API 24, yani `minSdk`'miz) beri cihazın
+**dil listesini sırayla** dener. Liste `[tr, en]` ise önce `values-tr`, sonra
+`values-en` aranır. **Listedeki hiçbir dile uyan klasör yoksa nitelikisiz
+`values/` kullanılır** — varsayılan bir yedek değil, son duraktır.
+
+Bu, "varsayılan klasöre hangi dili koyduğun" sorusunu bir ürün kararı yapar:
+oraya koyduğun dil, **uygulamanın konuşmadığı her dili konuşan herkese**
+gösterilecek dildir.
+
+### 16i'den önce ne yanlıştı
+
+Türkçe metinler `values/` içindeydi, İngilizce `values-en/` içinde. İki ayrı
+sonuç doğuruyordu ve ikisi de yayın engeliydi:
+
+| Cihazın dil listesi | Eşleşen klasör | Çıkan dil | Doğrusu |
+|---|---|---|---|
+| `[de]`, `[pt]`, `[id]`, `[zh]` … | yok → varsayılan | **Türkçe** | İngilizce |
+| `[tr]` | yok → varsayılan | Türkçe | Türkçe ✓ |
+| `[tr, en]` | `values-en` | **İngilizce** | Türkçe |
+| `[en]` | `values-en` | İngilizce | İngilizce ✓ |
+
+Birinci satır: `tr` de `en` de listesinde olmayan **her** cihaz uygulamayı
+Türkçe görüyordu. Uygulama tüm ülkelerde yayınlanacak, yani bu azınlık bir
+durum değil, çoğunluk.
+
+Üçüncü satır aynı mekanizmanın ters yüzü: Türkçe konuşan ama listesinde
+İngilizce de bulunan bir kullanıcıya İngilizce gidiyordu, çünkü `tr` için
+klasör yoktu ve sıradaki `en` eşleşiyordu. 16g'deki "cihaz İngilizce,
+uygulama Türkçe" gözlemi de buydu.
+
+**Bu AAB'ye özgü bir sorun değildi.** Aynı davranış APK'da da vardı; kaynak
+çözümlemesi paketleme biçimine bakmaz.
+
+### Karar: varsayılan İngilizce
+
+`values/` artık İngilizce, `values-tr/` Türkçe. `values-en/` kaldırıldı —
+İngilizce nitelikli klasörde tutulsaydı iki yerde dururdu ve ikisi ayrışabilirdi.
+
+Metin içeriği taşınırken **değişmedi**: iki dosya bütün hâlinde yer değiştirdi,
+git ikisini de %100 yeniden adlandırma olarak kaydetti. Tek ekleme, Türkçe
+çoğullardaki üç `one` girdisidir (aşağıda).
+
+Sonuç, aynı tablonun düzelmiş hâli:
+
+| Cihazın dil listesi | Eşleşen klasör | Çıkan dil |
+|---|---|---|
+| `[tr]` | `values-tr` | Türkçe |
+| `[tr, en]` | `values-tr` | Türkçe |
+| `[en]` | yok → varsayılan | İngilizce |
+| `[de]` | yok → varsayılan | İngilizce |
+| `[de, tr]` | `values-tr` | Türkçe |
+
+Beşinci satır listenin **sırayla** denendiğini gösteriyor: `de` için klasör
+yok, sıradaki `tr` eşleşiyor.
+
+### Kütüphane dilleri `en` ve `tr` ile sınırlı
+
+```kotlin
+androidResources {
+    localeFilters += listOf("en", "tr")
+}
+```
+
+Uygulama iki dilli, bağımlılıkları değil. Material3'ün tarih seçicisi ve
+altındaki AndroidX kütüphaneleri Google'ın desteklediği her dil için çeviri
+taşıyor. Filtre olmadan Almanca bir cihazda **İngilizce bir uygulamanın içinde
+Almanca bir tarih seçicisi** çıkıyordu — uygulamanın konuşmadığını iddia ettiği
+bir dilde karma arayüz.
+
+**DSL seçimi.** Eski yazılış `defaultConfig.resourceConfigurations` ve
+`resConfigs()`; AGP 9'da ikisi de `@Deprecated` ve mesajları doğrudan
+`androidResources.localeFilters`'a yönlendiriyor. CLAUDE.md §4 deprecated API
+yasakladığı için yeni yazılış kullanıldı.
+
+### Dil parçası kapalı — her iki dil de `base`'de
+
+```kotlin
+bundle { language { enableSplit = false } }
+```
+
+Filtreden sonra bölünecek şey yalnızca **kendi** Türkçe metinlerimiz kalıyor,
+onlarca kilobayt. Karşılığında dil parçasının bir maliyeti var: parça,
+cihazın **kurulum anındaki** diline göre gönderiliyor. Türkçeyi sonradan ekleyen
+bir kullanıcı, Play ek parçayı indirene kadar İngilizce görmeye devam ediyor.
+İki dil de `base`'de olunca cihazın kendi kaynak çözümlemesi ayar değişir
+değişmez doğru cevabı veriyor ve indirilecek bir şey kalmıyor.
+
+Bu, §26'daki "üç parça" tablosunu **iki parçaya** indiriyor: `base.apk` +
+`split_config.<abi>.apk`. Dil parçası artık üretilmiyor ve bu, kapatmanın
+kanıtıdır.
+
+### `localeConfig` v1.0'da yok
+
+`localeConfig` (ve AGP'nin `generateLocaleConfig`'i) kullanıcıya sistem
+ayarlarından **uygulamaya özel dil** seçtiren şeydir. Bu bir **özellik**, ve
+16i bir düzeltme turu. Düzeltmeden sonra kullanıcı zaten cihaz diline göre
+doğru dili alıyor; uygulamanın dilini cihazınkinden ayırmak isteyen kullanıcı
+ayrı bir faza kalıyor.
+
+Pratik sonucu: bugün uygulamanın dilini kullanıcıya ulaşan hiçbir yol
+değiştiremez, tek girdi cihazın dil listesidir.
+
+### Metnin dili ile biçimin dili ayrışabilir — ve bu doğrudur
+
+İki ayrı mekanizma var ve karıştırılmamalı:
+
+- **Metin** kaynaklardan gelir: yukarıdaki tabloya göre `values/` ya da
+  `values-tr/`.
+- **Ay ve gün adları, tarih kalıbı, sayı ve para biçimi** ise
+  `LocalConfiguration.current.locales[0]`, yani cihazın **birinci** diline göre
+  biçimlenir (`MoneyFormatter`, `MonthFormatter`, `rememberDateFormatter`).
+
+Ama `locales[0]` cihazın dil listesinin birincisi **değil**: Android uygulamaya
+verdiği Configuration'ın dil listesini, uygulamanın gerçekten kaynağı olan
+dillere göre süzüyor. Kural 16i'de ölçüldü:
+
+- Listede uygulamanın bildiği bir dil **varsa**, `locales[0]` o dil olur —
+  metin de biçim de onunla gelir.
+- Listede uygulamanın bildiği bir dil **yoksa**, `locales[0]` cihazın kendi
+  birinci dili olarak kalır — metin varsayılandan (İngilizce) gelir, biçim
+  o yabancı dile göre kurulur.
+
+Ölçülen üç hâl:
+
+| Cihazın listesi | Metin | Biçim | Ekranda |
+|---|---|---|---|
+| `[de]` | İngilizce | **Almanca** | `Total Monthly, 0,00 ₺`; seçicide gün harfleri `M D M D F S S`, hafta pazartesi başlıyor |
+| `[de, tr]` | Türkçe | **Türkçe** | `Aylık Toplam, ₺0,00`; seçicide `Eylül 2026`, gün harfleri `P S Ç P C C P` |
+| `[ar]` | İngilizce | **Arapça** | `Total Monthly, ٠٫٠٠ ₺`; ay adı `سبتمبر ٢٠٢٦`, rakamlar Arap-Hint |
+
+Yani metin ile biçim yalnızca uygulamanın **tanımadığı** bir dilde ayrışıyor.
+`[de, tr]` gibi eşleşen bir dil bulunan listede ikisi de Türkçe olur.
+
+Tarih seçicinin **kendi** başlık ve düğme metinleri kaynaklardan gelir, yani
+dil filtresine tabidir: `[de]` ve `[ar]` cihazlarda "Select date" / "Selected
+date" diye İngilizce çıkar, takvimin ay ve gün adları ise o cihazın dilinde.
+Bu ayrım filtrenin çalıştığının en görünür kanıtıdır — 16i'den önce `[de]`
+cihazda bu diyalog baştan sona Almancaydı.
+
+### Sağdan sola diller — düzen aynalanıyor, metin İngilizce
+
+Manifestte `android:supportsRtl="true"` olduğu için `[ar]` gibi bir listede
+düzen **aynalanıyor**: config `ldrtl` diyor, başlık sağa, ikonlar sola, FAB sol
+alta geçiyor, kategori çipleri ters sırada diziliyor. Metin İngilizce kalıyor,
+çünkü Arapça kaynak yok.
+
+Bu bir hata değil, ama **denenmemiş bir yol**: uygulamanın hiçbir ekranı RTL
+düzende tasarlanmadı ve v1.0'da Arapça bir çeviri de yok. 16i'de ölçüldü ve
+olduğu gibi bırakıldı; RTL'e karar vermek dil seçimi özelliğiyle aynı faza ait.
+
+### Türkçe çoğullarda `one` neden var ve neden `other` ile aynı
+
+Türkçede sayıdan sonra isim tekil kalır — "1 gün", "5 gün" — yani iki çoğul
+biçim **aynı sözcüklerdir**. Buna rağmen CLDR `tr` diline bir `one` kategorisi
+verir, ve lint bunu ancak metinler `values-tr/` gibi dilini bildiği bir
+klasöre girdikten sonra arar (nitelikisiz `values/` içindeyken hangi dil
+olduğunu bilemediği için sormuyordu).
+
+Üç Türkçe `plurals` girdisinin `one` ve `other` değerleri bu yüzden **bayt
+bayt aynı**. Çalışma zamanı davranışı değişmedi: Android eksik bir niceliği
+zaten `other`'a düşürüyordu. Kazanç, denetimin açık kalması — ileride eklenecek
+bir Türkçe çoğul, eksik nicelikle sessizce geçmez.
+
+`tools:ignore` ile susturma yolu bilerek kullanılmadı: projede `@SuppressLint`
+yasak ve `tools:ignore` onun XML karşılığıdır.
