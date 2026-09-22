@@ -6,6 +6,12 @@
          quiet when the permission is not granted. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!-- supportsRtl is false on purpose. The app ships in en and tr only, both left to
+         right. With it true, a device set to an RTL language mirrored the whole layout
+         while the text stayed English, and nothing in that direction was ever designed
+         or tested - not the swipe-to-delete gesture, not the charts. Measured in phase
+         16i. It goes back to true the day an RTL translation is added, together with
+         that language. See ARCHITECTURE section 28. -->
     <application
         android:name=".SubTrackApplication"
         android:allowBackup="true"
@@ -14,7 +20,7 @@
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
-        android:supportsRtl="true"
+        android:supportsRtl="false"
         android:theme="@style/Theme.SubTrack">
         <!-- adjustResize is not the phase 9b-2 workaround any more, it is the pre-API-30 half of
              the keyboard handling. Window#setDecorFitsSystemWindows(false) makes the platform
