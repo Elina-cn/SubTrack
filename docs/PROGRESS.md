@@ -27,6 +27,170 @@ Her faz sonunda **en üste** yeni kayıt eklenir. Eski kayıtlar silinmez.
 
 ---
 
+## [Faz 16j] Yayın Öncesi Son Kontrol — RTL Kapatıldı, İzinler ve Mağaza İddiaları Denetlendi — 2026-09-22
+
+**Durum:** Tamamlandı. Tek kod değişikliği manifestteki `supportsRtl`
+özniteliği; kaynak kod ve metinler değişmedi.
+
+### Bölüm A — RTL kapatıldı
+
+16i'de ölçülmüştü: `[ar]` gibi sağdan sola bir dil listesinde düzen
+aynalanıyor, metin İngilizce kalıyordu. Uygulamanın kaynağı olan iki dil de
+(`en`, `tr`) soldan sağa yazılıyor ve aynalanmış düzen hiç çalıştırılmadı —
+özellikle kaydırarak silmenin yönü ve `Canvas` ile çizilen iki grafik.
+
+`android:supportsRtl="false"`. Manifestte başka satır değişmedi;
+`windowSoftInputMode="adjustResize"` yerinde. Gerekçe `ARCHITECTURE.md` §28.
+
+**Ölçüm — api34, AAB'den kurulan build, cihaz `ar-EG` (`am get-config`:
+`ldrtl`):**
+
+| Ekran | 16i (aynalı) | 16j |
+|---|---|---|
+| Ana ekran | başlık sağda (920), FAB solda (115), çipler ters | **başlık solda (159), FAB sağda (964), çipler artan** |
+| Ekleme sheet'i | — | `[en]` ile **birebir aynı** koordinatlar (para çipleri 139/314/489/665) |
+| Tarih seçici | "Select date" sağ üstte, düğmeler sol altta | **"Select date" sol üstte, kalem sağda, düğmeler sağ altta** |
+| İstatistik | — | Back solda (74), başlıklar sola yaslı, çubuk soldan doluyor |
+| Ayarlar | — | Back solda (74), etiketler sola yaslı, para çipleri artan |
+| Kaydırarak silme | hiç ölçülmedi | **çalışıyor** — satır sola kayıyor, çöp ikonu sonda |
+| Geri alma Snackbar'ı | hiç ölçülmedi | **çıkıyor** — "Subscription deleted" solda, "Undo" sağda |
+
+**api24 (minSdk), `ar-EG`:** aynı sonuç. `config` yine `ldrtl` diyor ama
+uygulama soldan sağa: başlık 122'de, FAB 632'de, çipler 81/267/513/694.
+
+**Biçim beklendiği gibi cihazdan gelmeye devam ediyor:** tutar `٠٫٠٠ ₺`
+(Arap-Hint rakamları), tarih seçicide ay adı `سبتمبر ٢٠٢٦` ve hafta cumartesi
+başlıyor. `supportsRtl` yalnızca düzen yönünü kapatıyor, yerel ayarı değil.
+
+`[tr]` ve `[en]` satırları 16i'deki ağaçlarla **aynı koordinatlarda** çıktı;
+metin ve sayı biçimi de aynı (`₺159,99` / `₺159.99`).
+
+### Bölüm B — izin denetimi (AAB'nin birleşik manifesti)
+
+`bundletool dump manifest` + `manifest-merger-release-report.txt`:
+
+| İzin | Nereden geliyor |
+|---|---|
+| `android.permission.POST_NOTIFICATIONS` | **uygulamanın kendi manifesti** (satır 7); `androidx.work:work-runtime:2.11.2` de aynı satırı getiriyor |
+| `android.permission.WAKE_LOCK` | `androidx.work:work-runtime:2.11.2` |
+| `android.permission.ACCESS_NETWORK_STATE` | `androidx.work:work-runtime:2.11.2` |
+| `android.permission.RECEIVE_BOOT_COMPLETED` | `androidx.work:work-runtime:2.11.2` |
+| `android.permission.FOREGROUND_SERVICE` | `androidx.work:work-runtime:2.11.2` |
+| `${applicationId}.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION` | `androidx.core:core:1.17.0` (ve `androidx.lifecycle:lifecycle-process:2.10.0`). Kendi tanımladığı, `signature` düzeyinde bir izin — başka uygulamaya bir şey açmıyor |
+
+**`android.permission.INTERNET` YOK. `com.google.android.gms.permission.AD_ID`
+YOK.** Durma koşulu oluşmadı. Kaynak kodda da ağ çağrısı yok (OkHttp, Retrofit,
+`java.net`, `HttpURLConnection`, WebView taraması boş döndü) ve reklam/analitik
+bağımlılığı tanımlı değil.
+
+WorkManager'ın getirdiği dört izin 16g'de de kayıtlıydı; izin beyanında ve
+gizlilik politikasında bunların açıklanması gereği duruyor.
+
+### Bölüm C — mağaza metni iddia denetimi
+
+| # | İddia | Sonuç | Kanıt |
+|---|---|---|---|
+| a | Aylık/yıllık/haftalık; yıllık ve haftalık aylığa çevriliyor | **doğru** | `BillingPeriod` `MONTHLY(12)`, `YEARLY(1)`, `WEEKLY(52)`; çevrim `CurrencyConverter` (`paymentsPerYear` × `partsOfAYear`). Testler: `PeriodNormalisationTest.weeklyPrice_isFiftyTwoPaymentsOverTwelveMonths`, `.yearlyPrice_thatDoesNotDivide_roundsHalfUp`, `.mixedPeriods_addUpWithoutDrift` |
+| b | TRY, USD, EUR, GBP | **doğru** | `Currency` enum'unda tam olarak bu dördü |
+| c | Kurları kullanıcı giriyor, canlı kur yok | **doğru** | `SettingsRepository.setRate` / `resetRates`; `ExchangeRateTable.Default` uygulamayla gelen tahmin. Ağ kodu yok, `INTERNET` izni yok |
+| d | Kategoriler ve kategoriye göre filtre | **doğru** | `SubscriptionCategory`: `ENTERTAINMENT`, `PRODUCTIVITY`, `HEALTH`, `OTHER`; `CategoryFilterBar` |
+| e | Aylık/yıllık toplam görünümü arasında geçiş | **doğru** | `TotalPeriod` `MONTHLY(12)` / `YEARLY(1)`; cihazda ölçüldü |
+| f | İstatistik: kategori dağılımı, en pahalı, aylık trend, geçen aya göre değişim tek satırda | **doğru** | `SubscriptionStatistics.byCategory` / `.mostExpensive`, `MonthlyTrend.series` / `.changeSince`; `MonthlyChangeRow` tek `Row` içinde tek `Text` |
+| g | Hatırlatma ödemeden bir gün önce ve ödeme günü | **doğru** | `PaymentReminderSelection.UPCOMING_WITHIN_DAYS = 1L`; `DueToday` veya `Upcoming(days <= 1)`. Testler: `on_paymentIsToday_isSelectedAsDueToday`, `on_paymentIsTomorrow_isSelectedAsUpcoming`, `on_paymentIsTwoDaysAway_isNotSelected` |
+| h | Günde en fazla bir bildirim, abonelik başına değil | **doğru** | `PaymentReminderScheduler` günlük periyodik iş; `PaymentReminderWorker` `lastNotifiedDay()` ile aynı günü ikinci kez bildirmiyor; `PaymentReminderNotifier` tek `NOTIFICATION_ID = 1` kullanıyor ve bütün abonelikleri tek gövdede birleştiriyor |
+| i | Açık/koyu tema; duvar kâğıdı renkleri yalnızca Android 12+ | **doğru** | `ThemeMode` `SYSTEM`/`LIGHT`/`DARK`; `DynamicColorSupport.isAvailableOnThisBuild()` = `SDK_INT >= VERSION_CODES.S` (API 31 = Android 12) |
+| j | Uygulama dilleri Türkçe ve İngilizce | **doğru** | `values/` (İngilizce, varsayılan) + `values-tr/`; `localeFilters = [en, tr]`; AAB'de tek nitelikli locale `tr` |
+| k | Hesap/kayıt yok, reklam yok | **doğru** | Kod tabanında kimlik doğrulama yok; reklam/analitik bağımlılığı yok; `AD_ID` izni yok |
+| l | Veri cihazda kalıyor; yalnızca Auto Backup ile kullanıcının Google yedeğine gidiyor | **kısmen** | Ağ kodu ve `INTERNET` izni yok, veri Room + DataStore'da. **Ama Auto Backup iki hedef tanımlıyor**, biri metinde geçmiyor |
+
+**(l) için ayrıntı — metni sen düzelteceksin, koda dokunmadım.**
+`data_extraction_rules.xml` iki blok içeriyor:
+
+- `<cloud-backup>` — kullanıcının kendi Google yedeği. Metin bunu anlatıyor.
+- `<device-transfer>` — **eski telefondan yeni telefona doğrudan aktarım.**
+  Aynı iki yol (`database`, `datastore`) burada da listeli.
+
+İkisi de Auto Backup çerçevesinin parçası ve ikisi de kullanıcının kendi
+cihazları arasında kalıyor; veri yine üçüncü bir tarafa gitmiyor. Ama "yalnızca
+Google yedeğine gidiyor" cümlesi cihazdan cihaza aktarımı kapsamıyor. Öneri:
+cümleye "veya yeni telefon kurulumunda doğrudan cihazdan cihaza" eklensin.
+
+### Bölüm D — yayın adayı AAB
+
+Üretim commit'i **`a16e299`** (belge commit'i). Commit edilmedi.
+
+| Alan | Değer |
+|---|---|
+| Boyut | **4.575.367 B**, 16i'ye göre **+20 B** |
+| İmza SHA-256 | `fce85346…26da0` — yükleme anahtarıyla **birebir** |
+| `jarsigner -verify` | `jar verified.` |
+| Sürüm (AAB manifestinden) | `versionCode=1`, `versionName=1.0` |
+| `supportsRtl` (AAB manifestinden) | **`false`** |
+
+16i'de ölçülen ±5 baytlık imza oynaması burada da geçerli; +20 B onun
+üstünde, yani fark gerçek ve manifest değişikliğinden geliyor.
+
+### Bölüm E — otomatik testler ve lint
+
+| Koşu | Sonuç |
+|---|---|
+| `testDebugUnitTest --rerun-tasks` | **330 test, 0 hata, 0 atlanan** |
+| `connectedDebugAndroidTest` (`subtrack_wide_api34`) | **19 test, 0 hata, 1 atlanan** (bilinen) |
+| `lintDebug --rerun-tasks` | **0 hata, 21 uyarı** — 16i ile aynı, yeni uyarı yok |
+
+**Enstrümantasyon ilk koşuda düştü ve sebebi üründe değildi.** Cihazda 16i'nin
+release imzalı AAB kurulumu duruyordu; debug APK onun üzerine kurulamaz. Hemen
+sonraki iki koşu geçti. Hipotez sonradan **bilerek doğrulandı**: AAB yeniden
+kurulup `connectedDebugAndroidTest` koşulunca aynı hata çıktı —
+
+```
+INSTALL_FAILED_UPDATE_INCOMPATIBLE: Existing package com.elinacn.subtrack
+signatures do not match newer version; ignoring!
+Starting 0 tests / Finished 0 tests
+```
+
+Kural: enstrümantasyon koşulacaksa cihazda **release imzalı kurulum
+bulunmamalı**. Başarısız kurulum paketi de kaldırıyor, yani AAB turu bundan
+sonra yeniden kurulumla başlar.
+
+**Değişen dosyalar**
+- `app/src/main/AndroidManifest.xml` — `supportsRtl` `true` → `false` + gerekçe yorumu
+- `docs/ARCHITECTURE.md` — §28 RTL başlığı karara dönüştü
+- `docs/TESTING.md` — tarih seçici diyaloğunun `uiautomator dump`'ta görünmemesi
+
+**Commit'ler**
+- `75e86b4` fix: turn off RTL mirroring until an RTL language ships
+- `a16e299` docs: record the RTL deferral and the date picker dump blind spot
+
+**Karşılaşılan sorunlar**
+
+- **`bundleRelease` yine host RAM'i tükendiği için düştü** (`hs_err`, "Native
+  memory allocation (mmap) failed … G1 virtual space"). Üç emülatör + R8 aynı
+  anda sığmıyor; iki emülatör kapatılıp `-Xmx4096m` ile geçti. 16i'de de aynı
+  sorun yaşanmıştı — bu artık tekrar eden bir kısıt.
+- **XML yorumu başlangıç etiketinin içine yazılamaz.** `supportsRtl` yorumunun
+  ilk hâli `<application … >` etiketinin ortasına düştü ve geçersiz XML üretti;
+  yorum öğenin üstüne taşındı ve dosya ayrıştırılarak doğrulandı.
+- **Arapça arayüzde dil araması Latin harfle sonuç vermiyor.** `[ar]`
+  durumundaki Ayarlar'da "Turk" araması boş döndü (liste Arapça adlarla
+  sıralı). Yol: önce İngilizceye dön, sıralamayı oradan kur.
+- Oturum arasında makine yeniden başladı ve emülatörler kapandı; kurulum ve
+  dil ayarı `userdata`'da kalıcı olduğu için tur kaldığı yerden sürdü.
+
+**Bilinen eksikler / sonraki faz için not**
+
+- **Arapça rakamlarla bidi karışması.** `[ar]` cihazda istatistik satırındaki
+  tutar ve yüzde, Arap-Hint rakamları LTR paragraf içinde RTL koşu oluşturduğu
+  için görsel olarak yer değiştiriyor (`١٠٠ ,₺ ١٥٩,٩٩ %`). Metin İngilizce,
+  rakamlar cihazdan. Uygulamanın desteklemediği bir dilde ve `supportsRtl`
+  kararıyla ilgisiz; RTL faza girdiğinde bakılacak.
+- Tarih seçicide Arapça gün harfleri satırı yedi özdeş glif çiziyor
+  (Material3/ICU tarafı, 16i'de de böyleydi).
+- Mağaza metninde (l) maddesi cihazdan cihaza aktarımı kapsamıyor — metin
+  düzeltmesi kullanıcıda.
+
+---
+
 ## [Faz 16i] Varsayılan Kaynak Dili İngilizce Oldu — 2026-09-22
 
 **Durum:** Tamamlandı. Kotlin koduna dokunulmadı; metin içeriği değişmedi
