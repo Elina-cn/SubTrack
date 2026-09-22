@@ -531,6 +531,21 @@ saatini ileri almayı gerektirir ve o hâlâ yapılamıyor; ölçtüğü özelli
 doğru ("Girilen tarih: 25 Eylül 2037 Cuma"). Maskeye değil, seçicinin başlığında
 yazan ayrıştırılmış tarihe bakılır.
 
+### Tarih seçici diyaloğu `uiautomator dump`'ta görünmüyor
+
+16i'de ölçüldü. `DatePickerDialog` kendi penceresinde çiziliyor; `uiautomator
+dump` uygulamanın penceresini döndürüyor, yani diyalog **açıkken bile** ağaçta
+görünmüyor. Çıktıda hâlâ altındaki sheet duruyor.
+
+Tuzağı şu: dump'a bakan bir ölçüm "seçici açılmadı" diye karar verir ve
+dokunuşu tekrarlar — ikinci dokunuş bu kez diyaloğun **altındaki** ekrana
+gider, çünkü diyalog zaten açıktır. 16i'de üç ölçüm bu yüzden boşa gitti.
+
+Kural: **tarih seçici yalnızca ekran görüntüsüyle doğrulanır.** Açıldığını
+görmek, gün seçmek ve onaylamak için koordinatlar `screencap` çıktısından
+okunur. Sheet'in kendisi (ad, fiyat, çipler, Kaydet) dump'ta normal görünür;
+kesilen yalnızca diyalog.
+
 ### Tarih seçicinin metin maskesi cihaz diline bağlı
 
 Metin giriş modundaki maske cihazın **birinci** diline göre kuruluyor. 16i'de

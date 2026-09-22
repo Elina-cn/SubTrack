@@ -2963,16 +2963,37 @@ date" diye İngilizce çıkar, takvimin ay ve gün adları ise o cihazın dilind
 Bu ayrım filtrenin çalıştığının en görünür kanıtıdır — 16i'den önce `[de]`
 cihazda bu diyalog baştan sona Almancaydı.
 
-### Sağdan sola diller — düzen aynalanıyor, metin İngilizce
+### Sağdan sola diller — `supportsRtl` kapalı
 
-Manifestte `android:supportsRtl="true"` olduğu için `[ar]` gibi bir listede
-düzen **aynalanıyor**: config `ldrtl` diyor, başlık sağa, ikonlar sola, FAB sol
-alta geçiyor, kategori çipleri ters sırada diziliyor. Metin İngilizce kalıyor,
-çünkü Arapça kaynak yok.
+**Ölçüm (16i).** Manifestte `android:supportsRtl="true"` olduğu sürece `[ar]`
+gibi bir listede düzen **aynalanıyordu**: config `ldrtl` diyor, başlık sağa,
+ikonlar sola, FAB sol alta geçiyor, kategori çipleri ters sırada diziliyor.
+Metin İngilizce kalıyor, çünkü Arapça kaynak yok — yani ortaya **soldan sağa
+yazılmış metnin sağdan sola dizilmiş bir düzende** durduğu bir ekran çıkıyor.
 
-Bu bir hata değil, ama **denenmemiş bir yol**: uygulamanın hiçbir ekranı RTL
-düzende tasarlanmadı ve v1.0'da Arapça bir çeviri de yok. 16i'de ölçüldü ve
-olduğu gibi bırakıldı; RTL'e karar vermek dil seçimi özelliğiyle aynı faza ait.
+**Karar (16j): `android:supportsRtl="false"`.** Uygulamanın kaynağı olan iki
+dil de (`en`, `tr`) soldan sağa yazılıyor, ve aynalanmış düzen **hiç
+denenmedi**. İki yer özellikle riskli:
+
+- **Kaydırarak silme kendi bileşenimiz** (§12). Jestin yönü koda gömülü;
+  aynalanmış düzende "sona doğru" kaydırmanın ne anlama geldiği ölçülmedi.
+- **Kategori dağılımı ve aylık trend `Canvas` ile çiziliyor** (§20, §21).
+  Çubuklar ve sütunlar bir eksen boyunca elle yerleştiriliyor; o eksenin
+  aynalandığında ne yaptığı ölçülmedi.
+
+Hiç çalıştırılmamış bir düzeni kullanıcıya göndermek, aynalamamaktan daha kötü
+bir bahis. `false` ile sağdan sola dil kullanan bir kullanıcı İngilizce metni
+**tanıdık soldan sağa düzende** görüyor; kaybettiği şey yalnızca aynalama.
+
+**Bu bir erteleme, RTL'e karşı bir karar değil.** Sağdan sola bir çeviri
+eklendiği gün öznitelik `true`'ya döner ve düzen **o dille birlikte** tasarlanıp
+ölçülür. Tek başına `true` yapmak bugün olduğu gibi yine çevirisiz bir aynalama
+üretir.
+
+**Biçim etkilenmiyor.** `supportsRtl` yalnızca düzen yönünü kapatır; ay ve gün
+adları, rakamlar ve para biçimi cihazın diline göre gelmeye devam eder. `[ar]`
+cihazda tarih seçicide Arapça ay adı ve Arap-Hint rakamları görmek **beklenen**
+davranıştır, aynalama kalkmış olsa bile.
 
 ### Türkçe çoğullarda `one` neden var ve neden `other` ile aynı
 
