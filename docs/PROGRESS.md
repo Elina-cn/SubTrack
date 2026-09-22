@@ -27,6 +27,261 @@ Her faz sonunda **en üste** yeni kayıt eklenir. Eski kayıtlar silinmez.
 
 ---
 
+## [Faz 16i] Varsayılan Kaynak Dili İngilizce Oldu — 2026-09-22
+
+**Durum:** Tamamlandı. Kotlin koduna dokunulmadı; metin içeriği değişmedi
+(tek istisna aşağıdaki üç Türkçe `one` girdisi).
+
+**Neden**
+
+16g'nin B6 ölçümü bir yayın engeli buldu. Kök neden dil parçası değil,
+**varsayılan kaynak diliydi**: Türkçe metinler nitelikisiz `values/` içindeydi.
+Android dil listesini sırayla dener ve hiçbiri eşleşmezse varsayılana düşer,
+yani listesinde ne `tr` ne `en` bulunan **her** cihaz uygulamayı Türkçe
+görüyordu — uygulama tüm ülkelerde yayınlanacak. Aynı mekanizmanın ters yüzü:
+`[tr, en]` listeli bir Türk kullanıcıya İngilizce gidiyordu. Gerekçenin tamamı
+`ARCHITECTURE.md` §28.
+
+### Bölüm A — kaynak taşıma
+
+`git mv` ile iki dosya bütün hâlinde yer değiştirdi; git ikisini de **%100
+yeniden adlandırma** olarak kaydetti, 0 satır içerik değişimi.
+
+**Taşıma bütünlüğü betikle doğrulandı** (XML ayrıştırıp anahtar anahtar
+karşılaştırma):
+
+| Karşılaştırma | Anahtar | Eşleşen | Eksik | Fazla | Beklenmeyen fark |
+|---|---|---|---|---|---|
+| yeni `values/` ↔ eski `values-en/` | 125 | 125 | 0 | 0 | **0** |
+| yeni `values-tr/` ↔ eski `values/` | 125 | 125 | 0 | 0 | **0** |
+
+`values-tr`'de olup varsayılanda olmayan anahtar: **sıfır** (çökme kontrolü).
+Tek kasıtlı fark, üç Türkçe `plurals`'a eklenen `one` girdisidir; her biri
+kendi `other`'ıyla **bayt bayt aynı**. Türkçede sayıdan sonra isim tekil kalır,
+yani iki biçim zaten aynı sözcükler; CLDR `tr`'ye yine de bir `one` kategorisi
+veriyor ve lint bunu ancak metinler dilini bildiği bir klasöre girdikten sonra
+arıyor. `tools:ignore` kullanılmadı (projede `@SuppressLint` yasak).
+
+**Taranan ve bulunmayanlar:** `translatable="false"` girdi yok; `tools:locale`
+hiçbir dosyada yok (bu yüzden eklenmedi); `strings.xml` dışında dile bağlı
+kaynak yok — `values/` altındaki `colors.xml` ve `themes.xml` dilden bağımsız,
+başka dil nitelikli klasör hiç yok. Test kodunda taşınan dosyaların yoluna
+başvuran yer yok, yani görev 3 boş çıktı.
+
+### Bölüm B — paketleme
+
+```kotlin
+androidResources { localeFilters += listOf("en", "tr") }
+bundle { language { enableSplit = false } }
+```
+
+`defaultConfig.resourceConfigurations` ve `resConfigs()` AGP 9'da
+`@Deprecated`; mesajları doğrudan `localeFilters`'a yönlendiriyor ve CLAUDE.md
+§4 deprecated API yasaklıyor. Önceden tanımlı bir filtre **yoktu**.
+
+Ölçülen etki:
+
+| | 16g | 16i |
+|---|---|---|
+| AAB'de nitelikli locale | **86** | **1** (`tr`) + nitelikisiz varsayılan (İngilizce) |
+| `bundletool dump config` | dil boyutu açık | `"LANGUAGE", "negate": true` |
+| APK setindeki parça | `base-master`, `base-<abi>`, dil parçası | **`base-master` + `base-<abi>`** |
+| AAB boyutu | 4.657.988 B | **4.575.347 B** (−82.641 B) |
+
+### Bölüm C — yayın adayı AAB
+
+Üretim commit'i **`4726fd4`** (belge commit'i). Commit edilmedi.
+
+| Alan | Değer |
+|---|---|
+| Boyut | **4.575.347 B**, 16g'ye göre **−82.641 B** |
+| İmza SHA-256 | `fce85346…26da0` — yükleme anahtarıyla **birebir**, programla karşılaştırıldı |
+| `jarsigner -verify` | `jar verified.` |
+| Sürüm (AAB manifestinden) | `versionCode=1`, `versionName=1.0`, `minSdk=24`, `targetSdk=36` |
+
+**AAB boyutu bayt bayt sabit değil.** Altı derleme ölçüldü, sonuç 4.575.344 ile
+4.575.353 arasında ±5 bayt oynadı. İçerikten gelmiyor: art arda iki derlemenin
+**148 girdisi de** boyut ve CRC olarak eşleşti, fark imza bloğunun uzunluğunda.
+Bir turun AAB'si artık "şu kadar bayt" diye doğrulanmaz.
+
+### Bölüm D — dil matrisi (api34, AAB'den kurulan build)
+
+APK seti cihaz dili `[en]` iken **bir kez** kuruldu. `pm path` iki satır:
+`base.apk` + `split_config.x86_64.apk` — **dil parçası yok.** Sonraki satırlarda
+yalnızca cihazın dil listesi değişti, yeniden kurulum yapılmadı.
+
+| Cihaz listesi (`system_locales`) | Metin | Tarih seçici | Sonuç |
+|---|---|---|---|
+| `tr-TR` | Türkçe | "Tarih seç", `Eylül 2026`, `P S Ç P C C P` | geçti |
+| `tr-TR,en-US` | Türkçe | Türkçe | geçti |
+| `en-US` | İngilizce | "Select date", `September 2026` | geçti |
+| `de-DE` | **İngilizce** | Başlıklar **İngilizce**, gün harfleri `M D M D F S S` | geçti |
+| `de-DE,tr-TR` | Türkçe | Türkçe | geçti |
+| `ar-EG` | **İngilizce** | Başlıklar İngilizce, ay `سبتمبر ٢٠٢٦`, rakamlar Arap-Hint | geçti |
+
+`[en]` iken kurulup `[tr]`'ye geçince Türkçe **anında** geldi ve `pm path`
+değişmedi — dil parçasının kapatıldığının kanıtı bu.
+
+`[de]` satırındaki İngilizce tarih seçici dil filtresinin kanıtı: 16i'den önce
+o diyalog baştan sona Almancaydı.
+
+**api24 (minSdk), `tr-TR,en-US`:** Türkçe. `am get-config` sıralı listeyi
+doğruluyor (`tr-rTR,en-rUS`). Kurulum yine iki parça; 16i öncesi o cihazda
+`split_config.en.apk` dahil **üç** parça vardı.
+
+### Bölüm E — 117 listesinden metin/biçim/çoğul maddeleri (api34, tr ve en)
+
+Hiçbir ekranda ham anahtar ya da yerine konmamış biçim belirteci görülmedi.
+
+| # | Türkçe cihaz | İngilizce cihaz |
+|---|---|---|
+| 11 | **`₺219,89`** (159,99 + 59,90) | **`₺219.89`** |
+| 16 | tüm metinler Türkçe | tüm metinler İngilizce |
+| 17 | "Abonelik adı boş olamaz" / "Fiyat boş olamaz", alan altında | — |
+| 27 | **"1 gün kaldı"** (Türkçe tekil doğru) | **"1 day left"** (`one` biçimi) |
+| 30 | "Bugün ödenecek" | "Due today" |
+| 33 | "Ödeme hatırlatmaları, Açık" | "Payment reminders, On" |
+| 47 | "Henüz abonelik yok / Eklemek için + düğmesine dokun" | "No subscriptions yet / Tap + to add one" |
+| 64 | **`₺2.638,68`** | **`₺2,638.68`** |
+| 79 | "yüzde 100" | "100 percent" |
+| 80 | "Netflix, Aylık, ayda ₺159,99" | "Netflix, Monthly, ₺159.99 a month" |
+| 82/86 | "Trend için en az iki ay gerekiyor…" | "A trend needs at least two months…" |
+| 106 | "Tema, Sistemi takip et" | "Theme, Follow the system" |
+| 114 | "Duvar kâğıdı renkleri, Kapalı — uygulamanın kendi paleti" | "Wallpaper colours, Off — the app's own palette" |
+| 115 | ₺ $ € £, ISO kodu yok | aynı |
+| 116 | `₺219,89` / `₺2.638,68` | `₺219.89` / `₺2,638.68` |
+| 25 | "Kurlar hiç düzenlenmedi…", "1 $ = … ₺" | "The rates have never been edited…", "1 $ = … ₺" |
+
+**Türkçe tekil çoğul asıl sınavdı** ve geçti: `one` ile `other` aynı metni
+taşıdığı için "1 gün kaldı" doğru çıkıyor, davranış 16i öncesiyle aynı.
+
+### Bölüm F — 16g regresyonunun açıkları kapandı
+
+**#50 neden "kısmen":** madde "boş durum yükleme sırasında **da** görünmüyor"
+diyor; kararlı hâl ölçülebiliyor ama açılış karesi ölçülemiyor, çünkü elimizdeki
+en hızlı gözlem aracı olan `uiautomator dump` 3,3 saniye sürüyor ve yakalaması
+gereken kare ondan kat kat kısa.
+
+**#75 — geçti.** api34 debug build (`run-as` release'de yok). Çıpa 11 Eylül 2026,
+aylık; kart **"20 days left"** diyor (sonraki ödeme 11 Ekim). Veritabanındaki
+`nextPaymentDate` = `1789084800000` = **2026-09-11T00:00:00Z**, yani girilen
+çıpanın kendisi. İlerletme yalnızca ekranda.
+
+**#105 — geçti.** Aynı aboneliğin fiyatı 159,99 → 200,00 yapıldı.
+`monthly_snapshots` **tek satır**: `202609 | 20000 | TRY`. Kaydedici
+güncellemeyi görüyor.
+
+### Bölüm G — otomatik testler ve lint
+
+| Koşu | Sonuç |
+|---|---|
+| `testDebugUnitTest --rerun-tasks` | **330 test, 0 hata, 0 atlanan** |
+| Aynı paket, JVM varsayılan dili **tr-TR** | **330 test, 0 hata** |
+| `connectedDebugAndroidTest` (`subtrack_wide_api34`) | **19 test, 0 hata, 1 atlanan** (bilinen) |
+| `lintDebug --rerun-tasks` | **0 hata, 21 uyarı** |
+
+Türkçe koşu repoya dokunmadan yapıldı: geçici bir init script (`-I`) yalnızca
+`Test` görevlerine `-Duser.language=tr -Duser.country=TR` verdi; `--info`
+çıktısındaki worker komut satırı bunu doğruluyor. Kotlin/KSP bu ayarda hiçbir
+hata üretmedi.
+
+**Lint sayısı 22'den 21'e düştü, artmadı.** `MissingQuantity`,
+`MissingTranslation`, `ExtraTranslation`, `MissingDefaultResource`
+**çıkmıyor**. Düşen uyarı, Türkçe `error_date_too_far`'ın (`%1$d yıl`)
+üzerindeki `PluralsCandidate` yanlış alarmıydı: lint artık o dosyanın Türkçe
+olduğunu biliyor ve İngilizce sezgisini uygulamıyor.
+
+**İki bilinen uyarı — kabul edildi, susturulmadı:**
+
+1. `values/strings.xml` `statistics_category_description` (`%3$d percent`) —
+   **yanlış alarm.** İngilizcede "percent" sayıyla değişmez ("1 percent",
+   "5 percent").
+2. `values/strings.xml` `error_date_too_far` (`%1$d years`) — argüman
+   `SubscriptionInput.MAX_YEARS_AHEAD = 10L` sabiti ve tek çağıran
+   `FormErrors.kt`. Değer **her zaman 10**, yani "1 years" hiç oluşamaz.
+
+Plurals'a çevirmiyoruz: hem metin hem Kotlin kodu değişikliği ister
+(`stringResource` → `pluralStringResource`) ve bu turun kapsamı dışında.
+**Beklenen lint tablosu bundan sonra: 0 hata, 21 uyarı.**
+
+**Yerel ayara bağlı çağrı taraması.** `app/src` altındaki tüm Kotlin kodu
+tarandı. Biçimlendirmenin tamamı `LocalConfiguration.current.locales[0]`'ı
+açıkça alıp geçiriyor (`MoneyFormatter`, `MonthFormatter`,
+`rememberDateFormatter`, `ExchangeRatesScreen.updatedAtText`). Yerel ayarsız
+tek çağrı `SubscriptionCard.iconFor`'daki `name.lowercase()` ve o **güvenli**:
+Kotlin'in argümansız `lowercase()`'i yerel ayardan bağımsızdır, yani Türkçe
+cihazda "ICLOUD" → "ıcloud" olup ikonu kaybetmiyor. Java'nın `toLowerCase()`'i
+kullanılsaydı tam bu hata çıkardı. `Locale.forLanguageTag("tr-TR")` sabiti
+yalnızca bir `@Preview` içinde.
+
+**Değişen dosyalar**
+- `app/src/main/res/values/strings.xml` — İngilizce (eski `values-en/`)
+- `app/src/main/res/values-tr/strings.xml` — Türkçe (eski `values/`) + üç `one`
+- `app/src/main/res/values-en/` — kaldırıldı
+- `app/build.gradle.kts` — `androidResources.localeFilters`, `bundle.language`
+- `docs/ARCHITECTURE.md` — §28 yeni, §26 güncellendi
+- `docs/TESTING.md` — dil bölümü, AAB parça sayısı, iki yeni ölçüm notu
+- `docs/ROADMAP.md` — Faz 16i satırı
+
+**Commit'ler**
+- `f4d8ed2` refactor: make English the default string resource locale
+- `657aa69` build: keep only en and tr resources and put both in the base
+- `4726fd4` docs: record the localisation decisions and what they change
+
+**Karşılaşılan sorunlar**
+
+- **`bundleRelease` iki kez host RAM'i tükendiği için düştü** (`hs_err`
+  dosyası, "Native memory allocation (mmap) failed … G1 virtual space"). Üç
+  emülatör + Android Studio + R8 aynı anda sığmıyor. Çözüm:
+  `-Dorg.gradle.jvmargs=-Xmx4096m` ve derleme sırasında bir emülatörü kapatmak.
+- **Tarih seçici diyaloğu `uiautomator dump` çıktısında hiç görünmüyor** —
+  ayrı bir pencerede çiziliyor, dump uygulama penceresini döndürüyor. İlk
+  denemelerde "seçici açılmadı" sanıldı, oysa açıktı. Bu diyalog **yalnızca
+  ekran görüntüsüyle** doğrulanır. (Kapsam dışı olduğu için TESTING'e
+  yazılmadı; yazılmaya değer.)
+- **`am start`'tan sonraki ilk dokunuş sıklıkla yutuluyor.** Açılış animasyonu
+  bitmeden giden `input tap` hiçbir şey yapmıyor; her açılıştan sonra dokunuş
+  dump ile doğrulanıp gerekirse tekrarlandı.
+- **Cihaz dili kabuktan kurulamıyor.** `setprop persist.sys.locale` "Failed to
+  set property" diyor, `adb root` "cannot run as root in production builds",
+  `settings put system system_locales` değeri yazıyor ama uygulamıyor
+  (`am get-config` eski dilde kalıyor), `cmd locale` yalnızca uygulama dilini
+  biliyor. Tek yol Ayarlar arayüzü — matrisin altı satırı böyle kuruldu.
+- Oturum ortasında makine yeniden başladı ve üç emülatör de kapandı. Kurulum,
+  dil listesi ve tema ayarı `userdata`'da kalıcı olduğu için tur kaldığı
+  yerden sürdü.
+
+**Bir önceki tur için düzeltmeler**
+
+- **16g'nin "api29'da koyu temayı kapatmak Ayarlar → Ekran ile yeniden
+  başlatmasız çalışıyor, reboot yolu yalnızca açmak için" notu eksikti.**
+  Yeniden ölçüldü: anahtar **iki yönde de** yeniden başlatma istemiyor
+  (kapatma `2/0x21` → `1/0x11`, açma tam tersi). Kilitli olan Ayarlar değil,
+  kabuk komutu: aynı turda `cmd uimode night no` yine iş görmedi. TESTING'e
+  tabloyla yazıldı.
+- **Bu turun ilk raporunda "iki yeni PluralsCandidate uyarısı" denmişti,
+  yanlıştı.** Temel çizgi `HEAD~1`'de ölçülünce ikisinin de taşımadan önce
+  `values-en/strings.xml`'de var olduğu görüldü. Taşıma lint'e uyarı eklemedi.
+- **ARCHITECTURE §28'in ilk hâli "`[de, tr]`'de metin Türkçe, biçim Almanca
+  olur" diyordu; ölçüm bunu çürüttü.** Android, uygulamaya verdiği
+  Configuration'ın dil listesini uygulamanın kaynağı olan dillere göre
+  süzüyor: eşleşen bir dil varsa `locales[0]` o oluyor ve **biçim de** onunla
+  geliyor. `[de, tr]`'de hem metin hem biçim Türkçe. Metin ile biçim yalnızca
+  hiçbir dilin eşleşmediği listelerde ayrışıyor (`[de]`, `[ar]`). §28 ölçülen
+  tabloyla düzeltildi.
+
+**Bilinen eksikler / sonraki faz için not**
+
+- **RTL denenmemiş bir yol.** `[ar]` listesinde düzen aynalanıyor (`ldrtl`,
+  FAB sol alta, çipler ters sırada) ama hiçbir ekran RTL için tasarlanmadı ve
+  Arapça çeviri de yok. 16i'de ölçüldü, dokunulmadı. Ayrıca Arapça takvimde
+  gün harfleri satırı yedi özdeş glif olarak çiziliyor — Material3/ICU
+  tarafında, uygulamanın desteklemediği bir dilde.
+- `localeConfig` v1.0'da yok; dil seçimi ayrı bir özellik faza kalıyor.
+- Mağaza ekran görüntüleri yeniden çekilmedi — metinler değişmedi.
+
+---
+
 ## [Faz 16g-2] Yayın Adayı AAB Yeniden Üretildi ve Üç Cihazda Sürüldü — 2026-09-21
 
 **Durum:** Tamamlandı. Kaynak koda dokunulmadı; bu tur ölçümdür.
