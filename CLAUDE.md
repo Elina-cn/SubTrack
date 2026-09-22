@@ -117,6 +117,12 @@ Her kod değişikliğinden sonra, bildirmeden önce:
 2. Kotlin görevi `UP-TO-DATE` gelirse **güvenme** — `--rerun-tasks` ile zorla
 3. Yeni uyarı çıktıysa raporla
 4. Test varsa `./gradlew :app:testDebugUnitTest`
+5. `git diff`'te `app/schemas/1.json` değişmiş görünüyor ve `version` artmamışsa
+   **dur** — migration kuralı ihlal edilmiş demektir (gerekçe:
+   `docs/ARCHITECTURE.md` "Şema sürümlemesi")
+6. Fiziksel test cihazına dokunma: kurulum, kaldırma, `pm clear`, test koşumu
+   yapma — cihazdaki sürüm Play'in imzasını taşır ve yalnızca dahili test
+   kanalından güncellenir (gerekçe: `docs/ARCHITECTURE.md` "Şema sürümlemesi")
 
 Derleme geçmesi doğruluk kanıtı değildir. Çalışma zamanı davranışını
 (state akışı, lifecycle, boş liste durumu) mantıken kontrol et ve

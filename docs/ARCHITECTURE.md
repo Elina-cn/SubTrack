@@ -599,6 +599,22 @@ geri eklenmemeli** — root dosyasında bunu hatırlatan bir yorum var.
 
 ### Şema sürümlemesi
 
+> **Yürürlükte (2026-09-23, Faz 16k):** Migration kuralı yürürlüğe girdi.
+> Tetik mağazada herkese açık yayın değil, **Play üzerinden ilk kurulum**:
+> kapalı test kanalından kurulan cihazlardaki veri gerçek veridir. `1.json`
+> dondu. Her şema değişikliği = `version` artışı + `Migration` + migration
+> testi. `fallbackToDestructiveMigration` **yasak** (veriyi sessizce siler).
+> Bir diff'te `1.json` değişmiş görünüyorsa sürüm artırılmadan şema
+> değişmiştir — dur.
+>
+> Aynı gerekçeyle: fiziksel test cihazındaki SubTrack artık Play'den geliyor
+> ve Google'ın imzasını taşıyor; yerel imzalı hiçbir derleme üzerine
+> kurulamaz. Claude Code telefona kurulum yapmaz, uygulamayı kaldırmaz,
+> `pm clear` / dil / tema / izin değiştirmez, test koşturmaz. Telefondaki
+> sürüm yalnızca Play'in dahili test kanalından güncellenir.
+
+#### Yayın öncesi kural (artık geçerli değil)
+
 **Uygulama yayınlanana kadar** şema değişikliklerinde migration yazılmaz:
 sürüm 1 yeniden üretilir ve `app/schemas/1.json` güncellenir.
 
@@ -610,6 +626,7 @@ gerektirir, istisnası yoktur — o noktadan sonra cihazlarda gerçek veri vard�
 onu bozmak geri alınamaz.
 
 > Bu satır **Faz 16'da tekrar okunmalı.** Yayın anı kuralın değiştiği andır.
+> **Okundu (Faz 16k) — kural yürürlüğe girdi, bkz. yukarıdaki yürürlük notu.**
 
 **Faz 12a'da uygulandı.** `monthly_snapshots` tablosu sürüm 1'e eklendi,
 migration yazılmadı, sürüm numarası 1 kaldı ve
