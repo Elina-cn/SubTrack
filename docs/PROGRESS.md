@@ -27,6 +27,73 @@ Her faz sonunda **en üste** yeni kayıt eklenir. Eski kayıtlar silinmez.
 
 ---
 
+## [Faz 16k] Play Console Kurulumu ve v1.0 — 2026-09-23
+
+**Durum:** Tamamlandı. Bu tur yalnızca belge; kod değişmedi. Console işleri
+repoda hiç kanıt bırakmıyor (yüklemeler, Data Safety formu, mağaza girişi
+UI üzerinden yapılıyor), bu yüzden bu kayıt tamamen kullanıcının verdiği
+bilgiye dayanıyor — koddan doğrulanabilen tek şey Görev 0'daki üç kontrol.
+
+### Görev 0 — doğrulama (değiştirmeden)
+
+| Kontrol | Sonuç |
+|---|---|
+| `git rev-list -n 1 v1.0` | `a16e29977bc48b95d1b8c3bba5de4770c7c62534` — kullanıcının verdiği a16e299 ile eşleşiyor |
+| `git ls-remote --tags origin v1.0` | aynı hash ile döndü, boş dönmedi |
+| `grep -rn fallbackToDestructiveMigration app/` | eşleşme yok |
+
+Üçü de tuttu. Etiket atılmadı, taşınmadı, silinmedi.
+
+### Console'da yapıldı, repoda kanıt yok
+
+- **AAB:** `versionCode 1` / `versionName 1.0`, kaynak commit `a16e299` (16j).
+  Kullanıcı bu commit'e `v1.0` etiketini attı.
+- **Play App Signing açık:** uygulama imzalama anahtarı Google'da, bizimki
+  upload key (16g).
+- **Dahili test:** sürüm 1 yayında. **Kapalı test:** tüm ülkeler, aynı sürüm
+  kitaplıktan eklendi, 22.09.2026'da incelemeye gönderildi.
+- **Gizlilik politikası:** https://elina-cn.github.io/subtrack-privacy/
+  (TR + EN).
+- **Data Safety:** toplama yok, paylaşım yok. Hedef kitle 18+, içerik
+  derecesi 3+, reklam ve reklam kimliği yok. Gerekçeler `PROJECT_SPEC.md` §5.
+- **Mağaza girişi:** en-US (varsayılan) + tr-TR; simge `docs/store/icon-512.png`,
+  özellik grafiği `docs/store/feature-graphic.png`, ekran görüntüleri
+  `docs/screenshots/store/` (EN 7, TR 5). TR'de koyu tema görüntüsü yok.
+- **Console'un tek uyarısı** "yerel kod için hata ayıklama sembolü yok" —
+  kabul edildi (yerel kod AndroidX'ten, sembolü elimizde yok; bkz. ROADMAP
+  Faz 16'daki native kütüphane maddesi).
+- **Üretim erişimi:** 12 testçi 14 gün kesintisiz katılımda kalınca
+  başvurulacak.
+
+### Değişen belgeler
+
+- `docs/ARCHITECTURE.md` — "Şema sürümlemesi" bölümünün başına tarihli bir
+  yürürlük notu eklendi (migration kuralı artık yürürlükte; tetik ilk Play
+  kurulumu, `1.json` dondu); eski "yayın öncesi" paragrafları silinmeden
+  "artık geçerli değil" alt başlığı altına alındı.
+- `CLAUDE.md` — §6 doğrulama listesine iki madde: `1.json` diff'te
+  değişmiş görünüyorsa dur, ve fiziksel test cihazına dokunulmaz (gerekçeler
+  `ARCHITECTURE.md`'de).
+- `docs/ROADMAP.md` — Faz 16 başlığı 🟡'ya çevrildi, bitiş tanımı üretim
+  erişimi koşuluyla genişletildi, PROJECT_SPEC bölüm numarası düzeltildi
+  (§7 → §8, dosyadan kontrol edildi), yukarıdaki bilgilerle kapanan maddeler
+  işaretlendi, "Internal testing → production" üçe bölündü, 16j için satır
+  eklendi. Faz 17 kapsamı `PROJECT_SPEC.md` §4'e ("v1.1") yönlendirildi.
+- `docs/PROGRESS.md` — bu kayıt.
+
+### README bulgusu
+
+`README.md` yalnızca okundu, değiştirilmedi. Yayın durumu hakkında gerçeğe
+aykırı bir cümle bulunmadı — dosya zaten "no server, no account" gibi nötr
+ifadeler kullanıyor, "Play'de yayında" türünden bir iddia yok.
+
+**Commit'ler**
+
+- `127764f` docs: put the schema migration rule into force
+- (bu kayıt) docs: record the Play Console setup and the v1.0 release
+
+---
+
 ## [Faz 16j] Yayın Öncesi Son Kontrol — RTL Kapatıldı, İzinler ve Mağaza İddiaları Denetlendi — 2026-09-22
 
 **Durum:** Tamamlandı. Tek kod değişikliği manifestteki `supportsRtl`

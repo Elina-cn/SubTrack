@@ -455,7 +455,7 @@ Aylık toplamın zaman içindeki anlık görüntüleri. `PROJECT_SPEC.md` §1'de
 
 ---
 
-## ⬜ Faz 16 — Play Store Hazırlığı
+## 🟡 Faz 16 — Play Store Hazırlığı
 
 - [x] **Uygulama ikonu (adaptive) ve marka kimliği** — Faz 16d. Şablon ikonu
       (yeşil kare + Android robotu) gitti; işaret 14a'nın paletinden:
@@ -534,7 +534,9 @@ Aylık toplamın zaman içindeki anlık görüntüleri. `PROJECT_SPEC.md` §1'de
       `ExampleInstrumentedTest` (paket adı kontrolü) silindi; **331 birim testi
       → 330**, **20 enstrümantasyon metodu → 19**. İkincisi her pakette bir cihaz
       kurulumu ve koşumu maliyeti getiriyordu.
-- [ ] `targetSdk` Play'in güncel zorunluluğuna yükseltilsin
+- [x] `targetSdk` Play'in güncel zorunluluğuna yükseltilsin — **36**, Play AAB'yi
+      bu hedefle kabul etti (Faz 16k). Eşik her yıl yükseliyor; bu madde her
+      yayın döneminde tekrar okunmalı, kapanışı kalıcı değil.
 - [x] **Edge-to-edge'e geçildi** — Faz 16a. `enableEdgeToEdge()` `setContent`
       öncesinde çağrılıyor, sistem çubuğu ikonları tema tercihini takip ediyor,
       paylar `Scaffold` üzerinden her ekranda uygulandı (ana ekranda
@@ -574,6 +576,15 @@ Aylık toplamın zaman içindeki anlık görüntüleri. `PROJECT_SPEC.md` §1'de
       `localeConfig` bilerek eklenmedi: dil seçimi bir özellik, bu bir düzeltme
       turu. Karar ve dil matrisi `ARCHITECTURE.md` §28, kayıt `PROGRESS.md`'deki
       16i girdisi.
+- [x] **Yayın öncesi son kontrol: RTL kapatıldı, izinler ve mağaza iddiaları
+      denetlendi** — Faz 16j. `android:supportsRtl="false"` — uygulamanın iki
+      kaynağı da (`en`, `tr`) soldan sağa yazılıyor ve aynalanmış düzen hiç
+      çalıştırılmadı. WorkManager'ın getirdiği dört izin (`WAKE_LOCK`,
+      `ACCESS_NETWORK_STATE`, `RECEIVE_BOOT_COMPLETED`, `FOREGROUND_SERVICE`)
+      dışında beklenmeyen izin yok, `INTERNET` ve `AD_ID` hâlâ yok. Mağaza
+      metnindeki her iddia kodla eşleştirilip doğrulandı — tek istisna Auto
+      Backup'ın cihazdan cihaza aktarım hedefinin metinde geçmemesi (öneri
+      `PROGRESS.md`'deki 16j kaydında). Kayıt `PROGRESS.md`'deki 16j girdisi.
 - [x] **Test paketi sıra bağımsız hâle geldi ve tam regresyon turu atıldı** —
       Faz 16b. Paket dört cihazda, iki koşum yöntemiyle, arka arkaya iki kez
       geçiyor; 117 maddelik liste dört cihazda eksiksiz sürüldü (468 hücre).
@@ -597,16 +608,23 @@ Aylık toplamın zaman içindeki anlık görüntüleri. `PROJECT_SPEC.md` §1'de
       sürüldü: veritabanı bire bir, tercihler bayt bayt aynı geldi, çökme yok,
       bildirim işi yeniden kuruldu. Ayrıntı `ARCHITECTURE.md` §25,
       ölçümler `PROGRESS.md`.
-- [ ] Gizlilik politikası — v1.0 çevrimdışı, veri toplanmıyor. **v1.1'de ağ
-      eklendiğinde politika ve Data Safety formu güncellenecek**
-      (PROJECT_SPEC §4). **16f'nin ölçümü politikanın metnini değiştiriyor:**
+- [x] Gizlilik politikası — yayınlandı:
+      https://elina-cn.github.io/subtrack-privacy/ (TR + EN). **v1.1'de**
+      (dışa/içe aktarma) politikaya dosya konumu cümlesi eklenecek; **v1.2'de**
+      ağ eklendiğinde politika ve Data Safety formu yeniden güncellenecek
+      (PROJECT_SPEC §4). **16f'nin ölçümü politikanın metnini değiştiriyordu:**
       Auto Backup açık, yani veri kullanıcının kendi Google Drive'ına
       kopyalanıyor. "Veriler cihazdan çıkmıyor" cümlesi olduğu gibi
-      kullanılamaz — doğru cümle `PROGRESS.md`'deki 16f kaydında.
-- [ ] Ücretlendirme kararı verilsin (peşin / ücretsiz+premium / ücretsiz) —
-      kod tarafında etkisi yok, buraya kadar bekleyebilir (PROJECT_SPEC §5)
-- [ ] ARCHITECTURE'daki **"Şema sürümlemesi"** kuralı okunsun. Yayından sonra
-      migration zorunlu hale geliyor, istisnası yok.
+      kullanılamaz — doğru cümle `PROGRESS.md`'deki 16f kaydında. (Faz 16k: URL
+      Console dışında bir kaynaktan geldi, repoda kanıt yok.)
+- [x] Ücretlendirme kararı verilsin (peşin / ücretsiz+premium / ücretsiz) —
+      **ücretsiz.** v1.0 uygulama içi satın alma ve reklam olmadan yayınlandı;
+      Play'de ücretsiz yayınlanan bir uygulama sonradan ücretliye çevrilemez.
+      Karar ve gerekçesi `PROJECT_SPEC.md` §5.
+- [x] ARCHITECTURE'daki **"Şema sürümlemesi"** kuralı okunsun. Yayından sonra
+      migration zorunlu hale geliyor, istisnası yok. **Okundu (Faz 16k) —
+      kural yürürlüğe girdi**, bkz. `ARCHITECTURE.md` "Şema sürümlemesi" ve
+      `CLAUDE.md` §6'ya eklenen iki yeni madde.
 - [ ] TalkBack testi bir kez düzgün yapılsın. Test cihazında (OPPO A15s)
       TalkBack donuyor. **Emülatör de çözüm olmadı:** kurulu iki
       `google_apis_playstore` imajının ikisinde de Android Accessibility
@@ -648,33 +666,59 @@ Aylık toplamın zaman içindeki anlık görüntüleri. `PROJECT_SPEC.md` §1'de
       `checkable="true"`, seçili olan `checked="true"`. Hotfix'teki ters
       bulgu yanlış düğüme bakmaktan gelmişti. Geriye yalnızca **TalkBack'in
       bunu gerçekten seslendirdiği** doğrulaması kaldı.
-- [ ] Strip edilemeyen native kütüphaneler: DataStore'un
+
+      > **Not (Faz 16k):** Bu maddeye ne bu belge turunda ne `PROGRESS.md`'de
+      > yeni kanıt geldi — açık kalıyor.
+- [x] Strip edilemeyen native kütüphaneler: DataStore'un
       `libdatastore_shared_counter.so`'su ve Compose'un `androidx.graphics:graphics-path`
       üzerinden gelen `libandroidx.graphics.path.so`'su. `stripDebugDebugSymbols`
       ikisini de strip edemiyor, olduğu gibi paketleniyor. Release APK boyutu
       ölçülürken göz önünde bulundurulsun. (İkincisi Faz 10b Görev 0'da fark
-      edildi; WorkManager'dan gelmiyor, temiz tabanda da vardı.)
-- [ ] **API 24/25 üzerinde bir kez test edilsin** — `minSdk` 24 iddiası hiç
-      doğrulanmadı. Fiziksel cihaz API 29, emülatörler 29 ve 34; 24/25 için
-      ayrı bir AVD kurulması gerekiyor. Faz 10a'da `java.time` yüzünden
-      bu aralıkta çökeceği ortaya çıktı ve desugaring ile kapatıldı, ama
-      aralığın kendisi hâlâ hiç çalıştırılmadı.
-- [ ] **`desugar_jdk_libs` APK bedeli R8 sonrası ölçülsün** — bugün
-      ~200-400 KB tahmin ediliyor, `isMinifyEnabled = true` ile ne kaldığı
-      ölçülmedi. Yukarıdaki R8 maddesiyle birlikte yapılır.
+      edildi; WorkManager'dan gelmiyor, temiz tabanda da vardı.) **Faz 16k:**
+      Play Console'un tek uyarısı tam olarak buydu ("yerel kod için hata
+      ayıklama sembolü yok") — kabul edildi, yerel kod AndroidX'ten ve sembolü
+      elimizde yok.
+- [x] **API 24/25 üzerinde bir kez test edilsin** — `minSdk` 24 iddiası artık
+      doğrulandı. `subtrack_min_api24` AVD kuruldu ve Faz 16b'nin 117 maddelik
+      tam regresyonuna (dört cihaz, 468 hücre), Faz 16c'nin dört cihazlı
+      release APK turuna, Faz 16g/16h/16h-1/16h-2'nin açılış ölçümlerine ve
+      Faz 16j'nin RTL/izin turuna dahil edildi. API 24'te düşen tek madde
+      (#40, bildirim ayarları kısayolu) 16b hotfix'inde kapandı.
+- [x] **`desugar_jdk_libs` APK bedeli R8 sonrası ölçülsün** — bu madde
+      yukarıdaki, Faz 16c'de işaretlenmiş **`desugar_jdk_libs` bedeli ölçüldü**
+      maddesiyle aynı soruyu soruyor ve orada zaten cevaplandı (minify kapalı
+      144.680 B, minify açık 128.900 B). Ayrı bir ölçüm yapılmadı, ona gönderme.
 - [ ] **WorkManager'ın manifeste otomatik eklediği izinler Play Console'da
       görünecek:** `WAKE_LOCK`, `ACCESS_NETWORK_STATE`, `RECEIVE_BOOT_COMPLETED`,
       `FOREGROUND_SERVICE`. Dördü de kütüphaneden geliyor, uygulama kodu
       istemiyor. Birleşik manifestte ölçüldü (Faz 10b Görev 0). İzin beyanında
       ve gizlilik politikasında bunlar da açıklanmalı.
-- [ ] Play Console Data Safety formu
-- [ ] Mağaza görselleri ve açıklama metni — **telefon ekran görüntüleri bitti**
-      (Faz 16e-2): `docs/screenshots/store/`, 12 dosya, 1080x1920 24-bit PNG,
-      Türkçe ve İngilizce + koyu tema. **Kalanlar:** özellik grafiği
-      (1024x500), mağaza simgesi (512x512), listeleme metni
-- [ ] Internal testing → production
 
-**Bitti:** `PROJECT_SPEC.md` §7'deki tüm maddeler işaretli.
+      > **Not (Faz 16k):** Faz 16j izin beyanının Console tarafını doğruladı
+      > ama gizlilik politikası metninin bu dördünü içerdiğine dair ne bu
+      > turda ne PROGRESS'te kanıt var — açık kalıyor.
+- [x] Play Console Data Safety formu — dolduruldu: toplama yok, paylaşım yok;
+      hedef kitle 18+, içerik derecesi 3+, reklam ve reklam kimliği yok
+      (gerekçeler PROJECT_SPEC §5). (Faz 16k: Console'da yapıldı, repoda kanıt
+      yok.)
+- [x] Mağaza görselleri ve açıklama metni — tamamlandı. Ekran görüntüleri
+      (Faz 16e-2): `docs/screenshots/store/`, İngilizce 7 + Türkçe 5 (Türkçe
+      tarafında koyu tema görüntüsü yok). Simge `docs/store/icon-512.png`,
+      özellik grafiği `docs/store/feature-graphic.png`. Mağaza girişi en-US
+      (varsayılan) + tr-TR. (Faz 16k: Console'da yapıldı, repoda yalnızca
+      görsel dosyaları var.)
+- [x] Internal testing — sürüm 1 (`versionCode 1` / `versionName 1.0`, kaynak
+      commit `a16e299`, kullanıcının `v1.0` etiketiyle işaretlediği) yayında
+      (Faz 16k).
+- [ ] Kapalı test — aynı sürüm, tüm ülkeler, 22.09.2026'da incelemeye
+      gönderildi; **Google incelemesinde.**
+- [ ] Üretim erişimi ve yayın — 12 testçi 14 gün kesintisiz katılımda kalınca
+      başvurulacak (Faz 16k).
+
+**Bitti:** `PROJECT_SPEC.md` §8'deki "Bitti" tanımının tamamı karşılandı **ve**
+üretim erişimi alınıp bu sürüm üretimde yayına girdi. İlk koşul 22 Eylül
+2026'da sağlandı; ikincisi henüz sağlanmadı (kapalı test incelemede) — bu
+yüzden faz 🟡 kalıyor.
 
 ---
 
@@ -685,6 +729,7 @@ kullanıcının kendi Drive'ına yedekliyor ve kullanıcı o yedeğe elle
 dokunamıyor; bu faz veriyi kullanıcının **elinde tutabileceği bir dosyaya**
 çıkarmakla ilgili.
 
-Maddeler sohbette kararlaştırılacak.
-
-- [ ]
+Kapsam `PROJECT_SPEC.md` §4 "v1.1 — Veri taşınabilirliği" bölümünde karara
+bağlandı. Faz 17, Karar 3 gereği **üretim erişimiyle başlar**; o güne kadar
+koda yalnızca kapalı test geri bildiriminden gelen düzeltmeler girer
+(`versionCode 2`'den başlayarak).
