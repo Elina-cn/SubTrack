@@ -1059,11 +1059,13 @@ açıkken ve büyük yazıda görülüyor. Sheet içerik boylu durduğunda (411d
 1.0, klavye kapalı) piksel farkı yok. Açık ve koyu temada ekran görüntüleri:
 `docs/screenshots/phase-16m/`.
 
-**Bilinen, kabul edilen:** kütüphanenin **tek** sıçraması değişmedi — bırakış
-hızıyla orantılı (tepe ≈ 0,0149 sn × hız), 16m'de en fazla ~73 dp ölçüldü ve
-her hücrede 0,4 sn içinde sönüyor. Hızlı bir fiskede üst kenar bu sıçramanın
-tepesinde bir iki kare boyunca durum çubuğu bölgesine girebiliyor; artık boyu
-değiştirmediği için tekrar etmiyor. **Dinlenmede** üst kenar hiçbir ölçümde bölgeye girmedi.
+**Üst kenar kuralı (16m'deki sapma 16n'de kabul edildi):** dururken — klavye
+açıkken ve sheet tam boyken dahil — sheet'in üst kenarı durum çubuğu bölgesine
+**girmez**. Hızlı bir fiskedeki tek sıçrama üst kenarı bir iki kare bölgeye
+taşıyabilir, ama sheet'in boyu değişmediği için **tekrarlamaz**. Tek sıçrama
+kütüphanenin, değişmedi: bırakış hızıyla orantılı (tepe ≈ 0,0149 sn × hız),
+16m'de en fazla ~73 dp ölçüldü ve her hücrede 0,4 sn içinde sönüyor. Dururken
+üst kenar 16m'nin hiçbir ölçümünde bölgeye girmedi.
 
 **Kapatma yolları değişmedi:** aşağı kaydırma (tutamaktan ve formdan), geri
 tuşu, geri jesti ve scrim'e dokunmak kapatıyor. Durum çubuğu şeridine dokunmak

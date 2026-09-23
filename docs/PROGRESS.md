@@ -27,6 +27,174 @@ Her faz sonunda **en üste** yeni kayıt eklenir. Eski kayıtlar silinmez.
 
 ---
 
+## [Faz 16n] Sürüm 1.0.1 — Kapalı Test Güncellemesi — 2026-09-23
+
+**Durum:** Tamamlandı. Tek kod değişikliği sürüm satırları
+(`versionCode 1 → 2`, `versionName "1.0" → "1.0.1"`). AAB hazır; kapalı test
+kanalına yükleme, dahili teste kitaplıktan ekleme ve etiket kullanıcıda.
+Gerçek kullanıcı verisi olan cihazlara giden **ilk güncelleme** — bu yüzden
+yükseltme testi kalıcı bir tur olarak TESTING'e girdi.
+
+### Görev 0 — 16m'deki sapma kabul edildi
+
+ARCHITECTURE §16'daki "Bilinen, kabul edilen" paragrafı **üst kenar kuralı**
+olarak yeniden yazıldı ve 16m kaydının ilgili maddesi aynı cümleyi taşıyor:
+dururken (klavye açıkken ve tam boyken dahil) sheet'in üst kenarı durum çubuğu
+bölgesine girmez; hızlı bir fiskedeki tek sıçrama bir iki kare girebilir ama
+sheet'in boyu değişmediği için tekrarlamaz. Eski metin dinlenme hâlini yalnızca
+ölçüm olarak anlatıyordu ("hiçbir ölçümde girmedi"), klavye/tam boy kapsamını ve
+kararı yazmıyordu. Ölçümler değişmedi.
+
+### Görev 1 — şema
+
+`git diff v1.0 -- app/schemas` → **boş** (0 bayt). Migration gerekmiyor.
+
+### Görev 2-3 — sürüm ve AAB
+
+`./gradlew :app:assembleDebug :app:testDebugUnitTest :app:bundleRelease
+--rerun-tasks` → geçti; `compileDebugKotlin` ve `compileReleaseKotlin` koştu.
+Yeni uyarı yok (tek uyarı `android.disallowKotlinSourceSets` deneysel seçenek
+uyarısı, 16m'nin derlemesinde de vardı).
+
+| Alan | Değer |
+|---|---|
+| Kaynak commit | **`80f5c25`** chore: bump version to 1.0.1 (versionCode 2) |
+| AAB | `app/build/outputs/bundle/release/app-release.aab`, **4.576.383 B** (16j: 4.575.367 B; fark 16m'nin düzeltmesi + sürüm) |
+| AAB SHA-256 | `d79d5e4d…57ff80` |
+| `jarsigner -verify` | `jar verified.`, `CN=ElinaDorothea, OU=Development, O=SubTrack, L=Denizli, ST=Denizli, C=TR`; üç bilinen uyarı (kendinden imzalı zincir, zaman damgası yok, 2054-02-02) |
+| `bundletool dump manifest` | `versionCode="2"`, `versionName="1.0.1"`, `minSdkVersion="24"`, `targetSdkVersion="36"`, `supportsRtl="false"` |
+| Birim testleri | **330 test, 0 hata, 0 atlanan** |
+
+**İzin listesi — 16j ile birebir aynı** (AAB manifesti ↔ v1.0 APK'sının
+`aapt2 dump permissions` çıktısı, sıralı satır satır):
+
+| İzin | v1.0 | 1.0.1 |
+|---|---|---|
+| `android.permission.POST_NOTIFICATIONS` | var | var |
+| `android.permission.WAKE_LOCK` | var | var |
+| `android.permission.ACCESS_NETWORK_STATE` | var | var |
+| `android.permission.RECEIVE_BOOT_COMPLETED` | var | var |
+| `android.permission.FOREGROUND_SERVICE` | var | var |
+| `com.elinacn.subtrack.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION` (tanım + kullanım) | var | var |
+
+Yeni izin yok; `INTERNET` ve `AD_ID` yok. Testçiler izin değişikliği görmeyecek.
+
+### Görev 4 — yükseltme testi (api33)
+
+`subtrack_tester_api33`, başlangıç hâli (açık, en-US, yazı 1.0, `wm` sıfır).
+Eski taraf 16m'nin `old-release.apk`'sı: `v1.0` ile kodu aynı commit'ten
+(`65ea072`; `git diff v1.0 65ea072 -- app gradle` boş), `versionCode 1`,
+upload anahtarı (SHA-256 `fce85346…26da0`). Yeni taraf 1.0.1 AAB'sinden
+`build-apks` + `install-apks`. Cihazdaki 16m derlemesi önce kaldırıldı.
+
+**Fikstür (v1.0 arayüzünden):** Netflix ₺159,99 aylık Eğlence; Spotify $10,99
+aylık Eğlence, sonraki ödeme 28.09.2026 (kaydedince bağlamsal izin istendi →
+Allow); Gym €450 yıllık Sağlık; iCloud £2,49 haftalık. Ana para USD, tema Dark,
+1 $ = 41,5 ₺ ("Last edited: Sep 23, 2026 10:57 AM"). Toplam aylık **$70,61**,
+yıllık **$847,27**.
+
+| Kontrol | Güncellemeden önce (v1.0) | Sonra (1.0.1) |
+|---|---|---|
+| Kurulum | `base.apk` | `base.apk` + `split_config.x86_64.apk` — **kaldırılmadan** |
+| `versionCode` / `versionName` | 1 / 1.0 | **2 / 1.0.1** |
+| `firstInstallTime` | 10:53:25 | **10:53:25** (aynı) — güncelleme, temiz kurulum değil |
+| `lastUpdateTime` | 10:53:25 | 10:59:28 |
+| `userId` | 10175 | **10175** |
+| `POST_NOTIFICATIONS` | `granted=true` | **`granted=true`** |
+| Ana ekran aylık / yıllık, istatistik, ayarlar, kurlar (5 dump) | kaydedildi | **beşi birebir aynı** (`diff` boş) |
+| Ana ekran görüntüsü | — | durum çubuğu (saat) dışında **piksel piksel aynı** |
+| `payment_reminder` işi (WorkManager tanı yayını) | `3a84cfc8…` `ENQUEUED`, iş #0 | **aynı kimlik** `ENQUEUED`, iş #0 |
+| JobScheduler | `JOB #u0a175/0`, ertesi 09:00 | açmadan önce aynı kayıt; açınca tazelendi, hedef yine 09:00 |
+| Crash tamponu | — | **boş** |
+
+Açılışta `WM-ForceStopRunnable: Application was force-stopped, rescheduling`
+göründü — güncelleme süreci öldürdüğü için beklenen; iş kimliği `KEEP` ile
+korundu. Release debuggable olmadığı için `run-as` yok; iş durumu WorkManager'ın
+tanı yayınıyla (`androidx.work.diagnostics.REQUEST_DIAGNOSTICS`) okundu.
+
+### Görev 5 — kısa tur (AAB kurulumu, api33)
+
+**Salınım hücresi** (16m'nin `cell.sh`'ı; koyu, tr-TR, `wm density 440`, yazı
+1.25): dinlenme üst kenar **182**, Kaydet **2101**, pay 19,6 dp — TESTING'dekiyle
+aynı.
+
+| İtiş | Sonuç | 16m |
+|---|---|---|
+| Orta (218 dp / 130 ms) | **tek sıçrama** 68 px = 25 dp; ilk yer değiştirmeden ~0,3 sn sonra dinlenmede (kareler ~50 ms arayla) | tek sıçrama 25 dp |
+| Hızlı (440 dp / 90 ms) | **tek sıçrama** 200 px = 73 dp, tepe karesinde üst kenar 0 (kabul edilen tek sıçrama); ~0,25 sn'de dinlenmede | tek sıçrama 72-73 dp |
+
+İkisinde de tekrar yok; 3 sn sonraki dokunuştan sonra sheet dinlenmede
+(`cell.sh` denetimi yeniden açma istemedi). Kayıtta Kaydet dinlenmede 2102 px
+okunuyor (ekran görüntüsünde 2101), fark kodlamadan; izler buna göre okundu.
+
+**Tur** (hücre geri alındıktan sonra, en-US, uygulama teması Dark):
+
+| Adım | Sonuç |
+|---|---|
+| Ekleme — Disney ₺99,99 aylık | eklendi; toplam $70,61 → **$73,01** (+99,99/41,5) |
+| Düzenleme — ₺129,99, yıllık | kaydedildi; toplam **$70,87** (+129,99/12/41,5) |
+| Kaydırarak silme | "Subscription deleted" + Undo, toplam $70,61 |
+| Geri alma (tek shell satırı, `942,2053`) | Disney geri geldi, **$70,87** |
+| İstatistik | beş satır "en pahalı", üç kategori %59/%21/%20 |
+| Ayarlar — ana para EUR, tema Light | toplam **€63,66** (70,87 × 41,5 / 46,2), tema değişti |
+| Crash tamponu | boş |
+
+### Görev 6 — sürüm notları ("Bu sürümdeki yenilikler")
+
+```
+<tr-TR>
+Abonelik ekleme ekranındaki bir hata düzeltildi: büyük yazı boyutu kullanan bazı telefonlarda form hızlıca yukarı kaydırılınca ekran kendi kendine titremeye başlıyor ve dokunulana kadar durmuyordu. Artık bir kez esneyip yerine oturuyor.
+
+Bu güncellemede başka değişiklik yok; abonelikleriniz ve ayarlarınız olduğu gibi kalır.
+
+Hatayı bildiren testçimize teşekkürler!
+</tr-TR>
+<en-US>
+Fixed a bug on the add subscription screen: on some phones, especially with a larger font size, a quick upward swipe on the form made the screen keep shaking until you touched it again. It now bounces once and settles in place.
+
+Nothing else changed in this update; your subscriptions and settings stay as they are.
+
+Thanks to the tester who reported it!
+</en-US>
+```
+
+tr-TR 366, en-US 354 karakter (sınır 500).
+
+### Ortam
+
+- Emülatör yalnız `subtrack_tester_api33` (`-gpu host`) çalıştı; derleme
+  emülatör kapalıyken koştu. Tur sonunda `wm size`/`wm density` sıfır, yazı 1.0,
+  `cmd uimode night no`, uygulama dili boş, `show_ime_with_hard_keyboard 0`;
+  `/sdcard`'da kayıt dosyası kalmadı. Emülatör kapatıldı.
+- api33'te kurulu: 1.0.1 (AAB'den, upload anahtarı) ve fikstür verisi (beş
+  abonelik, ana para EUR, uygulama teması Light). `installDebug` öncesi
+  `adb uninstall` gerekir.
+- Fiziksel telefona dokunulmadı; `adb devices` yalnız emülatörü gösterdi.
+- AAB'nin, APK setinin ve ölçüm kayıtlarının kopyası oturumun geçici klasöründe:
+  `%LOCALAPPDATA%\Temp\claude\C--Users-cane7-Documents-GitHub-SubTrack\1931bf28-dd7e-4150-b1c9-b11330039d03\scratchpad\16n\`
+  (`subtrack-1.0.1-vc2.aab`, `subtrack-1.0.1.apks`, `before/`, `after/`, `jit/rec/`).
+
+**Değişen dosyalar**
+- `app/build.gradle.kts` — `versionCode 2`, `versionName "1.0.1"`
+- `docs/ARCHITECTURE.md` §16 — üst kenar kuralı (16m sapmasının kabulü)
+- `docs/TESTING.md` — "Yükseltme Testi (Her Yeni Sürümde)" bölümü
+- `docs/ROADMAP.md` — Faz 16'ya 1.0.1 satırı
+- `docs/PROGRESS.md` — bu kayıt; 16m'nin "Bilinen" maddesi karar cümlesiyle
+
+**Commit'ler**
+- `80f5c25` chore: bump version to 1.0.1 (versionCode 2) — **etiket buna**
+- (bu kayıt) docs: record the 1.0.1 release build and its upgrade test
+
+**Sonraki faz için not**
+- Yükseltme testinin eski tarafı bir sonraki sürümde 1.0.1 olacak.
+  `app/build/` her derlemede eziliyor; 1.0.1'in AAB'si ve APK seti yukarıdaki
+  geçici klasörde duruyor ama orası kalıcı bir yer değil.
+- Fiziksel telefonda 1.0.1 dahili test kanalından gelince aboneliklerin,
+  toplamın ve ayarların yerinde olduğu gözle kontrol edilmeli (Play imzalı →
+  Play imzalı güncelleme yalnız orada görülüyor).
+
+---
+
 ## [Faz 16m] Ekleme Sheet'inin Salınımı — Düzeltme — 2026-09-23
 
 **Durum:** Tamamlandı. `versionCode`/`versionName` değişmedi (sürüm ayrı turda).
@@ -187,12 +355,12 @@ farklı; 16j'deki tuzak).
 
 ### Bilinen, kabul edilen / bildirilenler
 
-- **Tek sıçramanın tepesi durum çubuğu bölgesine girebiliyor.** Karar metni
-  "üst kenar hiçbir durumda bölgeye girmeyecek" diyor; bu **dinlenmede**
-  sağlandı (klavye açık, tam boy dahil — hiçbir ölçümde girmedi). Hızlı bir
-  fiskede kütüphanenin tek sıçraması (en fazla ~73 dp, 0,4 sn içinde) üst
-  kenarı bir iki kare bölgeye taşıyabiliyor (api33 yazı 1.25 hızlı itişte tepe
-  karesinde üst kenar y=0). Artık boyu değiştirmediği için tekrar etmiyor.
+- **Tek sıçramanın tepesi durum çubuğu bölgesine girebiliyor — sapma 16n'de
+  kabul edildi.** Karar: dururken (klavye açıkken ve tam boyken dahil) sheet'in
+  üst kenarı durum çubuğu bölgesine girmez — hiçbir ölçümde girmedi. Hızlı bir
+  fiskedeki tek sıçrama (kütüphanenin; en fazla ~73 dp, 0,4 sn içinde) üst
+  kenarı bir iki kare bölgeye taşıyabilir (api33 yazı 1.25 hızlı itişte tepe
+  karesinde üst kenar y=0), ama sheet'in boyu değişmediği için tekrarlamaz.
   Sıçramanın kendisini engellemek fırlatmayı yutmayı (seçilmeyen 3. seçenek)
   gerektirir.
 - TESTING'deki klavye tablosunun sheet satırları Türkçe ölçülmüş (x

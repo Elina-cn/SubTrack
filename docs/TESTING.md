@@ -1643,6 +1643,123 @@ karşılaştırılarak doğrulanır.**
 
 ---
 
+## Yükseltme Testi (Her Yeni Sürümde)
+
+Faz 16n'de kuruldu, **her yeni `versionCode`'dan önce** tekrarlanır. Testçilerin
+telefonunda gerçek veri var ve Play yeni sürümü eskisinin **üzerine** kuruyor;
+temiz kurulumla atılan tur bunu hiç ölçmez. Şema değiştiyse migration'ın asıl
+sınavı da bu turdur (`ARCHITECTURE.md` "Şema sürümlemesi").
+
+### 1. Şema kontrolü
+
+```bash
+git diff <önceki-sürüm-etiketi> -- app/schemas
+```
+
+Boş olmalı. Doluysa ve şema `version`'ı artmamışsa **dur** (`CLAUDE.md` §6);
+arttıysa bu tur migration'ın testi olur.
+
+### 2. İki derleme — ikisi de upload anahtarıyla
+
+- **Eski:** önceki yayının release derlemesi. 16n'de 16m'nin ürettiği
+  `old-release.apk` kullanıldı: `v1.0` ile kodu aynı commit'ten (`65ea072`;
+  `git diff v1.0 65ea072 -- app gradle` boş) `assembleRelease`, `versionCode 1`.
+  Elde yoksa önceki sürümün etiketinden üretilir (bu yol 16n'de denenmedi).
+- **Yeni:** bu sürümün AAB'sinden `build-apks` ile üretilen set (yukarıdaki AAB
+  bölümü, adım 4).
+- **Play'den indirilen APK eski taraf olamaz.** Play App Signing onu Google'daki
+  uygulama imzalama anahtarıyla imzalıyor, yerel derleme upload anahtarını
+  taşıyor; imzalar tutmadığı için güncelleme `INSTALL_FAILED_UPDATE_INCOMPATIBLE`
+  ile reddedilir (16j'deki imza tuzağıyla aynı kural).
+
+```bash
+apksigner verify --print-certs old-release.apk | grep SHA-256   # fce85346…26da0
+aapt2 dump badging old-release.apk | head -1                    # versionCode='<eski>'
+```
+
+### 3. Eski sürümü temiz kur ve fikstürü gir
+
+Cihaz `subtrack_tester_api33`, başlangıç hâlinde (AVD tablosu).
+
+```bash
+adb uninstall com.elinacn.subtrack
+adb install old-release.apk
+```
+
+Fikstür **eski sürümün arayüzünden** girilir, en az:
+
+- üç abonelik, farklı para birimi ve periyotta; biri **USD ve tarihli**. Tarihli
+  kayıt bağlamsal bildirim iznini sorar → **Allow** (izin de taşınması gereken
+  bir durum);
+- ana para birimi değiştirilir, tema değiştirilir, bir kur değiştirilir (kur
+  ekranındaki "Last edited" satırı da karşılaştırmaya girer).
+
+16n fikstürü: Netflix ₺159,99 aylık; Spotify $10,99 aylık, 28.09.2026; Gym €450
+yıllık; iCloud £2,49 haftalık; ana para USD, tema Dark, 1 $ = 41,5 ₺.
+
+### 4. Güncellemeden önce kayıt
+
+Uygulama `am force-stop` ile kapatılıp yeniden açılır (veri diskten gelsin),
+sonra:
+
+- **beş ekranın** `uiautomator dump`'ı (text, content-desc, bounds) dosyaya:
+  ana ekran aylık ve yıllık, istatistik, ayarlar, kurlar; ana ekranın ekran
+  görüntüsü;
+- paket ve iş:
+
+```bash
+adb shell dumpsys package com.elinacn.subtrack | grep -E "versionCode|firstInstallTime|lastUpdateTime|userId=|POST_NOTIFICATIONS: granted"
+adb shell dumpsys jobscheduler | grep -A9 "JOB #.*subtrack"
+adb logcat -c
+adb shell am broadcast -a androidx.work.diagnostics.REQUEST_DIAGNOSTICS -p com.elinacn.subtrack
+adb logcat -d | grep WM-DiagnosticsWrkr
+```
+
+Release derlemesi debuggable olmadığı için `run-as` ile WorkManager veritabanı
+okunamaz; WorkManager'ın tanı yayını onun yerine geçiyor ve release'te de
+çalışıyor. Çıktıda `payment_reminder` satırı: iş kimliği ve `ENQUEUED`.
+
+### 5. Kaldırmadan güncelle
+
+```bash
+java -jar bundletool-all-1.18.3.jar install-apks --apks=subtrack.apks --device-id=<serial>
+adb shell pm path com.elinacn.subtrack
+adb shell dumpsys package com.elinacn.subtrack | grep -E "versionCode|versionName|firstInstallTime|lastUpdateTime|userId=|POST_NOTIFICATIONS: granted"
+```
+
+`install-apks` eski kurulumu kaldırmadan üzerine kuruyor. Beklenen: `base.apk` +
+`split_config.x86_64.apk`, yeni `versionCode`, **`firstInstallTime` ve `userId`
+değişmemiş**, `lastUpdateTime` yeni, bildirim izni hâlâ `granted=true`.
+`firstInstallTime` değiştiyse kurulum güncelleme değil temiz kurulum olmuştur —
+tur geçersiz.
+
+### 6. Aç ve karşılaştır
+
+Uygulamayı açmadan önce `dumpsys jobscheduler`'da iş duruyor olmalı. Sonra:
+
+- beş dump güncellemeden öncekilerle **birebir aynı** (`diff`); ana ekranın
+  ekran görüntüsü durum çubuğu (üst 128 px, saat) dışında piksel piksel aynı;
+- tanı yayını **aynı iş kimliğini** `ENQUEUED` gösteriyor;
+- `adb logcat -b crash -d` boş.
+
+Açılışta `WM-ForceStopRunnable: Application was force-stopped, rescheduling`
+görülür — **normal**: güncelleme süreci öldürüp alarmları siliyor, WorkManager
+bunu zorla durdurma sayıp işleri yeniden kuruyor. İş kimliği aynı kalıyor
+(`ExistingPeriodicWorkPolicy.KEEP`), JobScheduler kaydı tazeleniyor, hedef saat
+(ertesi 09:00) değişmiyor.
+
+**16n'de (v1.0 → 1.0.1, api33):** beş dump aynı, görüntü durum çubuğu altında
+aynı, `firstInstallTime` 10:53:25 ve `userId` 10175 korundu, izin korundu, iş
+`3a84cfc8…` iki tarafta `ENQUEUED`, çökme yok.
+
+**Bu turun ölçmediği:** eski taraf universal APK'ydı; testçilere giden v1.0
+AAB'den bölünmüş APK'lardı. Play imzalı → Play imzalı güncellemeyi yalnızca
+fiziksel telefon görüyor; ona Claude dokunmaz (`CLAUDE.md` §6). Kullanıcı dahili
+test kanalından güncelleme gelince aboneliklerin, toplamın ve ayarların yerinde
+olduğunu gözle kontrol eder.
+
+---
+
 ## Yedekle — Geri Yükle Turu (Auto Backup)
 
 Faz 16f'de kuruldu. Kural dosyaları `res/xml/backup_rules.xml` (API ≤30) ve

@@ -718,6 +718,12 @@ Aylık toplamın zaman içindeki anlık görüntüleri. `PROJECT_SPEC.md` §1'de
 - [x] Kapalı test — sürüm 1, tüm ülkeler, **yayında**: 22.09.2026'da
       incelemeye gönderildi, inceleme geçti, 23.09.2026'da Console'da
       görüldü (Faz 16k-1).
+- [ ] Sürüm 1.0.1 (`versionCode 2`) — ekleme sheet'inin salınım düzeltmesi
+      (16l teşhis, 16m düzeltme). AAB 16n'de üretildi ve doğrulandı: şema
+      `v1.0`'dan beri değişmedi, izin listesi aynı, v1.0'ın üzerine güncelleme
+      olarak kurulunca veri korundu (`TESTING.md` "Yükseltme Testi"). Kaynak
+      commit `80f5c25`. **Açık kalan:** kapalı test kanalına yükleme, dahili
+      teste kitaplıktan ekleme ve etiket — kullanıcıda.
 - [ ] Üretim erişimi ve yayın — 12 testçi 14 gün kesintisiz katılımda kalınca
       başvurulacak (Faz 16k).
 
