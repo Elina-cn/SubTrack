@@ -27,6 +27,264 @@ Her faz sonunda **en üste** yeni kayıt eklenir. Eski kayıtlar silinmez.
 
 ---
 
+## [Faz 16l] Testçi bildirimi — ekleme ekranında titreme (teşhis) — 2026-09-23
+
+**Durum:** Teşhis tamamlandı, düzeltme yapılmadı (versionCode 2 adayı, ayrı tur).
+Kod değişmedi; deneyler için yapılan geçici değişiklikler geri alındı, çalışma
+ağacında yalnızca bu kayıt var.
+
+### Bildirim (2026-09-23)
+
+**Testçi cihazı (düzeltmeyle netleşti):** Xiaomi Redmi Note 12 Pro 5G, Android 13,
+1080×2400, 120 Hz. Videolar 720×1600'e küçültülerek kaydedilmiş; öğe boylarından
+yoğunluk ~2,75 (440 dpi, tahmin) → ~393×873 dp. Koyu tema, Türkçe, hareket
+çubuğu. İlk turda yazılan "Android 13, 720×1600, ~90 Hz, ~360×800 dp" bilgisi
+geçersiz.
+
+**Birinci video (sohbette kare kare ölçüldü):** Sheet açık, form boş, klavye
+kapalı, sheet ekranı neredeyse dolduruyor. Sheet'in tamamı tek parça (başlık ile
+Kaydet aynı miktarda) video pikseliyle ~215 px (~110 dp) yukarı fırlıyor
+(~35 ms), yavaşlayarak iniyor (~170 ms); döngü ~215 ms, seride 6-7 kez, iki seri
+(~1,5 sn ve ~1,2 sn). Tepede sheet'in üst kenarı ve başlık durum çubuğunun
+arkasında. Form sheet içinde kaymıyor, gerilme izi yok.
+
+**İkinci video (dokunuşlar görünür) + testçinin anlatımı:** Tetikleyici formda
+tek kısa yukarı kaydırma (dokunuş ~130 ms). Parmak kalkınca sheet kendi kendine
+salınıyor, dokunulmadan ~3 sn sürüyor, genlik hiç azalmıyor; sonraki dokunuşta
+~40 ms içinde duruyor ve gerçek dinlenme konumuna dönüyor. Genlik ilk itişe
+bağlı: küçük itişte ~8 dp (döngü ~120 ms), büyükte ~32 dp (~170 ms), ilk
+videodaki ~110 dp (~215 ms). En alçak nokta bile dinlenme konumunun ~7 dp üstünde.
+İlk turdaki "-13 px'lik parmak" yorumu geçersiz: salınım parmak kalktıktan
+sonra sürüyor.
+
+**Kullanıcının telefonunda:** OPPO A15s, Android 10, 720×1600 @272 (~423×940 dp),
+60 Hz. Art arda hızlı itme ve tek kaydırma + 3 sn dokunmadan bekleme denendi:
+titreme yok.
+
+### Görev 0 — kaynak (material3 1.4.0, `material3-android-1.4.0-sources.jar`)
+
+- `ModalBottomSheet.kt:338` — Surface'e `consumeWindowInsets(WindowInsets(top =
+  sheetState.offset.toInt().coerceAtLeast(0)))`; `:362` içerik
+  `windowInsetsPadding(contentWindowInsets())`; `SheetDefaults.kt:400-402`
+  varsayılan `safeDrawing.only(Bottom + Top)`. Sonuç: sheet'in üst kenarı durum
+  çubuğu bölgesine girince içeriğe `durum çubuğu − ofset` kadar üst dolgu
+  eklenir, yani **sheet'in boyu kendi ofsetine bağlı olur.**
+- `ModalBottomSheet.kt:295-309` — çapalar ölçülen boydan: `Expanded at
+  max(0, fullHeight − sheetSize.height)`. Boy değişince çapa değişir.
+- `AnchoredDraggable.kt:557-575` — `anchoredDrag(targetValue)` bloğu
+  `restartable(inputs = { anchors to targetValue })` içinde; çapalar değişince
+  süren animasyon iptal edilip yeniden başlatılır.
+- `AnchoredDraggable.kt:672-690` — `animateTo(target, velocity)` bloğu
+  `animate(prev, targetOffset, velocity, spec)` çağırır; yeniden başlatmada da
+  **ilk çağrıdaki `velocity`** (parmağın bırakış hızı) kullanılır, o anki hız
+  değil. Yorum satırı aşımı bilerek serbest bırakıyor ("allow the overshoot").
+- `AnchoredDraggable.kt:421-435` — `settle(velocity)` → `animateTo(hedef, velocity)`.
+  `SheetDefaults.kt:488-491` — formun iç içe kaydırması `onPostFling`'de artan
+  hızı `settle`'a verir; `ModalBottomSheet.kt:327-333` — sheet'in kendi
+  `draggable`'ı da bırakışta `settle(v)` çağırır.
+- `AnchoredDraggable.kt:588-592` — sürükleme adımları `[minAnchor, maxAnchor]`
+  aralığına kırpılır; `ModalBottomSheet.kt:331` — animasyon sürerken
+  `startDragImmediately = true`.
+- `BottomSheetScaffold.kt:470-476` — `verticalScaleUp`: ofset çapanın üstüne
+  çıkınca Surface dikeyde büyütülür, altta boşluk görünmez.
+- `StandardMotionTokens.kt:20-21` — `DefaultSpatial` yayı ζ 0,9, k 700. Çapadan
+  yukarı hızla başlayan tek yay: tepe ≈ 0,0149 sn × hız, yükseliş ~39 ms.
+
+**Uygulama tarafı:** `AddSubscriptionSheet.kt:69-74` varsayılan
+`contentWindowInsets` ve jestlerle `ModalBottomSheet`; `:86-91` form
+`weight(1f, fill = false) + verticalScroll`, Kaydet dışarıda. `fill = false`
+sheet'i içerik boyunda tutar; dinlenmedeki üst kenar "ekran − içerik boyu"na
+düşer, yani ekran boyu, durum çubuğu ve yazı ölçeği üst kenarın durum çubuğuna
+ne kadar yakın duracağını belirler. `imePadding()` uygulamada değil, kütüphanenin
+kök kutusunda (`ModalBottomSheet.kt:186`). `HomeScreen.kt:79`
+`skipPartiallyExpanded = true` → yalnız Hidden ve Expanded çapaları var.
+
+### Yeniden üretme
+
+Release derlemesi (kod `v1.0` ile aynı), koyu tema, Türkçe. Ölçüm: ekran kaydı →
+kare kare Kaydet'in üst kenarı (içerik) ve sheet'in üst kenarı. Hareket: tek
+kısa yukarı kaydırma, parmak kalkar, 3 sn beklenir, tek dokunuş. İtişler dp
+cinsinden: küçük 47 dp/130 ms, orta 218 dp/130 ms, hızlı 440 dp/90 ms.
+**Pay** = dinlenmedeki sheet üst kenarı − durum çubuğu alt kenarı.
+
+**Düzeltmeden önceki ölçüm (ayrı tutuldu):** 360×800 dp'de (api34, yazılım GPU)
+art arda 6 fırlatma kaydı alındı; kayıt 17 fps çıktı ve takip seçili TRY çipine
+oturdu — geçersiz, kullanılmadı. O ekranda sheet zaten tam boydu (üst kenar 0).
+
+**Varsayılan yazı ölçeğinde belirti üretilemedi.** API 33, 393×873 dp'de pay
+118,5 dp; üç itiş de tek sıçrama (5 / 24 / 72 dp), ~250 ms'de dinlenme. Tek
+sıçramanın tepesi bırakış hızıyla birebir: 4 600 px/s → 68 px, 13 300 px/s →
+200 px (model 0,0149 × hız). Her döngünün hızlı yükselip yavaş inme biçimi bu yay.
+
+**Pay küçülünce üretildi.** Yazı ölçeğiyle sheet durum çubuğuna yaklaştırıldı
+(393×873 dp): 1.15 → pay 36 dp, 1.2 → 28 dp, 1.25 → 19,6 dp, 1.26 ve üstü →
+sheet tam boy (üst kenar 0). Pay 19,6 dp'de (api33/34):
+
+| Hareket | Sonuç |
+|---|---|
+| Formda küçük itiş | tek sıçrama 5 dp (pay aşılmadı) |
+| Formda orta itiş | **salınım**, 3 sn, dip 19-20 dp, tepe 31-54 dp; tepe-dip ~30 dp, döngü ~168 ms |
+| Formda hızlı itiş | **salınım**, 3 sn, dip 19-20 dp, tepe 115-139 dp; tepe-dip ~112 dp, döngü ~200 ms |
+| Tutamaktan itiş | **salınım**, tepe 44-51 dp, döngü ~167 ms |
+| Başlıktan itiş | **salınım**, tepe 53-63 dp, döngü ~167 ms |
+| Klavye açık, formda hızlı itiş | sheet tam boy; tek sıçrama 29 dp, salınım yok |
+| Kısa yavaş aşağı sürükleme (kontrol) | 13 dp iner, geri döner, salınım yok |
+| Tam boy sheet (yazı 1.26) | tek sıçrama, salınım yok |
+
+Videodaki değerlerle: orta itiş ~30 dp / 168 ms ↔ testçi ~32 dp / ~170 ms;
+hızlı itiş ~112 dp / ~200 ms ↔ ilk video ~110 dp / ~215 ms. Salınım dokunulmadan
+sürdü, genlik azalmadı; api36'da 5 sn'den uzun sürdü.
+
+### Dört durum (+ yazı ölçeği)
+
+Yazı 1.0 (istenen tablo):
+
+|  | ~393×873 dp (1080x2400, 440) | ~423×940 dp (720x1600, 272) |
+|---|---|---|
+| API 29 | yok — pay 165 dp; 3 / 17 / 64 dp tek sıçrama | yok — pay 233 dp; 4 / 24 / 59 dp |
+| API 33 | yok — pay 118,5 dp; 5 / 24 / 72 dp | yok — pay 183 dp; 5 / 25 / 73 dp |
+
+Yazı 1.25:
+
+|  | ~393×873 dp | ~423×940 dp |
+|---|---|---|
+| API 29 | **var** (hızlı): pay 36,7 dp, dip 32-35 dp, tepe ~90-126 dp, döngü ~167 ms; küçük/orta tek sıçrama | yok — pay 134 dp; en sert itiş (600 dp/90 ms) bile 95 dp tek sıçrama |
+| API 33 | **var** (orta, hızlı): pay 19,6 dp, dip 19-20 dp | yalnız en sert itişte **var**: pay 84 dp, dip 85 dp, tepe ~210 dp, döngü ~151 ms |
+
+api36 (393×873 dp): yazı 1.0 tek sıçrama; yazı 1.25'te **var** (pay 19,6 dp, en
+alçak 54 px = pay). Bu imajda `screenrecord` 3 kare yazdı, 14 ekran görüntüsüyle
+5,2 sn örneklendi.
+
+**İki değişken ayrıldı: ikisi de tek başına belirleyici değil.** Android 10,
+13, 14 ve 16 aynı davranıyor; gerilme ↔ parlama farkı rol oynamıyor (API 29'da
+da var, E2'de de var). Belirleyici olan **pay**: tek sıçrama payı aşarsa salınım
+başlar. Pay ekran boyuna, durum çubuğu boyuna (API 29'da 24 dp, bu emülatörlerde
+~46 dp) ve içerik boyuna (yazı ölçeği) bağlı. En sert fırlatma (8000 dp/s)
+~119 dp sıçratır; kullanıcının telefonuna denk ayarda pay 233 dp, yani orada
+hiçbir itiş belirtiyi üretemez. Salınımın dibi payın ta kendisi olduğu için
+(aşağıda) testçinin payı ~7 dp: orada ~470 dp/s'lik hafif bir fiske bile yeter.
+**Testçinin sheet'i neden durum çubuğuna bu kadar yakın, bilinmiyor** —
+393×873 dp'de varsayılan yazıyla pay 118 dp. Olası sebep MIUI'de büyük yazı
+veya ekran boyutu ayarı; doğrulanmadı. Videoda dinlenmedeki üst kenarın durum
+çubuğunun ~7 dp altında olması beklenir; testçiye yazı boyutu sorulabilir.
+
+60 ↔ 120 Hz: dört imajda 60 Hz'de üretildi, yani yenileme hızı şart değil.
+120 Hz denenmedi (emülatörde `-vsync-rate` var); ayrıntılar farklı olabilir.
+
+### Sebep
+
+Bileşen: material3 1.4.0 `ModalBottomSheet`; uygulamanın içerik boylu sheet'i
+tetik koşulunu (üst kenar durum çubuğuna yakın) hazırlıyor.
+
+1. Parmak kalkınca yukarı yöndeki bırakış hızı sheet'e ulaşır (formdan
+   `onPostFling`, tutamak/başlıktan sheet'in kendi sürüklemesi) → `settle(v)` →
+   çapadan yukarı hızla başlayan yay çapanın üstüne taşar (tek sıçrama).
+2. Üst kenar durum çubuğu bölgesine girince üst dolgu değişir → sheet'in boyu
+   değişir → Expanded çapası değişir → süren animasyon yeniden başlar ve yine
+   **ilk bırakış hızıyla** yukarı itilir.
+
+Geçici kayıt deneyiyle (E4) kare kare görüldü: bölgede ofset iki karede bir
+değişiyor (her yeniden başlatma bir kare yiyor), H 2346 ↔ 2331-2344 px arasında
+gidip geliyor, kararlı döngüde ofset +2…+16 px ile −79…−89 px arasında,
+150-167 ms'de bir, sönmeden.
+
+- **Neden sönmüyor:** Her döngüde üst kenar bölgeye geri girince çapa değişiyor
+  ve animasyon ilk bırakış hızıyla yeniden başlıyor; kaybedilen enerji her
+  seferinde yerine konuyor. Genliği bırakış hızı belirliyor — testçinin "genlik
+  itişe bağlı" gözlemi.
+- **Neden dokununca duruyor:** Animasyon sürerken sheet'in sürüklemesi dokunuşta
+  hemen başlıyor (`startDragImmediately`) ve animasyonu iptal ediyor; ilk
+  sürükleme adımı ofseti çapa aralığına kırpıyor, sheet tek karede yerine
+  oturuyor (E4: −30,8 → 54,0 px). Parmak kayarsa çapalar tazeleniyor, bırakınca
+  gerçek dinlenmeye dönüyor (E4: 54 → 108 → 184 → 182).
+- **Neden en alçak nokta dinlenmenin üstünde:** Üst kenar bölgedeyken eklenen
+  üst dolgu ofseti birebir telafi ediyor; içerik, üst kenarın bölge sınırına
+  değdiği seviyede sabitleniyor = dinlenme − pay. Yeniden itiş tam bölgeye giriş
+  karesinde olduğu için dip = pay. Dört payda ölçüldü: 19,6 → 19-20 dp,
+  36 → 36-37 dp, 36,7 → 32-35 dp, 84 → 85 dp.
+
+**Emülatörde testçiden farklı bir ayrıntı:** hareketsiz tek dokunuş (`input tap`)
+salınımı durduruyor ama sheet dip seviyesinde donup kalıyor: üst kenar durum
+çubuğu bölgesinde (54 px), içerik dinlenmenin 20 dp üstünde, animasyon yok;
+dakikalarca böyle kaldı, yeni dokunuşlar işe yaramadı (animasyon olmadığı için
+dokunuş sürüklemeyi başlatmıyor, küçük kayma dokunma eşiğinin altında). Gerçek
+bir sürükleme çözüyor. 54, üst kenar ekran dışındayken hesaplanmış çapa
+(2400 − 2346); 54'te boy 2292'ye iniyor ve çapa 108 olmalı, ama durum makinesi
+sürükleme olmadan buna geçmiyor — **tam sebebini belirleyemedim.** Testçinin
+"dokununca yerine dönüyor" gözlemi, dokunuşunda küçük bir kayma olmasıyla
+açıklanabilir; emin değilim.
+
+### Geçici deneyler (commit edilmedi, geri alındı)
+
+API 34, 393×873 dp, yazı 1.25 (pay 19,6 dp), orta ve hızlı itiş:
+
+| Deney | Sonuç |
+|---|---|
+| E1 `contentWindowInsets` yalnız alt (üst inset yok) | **salınım yok**; tek sıçrama 69 / 200 px, ~250 ms |
+| E2 `verticalScroll(…, overscrollEffect = null)` | salınım sürüyor (dip 19 dp) |
+| E3 formda `verticalScroll` yok | salınım sürüyor (itiş sheet'in kendi sürüklemesinden) |
+| E4 kare kare `logcat` kaydı | yukarıdaki mekanizma |
+
+### Düzeltme seçenekleri (uygulanmadı)
+
+1. **Sheet boyunun ofsete bağlılığını kaldırmak:** `contentWindowInsets`
+   yalnız alt; sheet'i durum çubuğundan ofsetten bağımsız bir sınırla uzak
+   tutmak (ör. sheet'e durum çubuğu kadar üst pay / en fazla boy). + Sebebe
+   gidiyor, E1 doğruladı, küçük değişiklik; donma durumunu da gidermesi beklenir
+   (doğrulanmadı). − Sheet tam boy olduğunda (klavye açık, büyük yazı, küçük
+   ekran) başlığın durum çubuğu altına girmemesi için yerine bir şey konmalı;
+   klavye tablosu (TESTING) ve API 24/29 edge-to-edge yeniden ölçülmeli.
+2. **Sheet'i her zaman tam boy yapmak** (`fill = true` / tam yükseklik). +
+   Tek değişiklik; tam boy durumda salınım ölçülmedi (yazı 1.26+, klavye açık).
+   − Uzun ekranlarda görünüm değişir (üstte boş alan); koddaki "içerik boylu
+   sheet" kararına ters.
+3. **Yukarı fırlatma hızını sheet'e ulaşmadan yutmak** (formda
+   `NestedScrollConnection`, `onPostFling`'de y < 0'ı tüketmek). + Yerleşim
+   değişmez. − Kısmi: tutamak ve kaydırma dışı alanlardan itiş yine sheet'in
+   kendi sürüklemesinden geçiyor, onlar da tetikliyor.
+4. **`sheetGesturesEnabled = false`.** + İki yol da kapanır. − Aşağı kaydırarak
+   kapatma kaybolur (scrim ve geri tuşu kalır); kullanıcı davranışı değişir.
+5. **Kütüphane güncellemesi / hata bildirimi.** Kök (yeniden başlatmada ilk
+   hızın kullanılması + ofsete bağlı inset) material3 1.4.0'da; yeni sürümde
+   düzelip düzelmediğine bakılmadı. − BOM değişikliği riski, belirsiz.
+
+Önerilen sıra 1, sonra 2; 3-4 yedek; 5'e paralel bakılabilir. Tek sıçramanın
+kendisi (en fazla ~119 dp, ~250 ms'de biter) kütüphanenin varsayılanı ve her
+cihazda var; bildirilen belirti değil. Düzeltme turu için güvenilir test
+hücresi: API 33, 393×873 dp, yazı 1.25, orta itiş.
+
+### Ortam
+
+- API 33 imajı indirildi (`system-images/android-33/google_apis_playstore/x86_64`
+  r09); yeni AVD `subtrack_tester_api33` (pixel_6, `hw.keyboard=yes`).
+  TESTING.md'ye eklenmedi.
+- `wm size`/`wm density` dört emülatörde `reset`lendi, yazı ölçeği 1.0'a döndü;
+  api29 dil (en-US) ve tema (açık) eski hâline, api36 tema ve uygulama dili
+  eski hâline alındı. api34'te `cmd uimode night yes` ve uygulama dili tr-TR
+  kaldı (başlangıç hâli kaydedilmemişti).
+- api29/api34/api36'da uygulama kaldırılıp upload anahtarıyla imzalı release
+  kuruldu (eski veriler silindi); sonraki `installDebug` öncesi `adb uninstall`
+  gerekir. api29/33/34'te `/sdcard/f16l.mp4` kaldı.
+- Ölçüm tuzakları (TESTING'e sonra eklenebilir): API 33'te 60-70 ms'lik, API 36'da 90 ms'lik
+  `input swipe` sheet'e hiç ulaşmadı; api36'da `screenrecord` kare yazmıyor;
+  `-gpu swiftshader_indirect` kayıtları ~17 fps, `-gpu host` ~20-55 fps.
+- Kayıtlar, kareler, izler ve E4 logu repoya girmedi; oturumun geçici
+  klasöründe: `%LOCALAPPDATA%\Temp\claude\C--Users-cane7-Documents-GitHub-SubTrack\6eab1e64-5df3-4d2e-bef2-8c4613aec6f3\scratchpad\f16l\`
+  (`rec/<hücre>/rec.mp4`, `frames/`, `trace.csv`; `e4_log.txt`; `api36_burst/`).
+
+**Değişen dosyalar**
+- `docs/PROGRESS.md` — bu kayıt
+
+**Commit'ler**
+- (bu kayıt) docs: diagnose the add sheet jitter reported in closed testing
+
+**Sonraki faz için not**
+- Düzeltme ayrı turda, seçenek sohbette seçildikten sonra (versionCode 2 adayı).
+- Testçiye yazı boyutu / ekran boyutu ayarı sorulabilir; videoda dinlenmedeki
+  üst kenarın durum çubuğuna ~7 dp mesafede olması beklenir.
+
+---
+
 ## [Faz 16k-1] Kapalı Test Yayında — 2026-09-23
 
 **Durum:** Tamamlandı. Yalnızca belge; kod değişmedi.
