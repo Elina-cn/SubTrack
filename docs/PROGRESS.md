@@ -27,6 +27,211 @@ Her faz sonunda **en üste** yeni kayıt eklenir. Eski kayıtlar silinmez.
 
 ---
 
+## [Faz 16m] Ekleme Sheet'inin Salınımı — Düzeltme — 2026-09-23
+
+**Durum:** Tamamlandı. `versionCode`/`versionName` değişmedi (sürüm ayrı turda).
+Karar sohbette verildi (16l'nin 1. seçeneği): sheet içerik boylu kalıyor, boyu
+konumundan bağımsız oluyor. Kod değişikliği yalnızca `AddSubscriptionSheet.kt`.
+
+### Görev 0 — temizlik
+
+- `/sdcard/f16l.mp4` api29, api33 ve api34'te vardı, üçünden de silindi (api36'da
+  yoktu). 16m'nin kendi kayıtları (`/sdcard/f16m.mp4`) her kayıttan sonra
+  silindi; tur sonunda dört cihazda da `/sdcard/*.mp4` yok.
+- api34: TESTING'de teması/dili yazılı değildi → diğerleri gibi **açık tema,
+  en-US**. `cmd uimode night no` (16l koyu bırakmıştı). 16l'nin bıraktığı
+  uygulama dili (tr-TR) okunamadı: oturum başında `get-app-locales` "Unknown
+  package" dedi ve `pm list packages` uygulamayı göstermedi, `dumpsys package`
+  ise kayıt gösterdi — açılıştan hemen sonraydı, sebebinden emin değilim.
+  Uygulama kaldırılıp düzeltilmiş release temiz kuruldu, yani uygulama dili
+  de silindi: şu an boş (cihaz dili en-US).
+- api33'ü de 16l koyu tema + tr-TR'de bırakmıştı ve başlangıç hâli yazılı
+  değildi. Tur sonunda açık tema, en-US (uygulama dili boş), yazı 1.0, `wm`
+  sıfır yapıldı ve bu, TESTING'e başlangıç hâli olarak yazıldı.
+
+### Görev 1 — düzeltme
+
+`ModalBottomSheet`'in varsayılan inset'i (`BottomSheetDefaults.windowInsets` =
+`safeDrawing.only(Bottom + Top)`) ikiye bölündü:
+
+- `contentWindowInsets = { BottomSheetDefaults.windowInsets.only(Bottom) }` —
+  **alt ve klavye payları korunuyor:** gezinme çubuğu payı içerikte kalıyor,
+  klavyeyi hâlâ kütüphanenin kök kutusundaki `imePadding()` alıyor
+  (`ModalBottomSheet.kt:186`), içerikteki alt pay klavye açıkken yine sıfıra
+  iniyor. Klavye tablosu bunu doğruluyor (aşağıda).
+- `modifier = modifier.windowInsetsPadding(BottomSheetDefaults.windowInsets.only(Top))`
+  — **üst sınır:** uygulamanın `modifier`'ı Surface zincirinin başında,
+  `draggableAnchors`'tan önce (`ModalBottomSheet.kt:278` → `:295`); o düğüm
+  çapaları kendisine gelen kısıttan hesaplıyor (`AnchoredDraggable.kt:837`,
+  `fullHeight = constraints.maxHeight`). Durum çubuğu payı böylece içeriğe
+  dolgu olmuyor, sheet'in alabileceği en fazla boyu küçültüyor.
+  **Durum çubuğu payı** sheet'in kendi dialog penceresinin `safeDrawing` üst
+  payından geliyor (durum çubuğu; kesik daha derinse o), yani pencereden —
+  ofsetten değil.
+
+Neden bu biçim: salınımın kökü, üst payın içerikte ve ofsete bağlı olması
+(`:338` `consumeWindowInsets(top = offset)` + `:362` `windowInsetsPadding`).
+Üst pay dışarı alınınca içerikte üst inset kalmıyor, boy ve Expanded çapası
+her ofsette aynı; `:338` artık hiçbir şeyi değiştirmiyor. E1 deneyinin
+(yalnız alt inset) eksiği — tam boyda başlığın durum çubuğunun arkasına girmesi — dıştaki
+pay ile kapandı. Yeni bağımlılık, kütüphane güncellemesi, `Dimens` değeri yok;
+ortak form bileşenlerine dokunmak gerekmedi.
+
+### Görev 2 — salınım doğrulaması
+
+Release derlemesi (upload anahtarıyla imzalı), koyu tema, Türkçe, 393×873 dp
+(`wm density 440`; API 29'da ayrıca `wm size 1080x2400`). Hareket 16l'deki:
+tek kısa yukarı kaydırma (orta 218 dp/130 ms, hızlı 440 dp/90 ms), parmak
+kalkar, 3 sn beklenir, tek dokunuş. Ölçüm 16l'nin betikleriyle: ekran kaydı →
+kare kare Kaydet'in ve sheet'in üst kenarı. Emülatörler `-gpu host`.
+
+**Ortamın hatayı hâlâ ürettiği aynı oturumda gösterildi:** 16m öncesi derleme
+(HEAD'den ayrıca derlendi) api33 yazı 1.25'e kuruldu — orta itiş 3 sn salınım,
+dip 19-20 dp, tepe 48-53 dp, döngü ~152 ms; hızlı itiş 3 sn, tepe 116-125 dp,
+döngü ~200 ms; ikisinde de dokunuştan sonra sheet donup kaldı (üst kenar 54,
+Kaydet 2046 = dinlenmenin 20 dp üstü). 16l'nin ölçümüyle aynı.
+
+| Hücre | Pay | 16l (önce) | 16m (sonra) |
+|---|---|---|---|
+| api33, yazı 1.25 — orta | 19,6 dp | **salınım** 3 sn, dip 19-20 dp, tepe 31-54 dp, döngü ~168 ms | tek sıçrama 25 dp, 0,22 sn'de dinlenme |
+| api33, yazı 1.25 — hızlı | 19,6 dp | **salınım** 3 sn, dip 19-20 dp, tepe 115-139 dp, döngü ~200 ms | tek sıçrama 72 dp, 0,23 sn |
+| API 29, yazı 1.25 — orta | 36,7 dp | tek sıçrama | tek sıçrama 22 dp, 0,4 sn içinde |
+| API 29, yazı 1.25 — hızlı | 36,7 dp | **salınım**, dip 32-35 dp, tepe ~90-126 dp, döngü ~167 ms | tek sıçrama 52 dp, 0,2 sn içinde |
+| api36, yazı 1.25 — orta | 19,6 dp | **salınım**, 5 sn'den uzun (16l itişleri ayrı yazmadı) | tek sıçrama 25 dp, 0,23 sn |
+| api36, yazı 1.25 — hızlı | 19,6 dp | aynı satır | tek sıçrama 73 dp, 0,22 sn |
+
+Süre: kayıtta sheet'in ilk yer değiştirdiği kareden dinlenmeye döndüğü kareye;
+kareler 25-50 ms arayla. API 29 kayıtlarında Kaydet'in kenarı sıçramadan sonra
+bir iki karede dinlenmenin 3-9 px **altında** okunuyor, sonra dinlenmeye
+oturuyor; üst kenar aynı karelerde yalnız 1-5 px oynuyor. Salınım değil —
+tek seferlik ve sönüyor; sebebine bakılmadı (API 29'un kenar parlaması olabilir,
+emin değilim). 16l'nin api36 satırı hangi itişe ait ayrı yazılmamıştı;
+16l orada ekran görüntüsü dizisiyle ölçmüştü. İstenmeyen küçük itiş de koşuldu:
+api33'te kayıtta sheet kıpırdamadı, API 29'da 2 dp.
+
+**Hareketsiz tek dokunuş:** 16l'deki "20 dp yukarıda donma" yok. Her itişin
+sonundaki dokunuştan sonra ekran görüntüsüyle bakıldı; 16m'nin 19 itişinin
+(bu bölümdeki bütün hücreler) hepsinde sheet dinlenmedeydi. Ayrıca api33'te
+sıçrama **sürerken** dokunuldu (fiskeden 0,05 / 0,1 / 0,15 sn sonra, `input
+tap`): 0,1 ve 0,15 sn'de sheet tepede yakalandı, bir iki kare orada durdu ve
+ilk yer değiştirmeden 0,11 / 0,26 sn sonra dinlenmedeydi; 0,05 sn'de dokunuş
+sıçrama ekrana çıkmadan animasyonu iptal etti. 3 sn sonra üçünde de
+dinlenmede (182 / 2101). Beş ek koşuda (hızlı ve orta + hemen dokunuş) da aynı.
+
+**Sheet ekranı doldurduğunda:**
+
+| Hücre | Önce | Sonra |
+|---|---|---|
+| api33, yazı 1.3 | (aynı oturumda 16m öncesi derleme) üst kenar **0** — durum çubuğunun arkası; orta 22 dp, hızlı 72 dp tek sıçrama | üst kenar **128** = durum çubuğunun alt kenarı; orta 25 dp tek sıçrama, hızlı fiskeyi form kaydırmayla aldı; form kayıyor, Kaydet y=2099'da görünür |
+| api34, yazı 1.26 (16l) | tek sıçrama, salınım yok | — |
+| api36, yazı 1.3 | — | üst kenar 128; orta 24 dp, hızlı 73 dp tek sıçrama |
+| API 29, yazı 1.4 | — | pay **7,3 dp** (16l'nin testçi için tahmin ettiği pay); orta 23 dp, hızlı 69 dp tek sıçrama |
+| API 29, yazı 1.5 | — | tam boy, üst kenar 66 = durum çubuğu; hızlı 64 dp tek sıçrama |
+
+API 29 yazı 1.3'te sheet henüz tam boy değil (pay 27,3 dp; durum çubuğu 24 dp):
+orta 21 dp, hızlı 68 dp tek sıçrama.
+
+### Görev 3 — gerileme
+
+**§16 klavye tablosu, sheet satırları** (release, en-US, açık tema, yazı 1.0,
+`Save` düğümü) — üçü de değişmedi:
+
+| Cihaz | Klavye kapalı | Klavye açık (fiskesiz) | Klavye üst kenarı |
+|---|---|---|---|
+| API 29 | `[329,1132][391,1172]` | `[329,630][391,670]` | 784 (yeniden okunmadı; klavye pikseli iki derlemede aynı) |
+| API 34 | `[500,2143][580,2196]` | `[500,1323][580,1376]` | 1517 (`ime` frame `[0,1517][1080,2400]`) |
+| API 36 | `[500,2143][580,2196]` | `[500,1323][580,1376]` | 1517 (aynı) |
+
+API 29 ve 34'te 16m öncesi derleme de aynı cihazda ölçüldü: dört koordinatın
+dördü aynı. Değişen yalnızca üst kenar: API 29 klavye kapalı/açık 0 → 48
+(360dp'de sheet zaten tam boy), API 34 klavye açık 0 → 128, klavye kapalı 390 →
+390; API 36 sonrası 390 / 128.
+
+**Kapatma yolları** (sheet penceresinin kaybolmasıyla ölçüldü):
+
+| Yol | api33 yazı 1.25 | api33 yazı 1.3 | API 29 | API 34 | API 36 |
+|---|---|---|---|---|---|
+| Tutamaktan aşağı kaydırma | kapanıyor | kapanıyor | kapanıyor | kapanıyor | kapanıyor |
+| Formdan aşağı kaydırma | — | kapanıyor | kapanıyor | kapanıyor | — |
+| Geri tuşu | kapanıyor | kapanıyor | kapanıyor | kapanıyor | kapanıyor |
+| Geri jesti (kenardan) | — | — | — | kapanıyor | — |
+| Scrim'e dokunma | kapanıyor (y=155) | scrim yalnız durum çubuğu şeridi | — | kapanıyor (y=250) | kapanıyor (y=250) |
+| Durum çubuğu şeridine dokunma | **kapanmıyor** | **kapanmıyor** | **kapanmıyor** | — | — |
+
+Durum çubuğu şeridine dokunuş sistem çubuğunun penceresine gidiyor; api33'te
+16m öncesi derlemede de **kapanmadığı** ölçüldü (aynı yerde scrim'e y=155
+dokunuş kapattı). Yani fark yok; tam boy sheet'te kapatma aşağı kaydırma ve
+geri ile.
+
+**Tema ve durum çubuğu** (`docs/screenshots/phase-16m/`): açık ve koyu temada
+üst kenar tam durum çubuğunun alt kenarında — api33 yazı 1.3 (koyu, açık,
+koyu kaydırılmış), api34 klavye açık (açık, koyu), API 29 360dp (açık) ve
+393×873 yazı 1.5 (koyu), api36 yazı 1.3 (koyu), api36 klavye açık (açık). İki
+temada da durum çubuğunun arkasında scrim, ikonlar okunuyor (açıkta koyu,
+koyuda beyaz), sheet ile çubuk arasında boşluk ya da çakışma yok. 16m öncesi üç
+karşılaştırma görüntüsü (`*-before.png`): api33 yazı 1.3, api34 klavye açık,
+API 29 360dp — üçünde sheet'in yüzeyi durum çubuğunun arkasında.
+
+**Otomatik testler ve derleme:**
+
+| Koşu | Sonuç |
+|---|---|
+| `assembleDebug` + `assembleRelease` | Kotlin görevleri koştu (UP-TO-DATE değil), yeni uyarı yok |
+| `testDebugUnitTest` | **330 test, 0 hata, 0 atlanan** |
+| `connectedDebugAndroidTest` (`subtrack_wide_api34`) | **19 test, 0 hata, 1 atlanan** (bilinen) |
+| `installDebug` + `am instrument` | **OK (19 tests)** |
+| `lintDebug` | **0 hata, 21 uyarı** — 16j ile aynı; sheet dosyasında uyarı yok |
+
+`connectedDebugAndroidTest` öncesi api34'teki release kurulumu kaldırıldı (imza
+farklı; 16j'deki tuzak).
+
+### Bilinen, kabul edilen / bildirilenler
+
+- **Tek sıçramanın tepesi durum çubuğu bölgesine girebiliyor.** Karar metni
+  "üst kenar hiçbir durumda bölgeye girmeyecek" diyor; bu **dinlenmede**
+  sağlandı (klavye açık, tam boy dahil — hiçbir ölçümde girmedi). Hızlı bir
+  fiskede kütüphanenin tek sıçraması (en fazla ~73 dp, 0,4 sn içinde) üst
+  kenarı bir iki kare bölgeye taşıyabiliyor (api33 yazı 1.25 hızlı itişte tepe
+  karesinde üst kenar y=0). Artık boyu değiştirmediği için tekrar etmiyor.
+  Sıçramanın kendisini engellemek fırlatmayı yutmayı (seçilmeyen 3. seçenek)
+  gerektirir.
+- TESTING'deki klavye tablosunun sheet satırları Türkçe ölçülmüş (x
+  `[316..404]`, `[483..597]`), ARCHITECTURE'daki İngilizce (`[329..391]`,
+  `[500..580]`); y'ler aynı. Değiştirilmedi.
+
+### Ortam
+
+- Emülatörler tek tek çalıştırıldı (makinede 8 GB bellek). Tur sonunda dördünde
+  `wm size`/`wm density` sıfır, yazı 1.0, `show_ime_with_hard_keyboard 0`;
+  api29 dil en-US ve açık tema (Ayarlar arayüzünden geri alındı), api33 açık +
+  en-US, api34 açık + en-US, api36 açık + uygulama dili tr-TR (başlangıçtaki
+  gibi).
+- Kurulu derlemeler: api29, api33, api36'da 16m'nin release'i (upload anahtarı);
+  api34'te debug + test APK'sı. Release kurulu cihazlarda `installDebug`
+  öncesi `adb uninstall` gerekir.
+- Kayıtlar, kareler ve izler repoya girmedi; oturumun geçici klasöründe:
+  `%LOCALAPPDATA%\Temp\claude\C--Users-cane7-Documents-GitHub-SubTrack\b9a514d8-5fca-4486-9f10-586676cb18fd\scratchpad\f16m\`
+  (`rec/<A|B>_<hücre>_<itiş>/`, `shots/`; `A` = 16m, `B` = 16m öncesi).
+
+**Değişen dosyalar**
+- `app/src/main/java/com/elinacn/subtrack/ui/home/components/AddSubscriptionSheet.kt` — üst inset sheet'in dışına, alt inset içerikte
+- `docs/ARCHITECTURE.md` §16 — sheet satırlarının yeniden ölçümü, üst kenar tablosu, "ekleme sheet'inin boyu konumundan bağımsız" kararı
+- `docs/TESTING.md` — `subtrack_tester_api33` AVD'si ve oluşturma komutu; #118-#119; "Ekleme sheet'i salınım gerileme testi" bölümü
+- `docs/screenshots/phase-16m/` — 15 görüntü
+- `docs/PROGRESS.md` — bu kayıt
+
+**Commit'ler**
+- `372d75a` fix: keep the add sheet's height independent of its position
+- (bu kayıt) docs: record the add sheet jitter fix and its regression test
+
+**Sonraki faz için not**
+- Sürüm turu (`versionCode 2`): bu düzeltme AAB'ye girmeli; fiziksel telefon
+  yalnızca dahili test kanalından güncellenir.
+- Testçiden düzeltilmiş sürümde aynı hareketi denemesi istenebilir; 16l'nin
+  yazı boyutu sorusu hâlâ açık.
+
+---
+
 ## [Faz 16l] Testçi bildirimi — ekleme ekranında titreme (teşhis) — 2026-09-23
 
 **Durum:** Teşhis tamamlandı, düzeltme yapılmadı (versionCode 2 adayı, ayrı tur).

@@ -170,6 +170,8 @@ etmeden bildirin; sonraki maddeler zaten bozuk bir durumun üstüne binebilir.
 | 115 | Dashboard, kart, istatistik, trend, karşılaştırma ve kur ekranı | **Hiçbirinde ISO kodu yok** — hepsi ₺ $ € £. Bildirim zaten tutar taşımıyor | 14b |
 | 116 | Cihaz dilini İngilizceye al | Hâlâ sembol; sayı biçimi locale'e göre değişiyor ("₺3,060.43" ↔ "3.060,43 ₺") | 14b |
 | 117 | (API 29) ₺ karakteri | **Çiziliyor**, tofu kutusu değil — dashboard'daki en büyük punto dahil | 14b |
+| 118 | (`subtrack_tester_api33` hücresi — "Ekleme sheet'i salınım gerileme testi") Formda tek kısa yukarı kaydırma, orta ve hızlı; parmağı kaldır, 3 sn bekle, tek dokunuş | **Tek sıçrama**, ~0,25 sn'de dinleniyor; tekrar eden döngü **yok**. Dokunuştan sonra sheet dinlenme konumunda, yukarıda donmuyor | 16m |
+| 119 | Sheet'i ekranı dolduracak kadar uzat: klavye açık, 360dp ekran veya büyük yazı | Üst kenar durum çubuğunun **altında**, arkasında değil; form kayıyor, Kaydet görünür; aşağı kaydırma ve geri tuşu kapatıyor | 16m |
 
 **96-105 için not:** düzenleme maddeleri ekleme sheet'iyle **aynı** bileşenlerden
 kurulu bir formu sınıyor. #102 bilerek ikisini karşılaştırıyor: mesajlar
@@ -330,6 +332,7 @@ yapılır.
 | `subtrack_wide_api34` | 1080x2400 | 420 dpi | 411dp | 34 | Güncel Android davranışları, koyu tema, dynamic color |
 | `subtrack_edge_api36` | 1080x2400 | 420 dpi | 411dp | 36 | **Zorunlu edge-to-edge.** targetSdk 36 + Android 16; gezinme modu GESTURAL (Faz 16-0) |
 | `subtrack_store_api34` | 1080x**1920** | 420 dpi | 411dp | 34 | **Yalnızca mağaza çekimi** (Faz 16e-2). Play en fazla 2:1 kabul ediyor; 1080x2400 = 2,22:1 reddedilir. Ölçüm turlarında kullanılmaz |
+| `subtrack_tester_api33` | 1080x2400 | 420 dpi (ölçümde `wm density 440`) | 411dp (ölçümde **~393dp**) | 33 | **Kapalı test bildiriminin cihazı** (Faz 16l): testçinin Android 13'lü, ~393×873 dp telefonu. Ekleme sheet'i salınım gerileme testi (#118, aşağıda). Gezinme gestural. Başlangıç hâli: açık tema, en-US (uygulama dili boş), yazı 1.0, `wm` sıfır |
 
 360dp keyfi değil: Compose bileşenlerinin sığıp sığmadığı bu eşiğe göre
 hesaplanıyor, ve yaygın bütçe telefonlarının genişliği bu. Fiziksel cihaz
@@ -366,6 +369,9 @@ avdmanager create avd -n subtrack_wide_api34 -k "system-images;android-34;google
 # Faz 16-0'da eklenenler
 avdmanager create avd -n subtrack_edge_api36 -k "system-images;android-36.1;google_apis_playstore;x86_64" -d pixel_6
 avdmanager create avd -n subtrack_min_api24  -k "system-images;android-24;google_apis;x86_64" -d "Nexus 5"
+
+# Faz 16l'de eklenen (imaj: android sdk install "system-images/android-33/google_apis_playstore/x86_64")
+avdmanager create avd -n subtrack_tester_api33 -k "system-images;android-33;google_apis_playstore;x86_64" -d pixel_6 --abi x86_64
 ```
 
 **API 24 imajı `google_apis`, `google_apis_playstore` değil.** O aralıkta Play
@@ -612,6 +618,96 @@ chip'leri ve tarih alanı açılışta ekranın altında kalıyor**; ikisine de
 ulaşmak için form kaydırılmalı. Ürün açısından sorun değil — form zaten
 kaydırılabilir ve iki alan da opsiyonel — ama otomatik testte "düğüm yok"
 hatası olarak çıkar. Ölçüm yaparken önce kaydır.
+
+### Ekleme sheet'i salınım gerileme testi (#118, Faz 16m)
+
+16l'de teşhis edilip 16m'de düzeltilen hata: sheet'in üst kenarı durum
+çubuğuna yakın dururken formdan tek bir yukarı fiske sheet'i sönmeyen bir
+salınıma sokuyordu (mekanizma `ARCHITECTURE.md` §16, "ekleme sheet'inin boyu
+konumundan bağımsız"). **Varsayılan ayarlarla hiçbir emülatörde görülmez:**
+belirleyici olan pay (dinlenmedeki üst kenar − durum çubuğunun alt kenarı) ve
+varsayılan yazıda pay 118 dp'den büyük; en sert fiske ~119 dp sıçratıyor. Hücre
+payı küçültmek için kurulur.
+
+**Hücre** — `subtrack_tester_api33`, **release** derlemesi, koyu tema, Türkçe,
+~393×873 dp, yazı 1.25 (pay 19,6 dp):
+
+```bash
+emulator -avd subtrack_tester_api33 -no-snapshot-save -no-boot-anim -gpu host
+adb shell cmd uimode night yes
+adb shell cmd locale set-app-locales com.elinacn.subtrack --locales tr-TR
+adb shell wm density 440
+adb shell settings put system font_scale 1.25
+```
+
+Sheet açıkken beklenen dinlenme: sheet'in üst kenarı y=**182**, Kaydet
+düğmesinin üst kenarı y=**2101**, durum çubuğu 128 px.
+
+**Hareket** — formun sağ yarısından (x=899, çiplerin dışında), Kaydet'in
+~150 dp üstünden (y=1688) tek kısa yukarı kaydırma; parmak kalkar, 3 sn
+beklenir, tek dokunuş:
+
+```bash
+adb shell "input swipe 899 1688 899 1088 130; sleep 3; input tap 899 1688"   # orta: 218 dp / 130 ms
+adb shell "input swipe 899 1688 899 478 90; sleep 3; input tap 899 1688"     # hızlı: 440 dp / 90 ms
+```
+
+**Beklenen** (16m'de ölçülen; 16m öncesi derleme aynı hücrede aynı oturumda):
+
+| | 16m öncesi — hata | 16m sonrası — doğru |
+|---|---|---|
+| Orta | 3 sn salınım, dip 19-20 dp, tepe 48-53 dp, döngü ~150 ms | tek sıçrama ~25 dp, ~0,25 sn'de dinlenme |
+| Hızlı | 3 sn salınım, dip 19-20 dp, tepe 116-125 dp, döngü ~200 ms | tek sıçrama ~72 dp, ~0,25 sn'de dinlenme |
+| Dokunuştan sonra | dinlenmenin **20 dp üstünde donuyor** (üst kenar 54, Kaydet 2046) | dinlenmede (182 / 2101) |
+
+Tek sıçramanın kendisi hata değil: kütüphanenin varsayılan yayı, tepesi bırakış
+hızıyla orantılı. Hata sıçramanın **tekrar etmesi**. Gözle ayırt edilir — bozuk
+hâlde sheet parmak kalktıktan sonra 3 sn boyunca aynı genlikle zıplıyordu.
+
+**Tam boy hâli (#119):** aynı hücrede `font_scale 1.3`. Sheet ekranı
+dolduruyor: üst kenar y=**128** (16m öncesi 0 — durum çubuğunun arkası), form
+kayıyor, Kaydet y=2099'da sabit ve görünür, orta itiş tek sıçrama.
+
+**Aynı hücre diğer imajlarda** (16m'de koşuldu; api33 dahil üçünde de salınım yok):
+
+| İmaj | Kurulum | Pay | Durum çubuğu |
+|---|---|---|---|
+| `subtrack_narrow_api29` | `wm size 1080x2400` + `wm density 440`, yazı 1.25; dil ve koyu tema Ayarlar arayüzünden | 36,7 dp | 66 px |
+| `subtrack_edge_api36` | `wm density 440`, yazı 1.25 | 19,6 dp | 128 px |
+
+API 29'da yazı 1.4 payı **7,3 dp**'ye indiriyor — 16l'nin testçi için tahmin
+ettiği pay; 1.5'te sheet tam boy (üst kenar 66).
+
+**Sayıyla ölçmek gerekirse:** `screenrecord` + kare kare Kaydet düğmesinin üst
+kenarı (koyu temada `primaryContainer` `#14523A`, x = 109 dp) ve sheet'in üst
+kenarı (`surface` `#1F3D2D`, ekranın ortası). Tuzaklar:
+
+- **Emülatör `-gpu host` ile başlatılır.** `swiftshader_indirect` kayıtları
+  ~17 fps; ~150-200 ms'lik döngü yarım örnekleniyor.
+- **API 33'te 60-70 ms'lik `input swipe` sheet'e hiç ulaşmıyor**; 90 ms en kısa
+  çalışan. API 36'da 90 ms 16l'de ulaşmamıştı, 16m'de (`-gpu host`) ulaştı —
+  sıçrama görülmezse önce kaydırmanın ulaştığından emin olunur.
+- `screenrecord` yalnızca ekran değiştiğinde kare yazar. Tek kare "hiçbir şey
+  kıpırdamadı" demektir.
+- **Kaydırmanın hemen ardından gelen `input tap`** (araya `sleep` konmadan) API
+  33'te sıçrama ekrana çıkmadan iner ve animasyonu iptal eder — kayıt tek kare
+  verir. Sıçrama sırasında dokunmak için araya `sleep 0.1` konur.
+- API 36'da 16l'de `screenrecord` 3 kare yazmıştı; 16m'de `-gpu host` ile
+  17-24 kare yazdı.
+
+**Geri alma** — tur bitince, cihaz başlangıç hâline:
+
+```bash
+adb shell wm density reset
+adb shell wm size reset
+adb shell settings put system font_scale 1.0
+adb shell cmd uimode night no
+adb shell cmd locale set-app-locales com.elinacn.subtrack --locales ""
+```
+
+`subtrack_edge_api36`'nın başlangıçtaki uygulama dili `tr-TR`'dir, orada boş
+değil `tr-TR` geri yazılır. API 29'da son iki komut yok: dil ve tema Ayarlar
+arayüzünden geri alınır ("Cihaz dili", "Koyu tema").
 
 ### Bildirim izni durumunu adb ile kurma ve okuma
 

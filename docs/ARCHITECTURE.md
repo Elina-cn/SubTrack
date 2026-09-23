@@ -969,6 +969,19 @@ pikseline aynı kaldı.
 | Ekleme sheet'i | API 34 | `[500,2143][580,2196]` | `[500,1323][580,1376]` (fiskesiz) | 1517 |
 | Ekleme sheet'i | API 36 | `[500,2143][580,2196]` | `[500,1323][580,1376]` (fiskesiz) | 1517 |
 
+**Ekleme sheet'i satırları Faz 16m'de yeniden ölçüldü ve değişmedi.** Release
+derlemesi, en-US, açık tema, yazı 1.0, uygulamanın kendi `Save` metin düğümü;
+üç cihazda da iki sütun yukarıdakiyle piksel piksel aynı. API 34/36'da klavye
+üst kenarı `ime` inset'inden yeniden okundu (`[0,1517][1080,2400]`); API 29'da
+kenar yeniden okunmadı ama klavye piksel olarak iki derlemede aynı yerde
+başlıyor. Değişen tek şey sheet'in üst kenarı (aşağıdaki karar):
+
+| Cihaz | Durum çubuğu | Üst kenar, klavye kapalı | Üst kenar, klavye açık |
+|---|---|---|---|
+| API 29 | 48 px | 0 → **48** (360dp'de sheet zaten tam boy) | 0 → **48** |
+| API 34 | 128 px | 390 → 390 | 0 → **128** |
+| API 36 | 128 px | 390 (16m öncesi ölçülmedi) | **128** (16m öncesi ölçülmedi) |
+
 ### Sheet'lerin neden etkilenmediği
 
 `ModalBottomSheet` içeriğini `Box(Modifier.fillMaxSize().imePadding())` içine
@@ -981,6 +994,82 @@ işi tam olarak o eksiği kapatmaktı.
 Sheet 16a'da **dokunulmadı** ve ölçümle de değişmediği gösterildi: aynı
 cihazda 16a öncesi ve sonrası derlemelerde API 29 koordinatları
 `[329,1132][391,1172]` (kapalı) ve `[329,630][391,670]` (açık) — birebir aynı.
+
+### Mimari karar: ekleme sheet'inin boyu konumundan bağımsız (Faz 16m)
+
+**Karar.** Ekleme sheet'i içerik boylu kalıyor (`weight(1f, fill = false)`),
+ama boyu artık sheet'in nerede durduğuna bağlı değil. Kütüphanenin varsayılan
+inset'i (`BottomSheetDefaults.windowInsets` = `safeDrawing.only(Bottom + Top)`)
+`AddSubscriptionSheet`'te ikiye bölündü:
+
+- **Alt yarı içeride kaldı:** `contentWindowInsets = {
+  BottomSheetDefaults.windowInsets.only(Bottom) }`. Gezinme çubuğu payı ve
+  klavye davranışı aynı: klavyeyi hâlâ kütüphanenin kök kutusundaki
+  `imePadding()` alıyor, içerikteki alt pay klavye açıkken sıfıra iniyor
+  (`safeDrawing` alt − tüketilmiş `ime`). Yukarıdaki tablo bunu ölçüyor.
+- **Üst yarı dışarı çıktı:** `modifier = modifier.windowInsetsPadding(
+  BottomSheetDefaults.windowInsets.only(Top))`. Bu modifier kütüphanenin
+  Surface zincirinde `draggableAnchors`'tan **önce** geliyor
+  (`ModalBottomSheet.kt:278` → `:295`) ve o düğüm çapaları kendisine gelen
+  kısıttan hesaplıyor (`AnchoredDraggable.kt:837`). Yani durum çubuğu payı
+  sheet'in içeriğine dolgu eklemiyor, sheet'in **alabileceği en fazla boyu**
+  küçültüyor. Değer sheet'in kendi penceresinin `safeDrawing` üst payından
+  geliyor (durum çubuğu; kesik daha derinse o) — ofsetten değil, her konumda aynı.
+
+Sonuç: sheet'in en fazla boyu `pencere − klavye − durum çubuğu`. İçerik bundan
+kısaysa sheet içerik boyunda ve eskisiyle aynı yerde duruyor; uzunsa üst kenar
+durum çubuğunun alt kenarında duruyor, form kayıyor, Kaydet sabit (9b-1).
+Düzeltme yalnızca sheet sarmalayıcısında; ortak form bileşenlerine (§22)
+dokunulmadı.
+
+**Neden gerekti — 16l'nin mekanizması.** material3 1.4.0 sheet'in Surface'ine
+`consumeWindowInsets(WindowInsets(top = offset))` uyguluyor, içerik
+`windowInsetsPadding(contentWindowInsets())` alıyor (`ModalBottomSheet.kt:338`,
+`:362`). Üst kenar durum çubuğu bölgesine girince içerik `durum çubuğu − ofset`
+kadar üst dolgu alıyordu, yani **sheet'in boyu kendi ofsetine bağlıydı.**
+Expanded çapası ölçülen boydan hesaplanıyor (`:307`), çapa değişince süren
+animasyon yeniden başlıyor ve yeniden başlatmada **ilk bırakış hızı**
+kullanılıyor (`AnchoredDraggable.kt:557-575`, `:672-690`). Bir fiskenin tek
+sıçraması payı (dinlenmedeki üst kenar − durum çubuğu) aşınca sheet her döngüde
+bölgeye girip yeniden itiliyordu; salınım dokunulana kadar sönmüyordu, dokunuş
+da sheet'i dinlenmenin ~20 dp üstünde bırakabiliyordu. Pay büyük yazıda ve kısa
+ekranda küçülüyor — büyük yazı kullanan herkes etkilenebiliyordu. Ölçümler
+PROGRESS 16l ve 16m'de.
+
+Üst pay dışarı alınınca içerideki `consumeWindowInsets(top = offset)` artık
+hiçbir şeyi değiştirmiyor: içerikte üst inset kalmadı, boy sabit, çapa sabit.
+
+**Seçilmeyenler:**
+
+- **Tam boy sheet** — uzun ekranda görünüm değişir (üstte boş sheet alanı),
+  içerik boylu sheet kararına ters.
+- **Fırlatmayı formda yutmak** (`NestedScrollConnection`, `onPostFling`) —
+  kısmi: tutamak ve başlıktan itiş sheet'in kendi sürüklemesinden geçiyor, 16l'de
+  onlar da salınımı başlattı.
+- **`sheetGesturesEnabled = false`** — aşağı kaydırarak kapatma kaybolur.
+- **Kütüphane güncellemesi** — kapalı test sürerken bütün arayüzü etkileyen
+  geniş bir değişiklik.
+
+**Görünür fark yalnızca sheet ekranı doldurduğunda.** Önce sheet'in yüzeyi durum
+çubuğunun arkasına uzanıyordu, içerik altında başlıyordu; şimdi durum çubuğunun
+arkasında scrim var, sheet'in yuvarlak üst köşeleri çubuğun hemen altında.
+İçeriğin yeri iki hâlde aynı (Kaydet koordinatları birebir). Bu hâl 360dp'lik
+ekranda her zaman (API 29 AVD'sinde klavye kapalıyken de), her ekranda klavye
+açıkken ve büyük yazıda görülüyor. Sheet içerik boylu durduğunda (411dp, yazı
+1.0, klavye kapalı) piksel farkı yok. Açık ve koyu temada ekran görüntüleri:
+`docs/screenshots/phase-16m/`.
+
+**Bilinen, kabul edilen:** kütüphanenin **tek** sıçraması değişmedi — bırakış
+hızıyla orantılı (tepe ≈ 0,0149 sn × hız), 16m'de en fazla ~73 dp ölçüldü ve
+her hücrede 0,4 sn içinde sönüyor. Hızlı bir fiskede üst kenar bu sıçramanın
+tepesinde bir iki kare boyunca durum çubuğu bölgesine girebiliyor; artık boyu
+değiştirmediği için tekrar etmiyor. **Dinlenmede** üst kenar hiçbir ölçümde bölgeye girmedi.
+
+**Kapatma yolları değişmedi:** aşağı kaydırma (tutamaktan ve formdan), geri
+tuşu, geri jesti ve scrim'e dokunmak kapatıyor. Durum çubuğu şeridine dokunmak
+sheet'i **kapatmıyor** — dokunuş sistem çubuğunun penceresine gidiyor; 16m
+öncesi derlemede de aynı olduğu ölçüldü. Tam boy sheet'te görünen tek scrim bu
+şerit, yani o hâlde kapatma aşağı kaydırma ve geri ile.
 
 ## 17. Tarih İşleme
 
