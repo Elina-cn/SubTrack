@@ -2,12 +2,16 @@ package com.elinacn.subtrack.ui.home.components
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -70,7 +74,18 @@ fun AddSubscriptionSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         containerColor = MaterialTheme.colorScheme.surface,
-        modifier = modifier
+        // The default insets are split: the bottom half stays on the content, the top half moves
+        // outside the sheet. By default the sheet pads its content by however much of the status
+        // bar it overlaps at its current offset, so near the top its height - and with it the
+        // resting anchor - depends on where it is; a fling that bounced into that band kept
+        // restarting the settle animation with the release velocity and never died down
+        // (PROGRESS 16l). Outside the sheet, the status bar only lowers the height the sheet may
+        // take, the same at every offset: the top edge rests below the status bar, and a form too
+        // tall for that scrolls instead. The keyboard is still the root box's imePadding().
+        contentWindowInsets = { BottomSheetDefaults.windowInsets.only(WindowInsetsSides.Bottom) },
+        modifier = modifier.windowInsetsPadding(
+            BottomSheetDefaults.windowInsets.only(WindowInsetsSides.Top)
+        )
     ) {
         // Two siblings in the sheet's own ColumnScope: a form that scrolls, and a save button that
         // does not. weight(fill = false) is what splits them - it hands the scrolling half an upper
