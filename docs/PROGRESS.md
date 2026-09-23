@@ -27,6 +27,30 @@ Her faz sonunda **en üste** yeni kayıt eklenir. Eski kayıtlar silinmez.
 
 ---
 
+## [Faz 16k-1] Kapalı Test Yayında — 2026-09-23
+
+**Durum:** Tamamlandı. Yalnızca belge; kod değişmedi.
+
+**Yapılanlar**
+- Kapalı test yayında: sürüm 1 incelemeyi geçti; 23.09.2026'da Console'un Kontrol panelinde "Kapalı test sürümü yayınlayın" adımı tamamlanmış, yayınlanmamış değişiklik yok.
+- 16k kaydındaki "incelemeye gönderildi / incelemede" bilgisi aşıldı; 16k kaydı değiştirilmedi.
+- ROADMAP Faz 16 "Kapalı test" maddesi işaretlendi.
+- ROADMAP Faz 16 "Bitti": "kapalı test incelemede" → "kapalı test sürüyor: 12 testçinin 14 gün kesintisiz katılımı bekleniyor".
+- ROADMAP Faz 17: tanımsız "Karar 3" atfı çıkarıldı; gerekçe 16k kaydına yazılmamıştı, ROADMAP Faz 17'ye eklendi.
+- ROADMAP foreground service maddesi: Console'da doğrulandı, 22.09.2026 gönderiminde beyan istenmedi.
+- ROADMAP WorkManager izinleri notu: 16j Console'a değil birleşik manifeste bakmıştı; Console ayrı beyan istemedi (22.09.2026), gizlilik politikası doğrulanmadı, madde açık.
+- ROADMAP API 24/25 maddesi: 16h-1 listeden çıktı — o tur yalnızca api29 ve api34'te koştu (16h-1 kaydından kontrol edildi).
+- ROADMAP kapsam notunun altına sürüm sırası: v1.1 dışa/içe aktarma, ağ v1.2 (`PROJECT_SPEC.md` §4).
+
+**Değişen dosyalar**
+- `docs/ROADMAP.md` — yukarıdaki düzeltmeler
+- `docs/PROGRESS.md` — bu kayıt
+
+**Commit'ler**
+- (bu kayıt) docs: record the live closed test and fix stale roadmap notes
+
+---
+
 ## [Faz 16k] Play Console Kurulumu ve v1.0 — 2026-09-23
 
 **Durum:** Tamamlandı. Bu tur yalnızca belge; kod değişmedi. Console işleri

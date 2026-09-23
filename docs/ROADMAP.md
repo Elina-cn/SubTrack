@@ -12,6 +12,9 @@ geçilmez. Tüm çalışma `Elina` branch'inde yapılır; branch açılmaz. Faz 
 > düzenleme, kur yönetimi, yenileme tarihi, hatırlatma, kategoriler, ödeme
 > periyodu, geçmiş takibi ve istatistik v1.0'a alındı. Ağ bağlantısı v1.1'e,
 > hesap ve senkronizasyon v2.0'a taşındı.
+>
+> **Not (2026-09-23):** Sürüm sırası sonradan değişti — v1.1 dışa/içe
+> aktarma, ağ v1.2 (`PROJECT_SPEC.md` §4).
 
 ---
 
@@ -508,8 +511,9 @@ Aylık toplamın zaman içindeki anlık görüntüleri. `PROJECT_SPEC.md` §1'de
       `setExpedited`, `ForegroundInfo`, `OutOfQuotaPolicy` **hiç geçmiyor** —
       tek iş kısıtsız bir `PeriodicWorkRequest`. Alt tip olmadığı için
       **manifest değiştirilmedi** (`tools:node="remove"` gereksiz) ve Play
-      Console'da beyan formunun açılmaması bekleniyor — **bu tek nokta
-      Console'da henüz doğrulanmadı.** Ayrıntı `ARCHITECTURE.md` §26.
+      Console'da beyan formunun açılmaması bekleniyor — **Console'da
+      doğrulandı: 22.09.2026 gönderiminde foreground service beyanı
+      istenmedi.** Ayrıntı `ARCHITECTURE.md` §26.
 - [x] **ProGuard/R8 kuralları, release build testi** — Faz 16c.
       `proguard-rules.pro` **boş kaldı**: önce kuralsız derlendi, minify açık
       release APK dört cihazda (API 24/29/34/36) sürüldü, hiçbir şey kırılmadı.
@@ -681,7 +685,7 @@ Aylık toplamın zaman içindeki anlık görüntüleri. `PROJECT_SPEC.md` §1'de
 - [x] **API 24/25 üzerinde bir kez test edilsin** — `minSdk` 24 iddiası artık
       doğrulandı. `subtrack_min_api24` AVD kuruldu ve Faz 16b'nin 117 maddelik
       tam regresyonuna (dört cihaz, 468 hücre), Faz 16c'nin dört cihazlı
-      release APK turuna, Faz 16g/16h/16h-1/16h-2'nin açılış ölçümlerine ve
+      release APK turuna, Faz 16g/16h/16h-2'nin açılış ölçümlerine ve
       Faz 16j'nin RTL/izin turuna dahil edildi. API 24'te düşen tek madde
       (#40, bildirim ayarları kısayolu) 16b hotfix'inde kapandı.
 - [x] **`desugar_jdk_libs` APK bedeli R8 sonrası ölçülsün** — bu madde
@@ -694,9 +698,10 @@ Aylık toplamın zaman içindeki anlık görüntüleri. `PROJECT_SPEC.md` §1'de
       istemiyor. Birleşik manifestte ölçüldü (Faz 10b Görev 0). İzin beyanında
       ve gizlilik politikasında bunlar da açıklanmalı.
 
-      > **Not (Faz 16k):** Faz 16j izin beyanının Console tarafını doğruladı
-      > ama gizlilik politikası metninin bu dördünü içerdiğine dair ne bu
-      > turda ne PROGRESS'te kanıt var — açık kalıyor.
+      > **Not (Faz 16k, 16k-1'de düzeltildi):** Faz 16j Console'a bakmadı,
+      > birleşik manifestteki izin listesini doğruladı. Console bu izinler
+      > için ayrı beyan istemedi (22.09.2026); gizlilik politikasında geçip
+      > geçmedikleri doğrulanmadı — madde açık kalıyor.
 - [x] Play Console Data Safety formu — dolduruldu: toplama yok, paylaşım yok;
       hedef kitle 18+, içerik derecesi 3+, reklam ve reklam kimliği yok
       (gerekçeler PROJECT_SPEC §5). (Faz 16k: Console'da yapıldı, repoda kanıt
@@ -710,15 +715,16 @@ Aylık toplamın zaman içindeki anlık görüntüleri. `PROJECT_SPEC.md` §1'de
 - [x] Internal testing — sürüm 1 (`versionCode 1` / `versionName 1.0`, kaynak
       commit `a16e299`, kullanıcının `v1.0` etiketiyle işaretlediği) yayında
       (Faz 16k).
-- [ ] Kapalı test — aynı sürüm, tüm ülkeler, 22.09.2026'da incelemeye
-      gönderildi; **Google incelemesinde.**
+- [x] Kapalı test — sürüm 1, tüm ülkeler, **yayında**: 22.09.2026'da
+      incelemeye gönderildi, inceleme geçti, 23.09.2026'da Console'da
+      görüldü (Faz 16k-1).
 - [ ] Üretim erişimi ve yayın — 12 testçi 14 gün kesintisiz katılımda kalınca
       başvurulacak (Faz 16k).
 
 **Bitti:** `PROJECT_SPEC.md` §8'deki "Bitti" tanımının tamamı karşılandı **ve**
 üretim erişimi alınıp bu sürüm üretimde yayına girdi. İlk koşul 22 Eylül
-2026'da sağlandı; ikincisi henüz sağlanmadı (kapalı test incelemede) — bu
-yüzden faz 🟡 kalıyor.
+2026'da sağlandı; ikincisi henüz sağlanmadı (kapalı test sürüyor: 12
+testçinin 14 gün kesintisiz katılımı bekleniyor) — bu yüzden faz 🟡 kalıyor.
 
 ---
 
@@ -730,6 +736,15 @@ dokunamıyor; bu faz veriyi kullanıcının **elinde tutabileceği bir dosyaya**
 çıkarmakla ilgili.
 
 Kapsam `PROJECT_SPEC.md` §4 "v1.1 — Veri taşınabilirliği" bölümünde karara
-bağlandı. Faz 17, Karar 3 gereği **üretim erişimiyle başlar**; o güne kadar
-koda yalnızca kapalı test geri bildiriminden gelen düzeltmeler girer
-(`versionCode 2`'den başlayarak).
+bağlandı. Faz 17 **üretim erişimiyle başlar**; o güne kadar koda yalnızca
+kapalı test geri bildiriminden gelen düzeltmeler girer (`versionCode 2`'den
+başlayarak). Gerekçe:
+
+- Faz 16'nın bitiş tanımı üretime çıkışı içeriyor ve fazlar sırayla yapılıyor.
+- Tek branch'le çalışılıyor (`WORKFLOW.md` §6): kapalı testte bulunan bir
+  hatanın düzeltmesi `versionCode 2` olarak hemen çıkabilmeli, içinde yarım
+  kalmış bir dışa/içe aktarma olmadan.
+- Üretim başvurusu, kapalı testten öğrenilenlerle neyin değiştirildiğini
+  soruyor; bu dönemde koda yalnızca o düzeltmeler girmeli. İçe aktarma
+  kullanıcının verisine dokunan bir işlem, ilk herkese açık sürüme aceleyle
+  girmemeli.
