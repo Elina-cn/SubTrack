@@ -27,6 +27,84 @@ Her faz sonunda **en üste** yeni kayıt eklenir. Eski kayıtlar silinmez.
 
 ---
 
+## [Faz 16o] Türkçe Mağaza Sayfası İçin Koyu Tema Ekran Görüntüleri — 2026-09-23
+
+**Durum:** Tamamlandı. Yalnızca görsel; kod değişmedi. İki dosya Console'a
+yüklenmeyi bekliyor.
+
+**Yapılanlar**
+- `store-06-home-dark-tr.png` ve `store-07-stats-dark-tr.png` TESTING'deki
+  "Mağaza Ekran Görüntüleri" yöntemiyle çekildi: `subtrack_store_api34`
+  (1080x1920, 420 dpi, gestural, API 34, GMT — boot'ta doğrulandı), SystemUI
+  demo modu (09:41, pil %100, wifi ve sinyal `-e fully true` ile tam, bildirim
+  yok), `cmd uimode night yes`, uygulama dili `tr-TR`.
+- Derleme: HEAD'in debug APK'sı (1.0.1; fikstür `run-as` istediği için debug).
+  Cihazda 20.09'dan kalma bir debug derlemesi (versionCode 1) vardı, üzerine kuruldu.
+- Fikstür 16e-2'nin tablosunun aynısı, veritabanına host'ta yazıldı: altı
+  abonelik (tarihler bugünden +0/+1/+5/+3/+12/+23 gün), `monthly_snapshots`'a
+  202604-202608 16e-2'nin döktüğü değerlerle. Uygulamanın kendi yazdığı 202609
+  satırı **243860** — 16e-2'dekiyle aynı. Liste `createdAt DESC` sıralı olduğu
+  için Netflix, Spotify, iCloud en üstte (İngilizce kareyle aynı).
+- Alfa kanalı: iki çekim de RGBA geldi, önce tamamen opak olduğu kanıtlandı,
+  sonra RGB'ye çevrildi; pikseller ham çekimle birebir aynı.
+
+**Doğrulama**
+
+| Dosya | Boyut | Biçim | Alfa | Bayt |
+|---|---|---|---|---|
+| `store-06-home-dark-tr.png` | 1080x1920 | 8 bit/kanal RGB (24-bit PNG) | yok | 129.320 |
+| `store-07-stats-dark-tr.png` | 1080x1920 | 8 bit/kanal RGB (24-bit PNG) | yok | 116.509 |
+| `store-06-home-dark-en.png` (karşılaştırma) | 1080x1920 | aynı | yok | 135.969 |
+| `store-07-stats-dark-en.png` (karşılaştırma) | 1080x1920 | aynı | yok | 128.340 |
+
+İngilizce koyu karşılıklarıyla piksel karşılaştırması:
+
+| Bölge | Sonuç |
+|---|---|
+| Durum çubuğu (y < 120), iki ekranda | **birebir aynı** — demo modu tuttu |
+| Ana ekran: FAB kabı `[891,1668][1038,1815]`, ikon sütunu | birebir aynı |
+| İstatistik: dört kategori çubuğu | birebir aynı (aynı oranlar) |
+| FAB kabının içindeki `primary` (`#D4AF37`) piksel | **0** |
+| FAB'a en yakın tutarlar (TR) | Spotify `[866,1593][993,1629]` → 39 px = 15dp; iCloud `[892,1890][993,1919]` → 75 px = 29dp (16e-2'nin açık TR ölçümüyle aynı) |
+
+Metinler: "Aylık Toplam, ₺2.438,60", "Bugün ödenecek", "1 gün kaldı",
+"₺1.450,00, %60", "ayda ₺369,60" — para ve yüzde Türkçe yerel ayarda
+(nokta binlik, virgül ondalık, `%` önde). Hiçbir Türkçe dizgi üç noktayla
+kısalmıyor ya da alanından taşmıyor; kesik görünen iki yer ekranın çerçevesinden
+(aşağıda).
+
+**Bilinen — dizgi değil, çerçeve:**
+- İstatistikte en alttaki "Aylık Trend" başlığının `y` kuyruğu kaydırma
+  alanının alt kenarında (y=1857, gezinme çubuğu payının başladığı yer)
+  kesiliyor. Mevcut dört istatistik görüntüsünün **dördünde de** aynı
+  ("Monthlv trend" dahil); İngilizce kareyle aynı olsun diye çerçeve
+  değiştirilmedi.
+- Ana ekranda kategori çipi satırının beşincisi ("Diğer") ekranın sağ
+  kenarında kesiliyor — satır yatay kayıyor; açık TR görüntüsünde de böyle.
+
+**Emülatör geri alındı:** demo modundan çıkıldı, `sysui_demo_allowed 0`,
+`cmd uimode night no`, uygulama dili boş, `pm clear` (başlangıçta da uygulama
+verisi yoktu), `/data/local/tmp` boş; `wm` ve yazı ölçeği hiç değişmedi.
+Emülatör kapatıldı. Kurulu derleme artık 1.0.1 debug (başlangıçta 20.09'dan
+kalma 1.0 debug). Fiziksel telefona dokunulmadı.
+
+**Faz 16n düzeltmesi:** tr-TR sürüm notu Console'a bir farkla girildi — "büyük yazı boyutu kullanan bazı telefonlarda" yerine "bazı telefonlarda, özellikle büyük yazı boyutunda".
+
+**Değişen dosyalar**
+- `docs/screenshots/store/store-06-home-dark-tr.png` — yeni
+- `docs/screenshots/store/store-07-stats-dark-tr.png` — yeni
+- `docs/ROADMAP.md` — Faz 16 mağaza görselleri maddesi
+- `docs/PROGRESS.md` — bu kayıt
+
+**Commit'ler**
+- (bu kayıt) docs: add Turkish dark theme store screenshots
+
+**Sonraki faz için not**
+- İki görüntü Console'da tr-TR ekran görüntülerine 6. ve 7. sıra olarak
+  yüklenecek; İngilizce taraftaki sırayla aynı.
+
+---
+
 ## [Faz 16n] Sürüm 1.0.1 — Kapalı Test Güncellemesi — 2026-09-23
 
 **Durum:** Tamamlandı. Tek kod değişikliği sürüm satırları

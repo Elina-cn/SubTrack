@@ -707,8 +707,10 @@ Aylık toplamın zaman içindeki anlık görüntüleri. `PROJECT_SPEC.md` §1'de
       (gerekçeler PROJECT_SPEC §5). (Faz 16k: Console'da yapıldı, repoda kanıt
       yok.)
 - [x] Mağaza görselleri ve açıklama metni — tamamlandı. Ekran görüntüleri
-      (Faz 16e-2): `docs/screenshots/store/`, İngilizce 7 + Türkçe 5 (Türkçe
-      tarafında koyu tema görüntüsü yok). Simge `docs/store/icon-512.png`,
+      (Faz 16e-2): `docs/screenshots/store/`, İngilizce 7 + Türkçe 5. **Faz
+      16o:** Türkçe'nin iki koyu tema görüntüsü (`store-06-home-dark-tr.png`,
+      `store-07-stats-dark-tr.png`) hazır, iki dil 7'şer görüntüyle eşit —
+      Console'a yüklenmeyi bekliyor. Simge `docs/store/icon-512.png`,
       özellik grafiği `docs/store/feature-graphic.png`. Mağaza girişi en-US
       (varsayılan) + tr-TR. (Faz 16k: Console'da yapıldı, repoda yalnızca
       görsel dosyaları var.)
