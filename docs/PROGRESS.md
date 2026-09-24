@@ -27,6 +27,28 @@ Her faz sonunda **en üste** yeni kayıt eklenir. Eski kayıtlar silinmez.
 
 ---
 
+## [Faz 16p] 1.0.1 Yayında ve Doğrulandı — 2026-09-24
+
+**Durum:** Tamamlandı. Yalnızca belge; kod değişmedi. Aşağıdakiler Console'da
+ve testçilerle oldu; repoda kanıtı yok.
+
+**Yapılanlar**
+- 1.0.1 (`versionCode 2`) kapalı test incelemesinden geçti ve yayında (24.09.2026 itibarıyla); testçilere duyuruldu. Dahili testte de yayında.
+- Titremeyi bildiren testçi 1.0.1'de sorunun düzeldiğini doğruladı (24.09.2026).
+- Kullanıcının telefonu (OPPO A15s, Android 10) Play üzerinden 1.0 → 1.0.1 güncellendi; abonelikler, toplamlar ve ayarlar korundu — 16n'nin "Sonraki faz için not"undaki fiziksel telefon maddesi (Play imzalı → Play imzalı güncelleme yalnız orada görülüyor) kapandı.
+- Türkçe koyu tema görüntüleri (`store-06-home-dark-tr.png`, `store-07-stats-dark-tr.png`) Console'da Türkçe mağaza girişine 6. ve 7. sıraya yüklendi.
+- Lansman öncesi rapor: 1.0.1 doğrudan kapalı teste yüklendiği hâlde rapor oluşmadı; Console'un rapor ayarlarında raporu açıp kapatan bir seçenek yok, rapor varsayılan olarak açık, oluşmaması Google'ın cihaz laboratuvarının kapasitesine bağlı — sürüm üretime kaydedildiğinde yeniden bakılacak.
+- ROADMAP Faz 16: 1.0.1 maddesi işaretlendi (kapalı ve dahili testte yayında, testçi doğruladı); Türkçe koyu görüntü notu "Console'a yüklendi" oldu.
+
+**Değişen dosyalar**
+- `docs/ROADMAP.md` — yukarıdaki iki madde
+- `docs/PROGRESS.md` — bu kayıt
+
+**Commit'ler**
+- (bu kayıt) docs: record the live 1.0.1 release and the tester's confirmation
+
+---
+
 ## [Faz 16o] Türkçe Mağaza Sayfası İçin Koyu Tema Ekran Görüntüleri — 2026-09-23
 
 **Durum:** Tamamlandı. Yalnızca görsel; kod değişmedi. İki dosya Console'a

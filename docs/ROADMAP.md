@@ -710,7 +710,7 @@ Aylık toplamın zaman içindeki anlık görüntüleri. `PROJECT_SPEC.md` §1'de
       (Faz 16e-2): `docs/screenshots/store/`, İngilizce 7 + Türkçe 5. **Faz
       16o:** Türkçe'nin iki koyu tema görüntüsü (`store-06-home-dark-tr.png`,
       `store-07-stats-dark-tr.png`) hazır, iki dil 7'şer görüntüyle eşit —
-      Console'a yüklenmeyi bekliyor. Simge `docs/store/icon-512.png`,
+      **Faz 16p:** Console'a yüklendi (Türkçe giriş, 6. ve 7. sıra). Simge `docs/store/icon-512.png`,
       özellik grafiği `docs/store/feature-graphic.png`. Mağaza girişi en-US
       (varsayılan) + tr-TR. (Faz 16k: Console'da yapıldı, repoda yalnızca
       görsel dosyaları var.)
@@ -720,12 +720,14 @@ Aylık toplamın zaman içindeki anlık görüntüleri. `PROJECT_SPEC.md` §1'de
 - [x] Kapalı test — sürüm 1, tüm ülkeler, **yayında**: 22.09.2026'da
       incelemeye gönderildi, inceleme geçti, 23.09.2026'da Console'da
       görüldü (Faz 16k-1).
-- [ ] Sürüm 1.0.1 (`versionCode 2`) — ekleme sheet'inin salınım düzeltmesi
+- [x] Sürüm 1.0.1 (`versionCode 2`) — ekleme sheet'inin salınım düzeltmesi
       (16l teşhis, 16m düzeltme). AAB 16n'de üretildi ve doğrulandı: şema
       `v1.0`'dan beri değişmedi, izin listesi aynı, v1.0'ın üzerine güncelleme
       olarak kurulunca veri korundu (`TESTING.md` "Yükseltme Testi"). Kaynak
-      commit `80f5c25`. **Açık kalan:** kapalı test kanalına yükleme, dahili
-      teste kitaplıktan ekleme ve etiket — kullanıcıda.
+      commit `80f5c25` (kullanıcının `v1.0.1` etiketi). **Faz 16p:** kapalı
+      test incelemesinden geçti; kapalı ve dahili testte yayında (24.09.2026).
+      Titremeyi bildiren testçi düzeltmeyi doğruladı. (Console'da ve testçiyle
+      oldu, repoda kanıt yok.)
 - [ ] Üretim erişimi ve yayın — 12 testçi 14 gün kesintisiz katılımda kalınca
       başvurulacak (Faz 16k).
 
