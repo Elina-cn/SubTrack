@@ -92,6 +92,8 @@
     <string name="pick_date">Tarih seç</string>
     <string name="clear_date">Tarihi temizle</string>
     <string name="date_not_set">Seçilmedi</string>
+    <!-- Under the date field, only while a date is set. -->
+    <string name="next_payment_date_rolls_over">Ödeme günü geçince tarih kendiliğinden bir sonraki döneme geçer.</string>
     <!-- Spoken form of the date field: etiket, değer. -->
     <string name="next_payment_date_description">%1$s, %2$s</string>
     <string name="due_today">Bugün ödenecek</string>

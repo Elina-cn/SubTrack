@@ -142,12 +142,19 @@ fun SubscriptionFormFields(
         // has to carry the whole sentence itself: without this it reports as an unnamed button
         // and a screen reader user is told nothing about what the control is or holds.
         val dateValueText = dateText.ifEmpty { stringResource(id = R.string.date_not_set) }
+        // The line under the field. A rejection wins; otherwise, once there is a date, it says
+        // that the date moves on by itself - phase 16q, a tester could not tell whether a payment
+        // renews. Only with a date: with none there is nothing to move on, and the sentence would
+        // describe behaviour the empty field does not have.
+        val rollsOverNote = stringResource(id = R.string.next_payment_date_rolls_over)
+        val dateNote = dateError?.asString()
+            ?: rollsOverNote.takeIf { state.nextPaymentDate != null }
         val dateDescription = stringResource(
             id = R.string.next_payment_date_description,
             dateLabel,
-            // The rejection message is drawn under the field but merged out of the tree with
-            // everything else, so it has to be spoken as part of the field's own label.
-            dateError?.let { "$dateValueText, ${it.asString()}" } ?: dateValueText
+            // The note is drawn under the field but merged out of the tree with everything else,
+            // so it has to be spoken as part of the field's own label.
+            dateNote?.let { "$dateValueText, $it" } ?: dateValueText
         )
         Box {
             OutlinedTextField(
@@ -166,7 +173,7 @@ fun SubscriptionFormFields(
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 isError = dateError != null,
-                supportingText = dateError?.let { { Text(it.asString()) } }
+                supportingText = dateNote?.let { { Text(it) } }
             )
             Box(
                 modifier = Modifier
