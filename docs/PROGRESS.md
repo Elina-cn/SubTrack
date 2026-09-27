@@ -27,6 +27,272 @@ Her faz sonunda **en üste** yeni kayıt eklenir. Eski kayıtlar silinmez.
 
 ---
 
+## [Faz 16q] Testçi Geri Bildirimleri: Beyaz Parlama ve Yenilenme Açıklaması — 2026-09-27
+
+**Durum:** Tamamlandı. İki düzeltme (A, B); `versionCode`/`versionName`
+değişmedi (2 / 1.0.1). 1.0.2 adayı; sürüm ayrı turda.
+
+26.09.2026'da 3-4 testçiden geri bildirim geldi. Kapalı test sürerken koda
+yalnızca geri bildirim düzeltmeleri giriyor: bu turda ikisi yapıldı, gerisi
+özellik isteği olarak Görev C'de kayıtlı.
+
+### Görev A — geçişlerde beyaz parlama
+
+**Ölçüm.** Release derlemesi (upload anahtarı), emülatörler `-gpu host`,
+`screenrecord` → her kare çeyrek ölçekte, durum ve gezinme çubuğu bantları
+kesilerek. Her kare geçişin iki ucuyla (önceki ve sonraki dinlenme karesi)
+piksel piksel karşılaştırıldı. **Fazlalık** = pikselin iki uçtan da ne kadar
+parlak olduğu (0-255 seviye, kare ortalaması). İki ekranın kendi zemini
+üstündeki çapraz geçişi hiçbir pikselde iki uçtan birden parlak olamaz;
+fazlalık yalnızca arkadan daha açık bir şey görünürse doğar. **Tepe kare**
+fazlalığın en büyük olduğu kare; rengi kare ortalaması, yanında parlaklığın
+(luma) parlak uçtan farkı. **Süre** fazlalığın 5'i aştığı ilk kareden altına
+indiği ilk kareye. Fikstür: üç abonelik (Netflix, Spotify, Gym). Gezinme geri
+tuşuyla (`keyevent 4`). api29'da düzenlemeye Spotify satırından girildi
+(Netflix satırının ortası üç tuşlu çubuğa düşüyor) ve tarih alanı form
+kaydırıldıktan sonra açıldı (TESTING "360dp'de form kaydırma istiyor").
+
+**Koyu tema** (sistem koyu, uygulama sistemi izliyor). Hücre: `tepe kare`
+luma farkı · fazlalık · süre; "yok (n)" = en büyük fazlalık n, eşiğin altı.
+
+| Geçiş | api34 önce | api34 sonra | api29 önce | api29 sonra |
+|---|---|---|---|---|
+| ana → ayarlar | `#4B5952` +45,4 · 45 · 419 ms | yok (0,2) | `#4D5C57` +44,8 · 43 · 294 ms | yok (0,4) |
+| ayarlar → ana | `#4B5A52` +46,1 · 45 · 453 ms | yok (0,0) | `#4C5B55` +43,9 · 42 · 436 ms | yok (0,0) |
+| ayarlar → kurlar | `#4A5851` +54,1 · 51 · 377 ms | yok (1,3) | `#4C5955` +53,2 · 49 · 403 ms | yok (2,1) |
+| kurlar → ayarlar | `#495750` +53,0 · 51 · 470 ms | yok (0,0) | `#4C5954` +53,4 · 49 · 379 ms | yok (0,0) |
+| ana → istatistik | `#4C5B52` +47,2 · 44 · 393 ms | yok (0,0) | `#4E5C55` +45,0 · 40 · 368 ms | yok (0,1) |
+| istatistik → ana | `#4B5B51` +46,4 · 44 · 389 ms | yok (0,0) | `#505D57` +46,4 · 41 · 484 ms | yok (0,0) |
+| ana → düzenleme | `#4C5C53` +47,2 · 44 · 402 ms | yok (1,1) | `#4D5D58` +45,7 · 43 · 455 ms | yok (2,5) |
+| düzenleme → ana | `#4A5C52` +46,8 · 43 · 441 ms | yok (0,0) | `#4C5C56` +44,3 · 41 · 432 ms | yok (0,0) |
+| sheet açılış | yok (4,2) | yok (4,2) | yok (4,4) | yok (4,4) |
+| sheet kapanış | yok (3,5) | yok (3,5) | yok (3,4) | yok (1,4) |
+| seçici açılış | yok (1,1) | yok (1,2) | yok (1,3) | yok (1,3) |
+| seçici kapanış | yok (0,7) | yok (0,7) | yok (0,0) | yok (0,0) |
+
+Önce: sekiz gezinme geçişinin sekizinde, iki cihazda da zemin 0,3-0,5 sn
+griye çıkıyor. Düz zemin pikseli (ana → düzenleme, api34, tepe kare)
+`#0D1A14` → `#454F4B`. Sheet ve tarih seçicide iki uçtan parlak kare yok;
+sheet'teki 4'lük fazlalık kayan içeriğin kenarları (kareye bakıldı). api29
+sonra ana → düzenleme 2,5: dokunulan satırın dalgası (eşik üstü pikseller tam
+Spotify satırının sınırında, y 948-1116).
+
+**Açık tema** (sistem açık, uygulama sistemi izliyor). Hücre: fazlalık /
+koyu çukur (pikselin iki uçtan da ne kadar koyu olduğu).
+
+| Geçiş | api34 önce | api34 sonra | api29 önce | api29 sonra |
+|---|---|---|---|---|
+| ana → ayarlar | 4,2 / 0,2 | 0,0 / 0,7 | 3,8 / 0,3 | 0,1 / 1,7 |
+| ayarlar → ana | 4,3 / 0,1 | 0,0 / 1,0 | 3,4 / 0,1 | 0,0 / 1,4 |
+| ayarlar → kurlar | 5,7 / 0,7 | 0,1 / 1,1 | 5,2 / 1,7 | 0,1 / 1,9 |
+| kurlar → ayarlar | 5,9 / 0,1 | 0,1 / 1,2 | 5,2 / 0,1 | 0,1 / 2,0 |
+| ana → istatistik | 4,2 / 0,1 | 0,1 / 0,6 | 3,7 / 0,2 | 0,2 / 1,3 |
+| istatistik → ana | 4,3 / 0,1 | 0,1 / 0,7 | 3,8 / 0,1 | 0,2 / 1,3 |
+| ana → düzenleme | 4,1 / 0,2 | 0,0 / 0,7 | 3,7 / 0,9 | 0,1 / 1,5 |
+| düzenleme → ana | 4,3 / 0,1 | 0,1 / 0,9 | 3,8 / 0,1 | 0,0 / 1,1 |
+| sheet açılış | 2,4 / 10,4 | 2,5 / 14,3 | 2,9 / 9,4 | 3,0 / 16,0 |
+| sheet kapanış | 2,0 / 35,9 | 2,0 / 35,9 | 2,8 / 38,5 | 0,7 / 43,9 |
+| seçici açılış | 0,1 / 7,1 | 0,1 / 7,1 | 0,0 / 5,6 | 0,0 / 0,3 |
+| seçici kapanış | 0,1 / 13,6 | 0,0 / 11,0 | 0,0 / 47,4 | 0,0 / 0,0 |
+
+Ters yönde (koyu) parlama ne önce ne sonra var. Önce gezinme geçişlerinde
+hafif soluklaşma (3,4-5,9): `#FAFAFA` açık zeminden (`#D3E2D8`) daha açık.
+Sonra ikisi de gürültü düzeyinde. Sheet ve seçicideki çukurlar scrim ve
+diyalog karartması: sheet kapanırken açık yüzeyin yerinde bir süre karartılmış
+ana ekran, seçici kapanırken içerik kaybolup karartma sönene kadar birkaç
+kare. İkisi pencere zemininden bağımsız, kod iki derlemede aynı; değer farkı
+hangi karenin yakalandığına bağlı (api29 seçici kapanışı "önce"de yakalandı,
+"sonra"da yakalanmadı).
+
+**Uygulama teması sistemin tersine** (api34):
+
+| Geçiş | sistem açık + uyg. koyu, önce | sonra | sistem koyu + uyg. açık, önce | sonra |
+|---|---|---|---|---|
+| ana → ayarlar | `#4B5A51` +45,4 · 45 · 432 ms | 0,2 / 0,7 | 4,2 / 0,2 | 0,0 / 0,7 |
+| ayarlar → ana | `#4B5A52` +46,1 · 45 · 390 ms | 0,0 / 0,7 | 4,3 / 0,1 | 0,0 / 1,0 |
+| ayarlar → kurlar | `#4A5851` +54,1 · 52 · 487 ms | 0,7 / 0,7 | `#D7E5DA` +6,6 · 6 · 112 ms | 0,1 / 1,2 |
+| kurlar → ayarlar | `#4A5850` +54,0 · 52 · 506 ms | 0,0 / 0,8 | `#D8E4DD` +6,3 · 6 · 163 ms | 0,1 / 1,2 |
+| ana → istatistik | `#4B5A50` +45,3 · 43 · 366 ms | 0,1 / 0,7 | 4,2 / 0,1 | 0,1 / 0,6 |
+| istatistik → ana | `#4C5A51` +45,9 · 43 · 435 ms | 0,0 / 0,7 | 4,3 / 0,1 | 0,1 / 0,6 |
+| ana → düzenleme | `#4C5C54` +47,8 · 44 · 381 ms | 0,6 / 0,6 | 4,0 / 0,1 | 0,0 / 0,7 |
+| düzenleme → ana | `#4A5B53` +46,1 · 43 · 492 ms | 0,0 / 0,7 | 4,4 / 0,1 | 0,1 / 0,6 |
+| sheet açılış | 4,2 / 2,1 | 4,2 / 1,1 | 2,5 / 6,0 | 2,5 / 14,3 |
+| sheet kapanış | 3,5 / 4,9 | 3,5 / 4,9 | 2,0 / 35,9 | 2,0 / 35,9 |
+| seçici açılış | 1,0 / 0,9 | 1,1 / 0,2 | 0,1 / 5,4 | 0,1 / 7,1 |
+| seçici kapanış | 0,6 / 1,5 | 0,7 / 1,7 | 0,0 / 11,0 | 0,0 / 13,6 |
+
+Önce: parlama sistem temasından bağımsız (pencere zemini her zaman açık).
+Sonra: iki yönde de temiz — düzeltme sistemi değil uygulamanın tercihini
+izliyor. `values-night` ile yapılsaydı sağdaki hücre koyu çukur verecekti.
+
+**Sebep doğrulandı** — geçici deney, commit edilmedi (`git restore` ile geri
+alındı): `Theme.SubTrack`'e `android:windowBackground` `#FF00FF`. Aynı geçişte
+(ana → düzenleme, api34 koyu) tepe kare gri yerine mor: kare ortalaması
+`#4C5C53` → `#4B1E52`, düz zemin pikseli `(69,80,75)` → `(68,19,73)`. İki
+derlemede de pencerenin tepe karedeki payı ~%23-24; NavHost'un varsayılan
+çapraz geçişinde (giren ve çıkan ekran aynı anda yarı saydam) beklenen ~¼.
+Görünen şey `Theme.SubTrack`'in ebeveyni `android:Theme.Material.Light.NoActionBar`'dan
+gelen açık pencere zemini — hipotez doğru. Kareler
+`docs/screenshots/phase-16q/a-flash-api34-dark-{before,magenta-experiment,after}.png`.
+
+**Düzeltme.** `MainActivity.kt`'ye `WindowBackgroundFollowsTheTheme()`:
+pencerenin zemini o an çizilen `MaterialTheme.colorScheme.background`'dan,
+renk değişince yeniden, `DisposableEffect` ile yazılıyor.
+- Uygulama içi tercihi izliyor (sistem/açık/koyu, dynamic color dahil);
+  `themes.xml`'e dokunulmadı.
+- `SystemBarsFollowTheTheme`'in aksine tercihin okunmasını beklemiyor: o
+  sırada pencere splash'ın altında, ekranda değil; 1000 ms son tarih yolunda
+  uygulama varsayılan temayla çiziyor ve pencere de o rengi alıyor.
+
+**16h açılış zinciri bozulmadı.** Soğuk açılış kaydı (`am start`); kartların
+solundaki boşluğun (splash'ta da uygulamada da düz zemin) rengi kare kare ve
+splash → uygulama doğrusundan sapması (0-255):
+
+| Cihaz / uygulama teması | Önce | Sonra |
+|---|---|---|
+| api34 koyu | splash rengi ilk kareye değişmeden (2 koşu) | aynı (2 koşu) |
+| api34 açık | 3-9 ara kare, sapma ≤ 1,6 (2 koşu) | 5-6 ara kare, sapma ≤ 2,3 (2 koşu) |
+| api29 koyu | değişmeden (2 koşu) | aynı (2 koşu) |
+| api29 açık | 2-4 ara kare, sapma ≤ 2,6 (3 koşu) | 1 ara kare, sapma ≤ 1,5 (2 koşu) |
+
+Ara karelerin hepsi splash rengiyle uygulama zemini arasındaki doğrunun
+üstünde: saf çapraz geçiş, üçüncü renk yok. Ara kare sayısı kaydın o anki
+kare hızına bağlı.
+
+### Görev B — "Ödemeler her ay yenileniyor mu?"
+
+- `SubscriptionFormFields` (ortak form: ekleme sheet'i ve düzenleme ekranı),
+  tarih alanının `supportingText`'i: hata varsa hata (eskisi gibi), yoksa
+  tarih seçiliyken yeni metin, tarih yokken hiçbir şey.
+- `next_payment_date_rolls_over` — TR "Ödeme günü geçince tarih kendiliğinden
+  bir sonraki döneme geçer.", EN "Once the payment date passes, it moves to
+  the next period automatically."
+- Alanın üstündeki dokunma katmanı alanı tek düğüm yapıyor; not, hata
+  mesajı gibi içerik açıklamasına ekleniyor. Dump: `Next Payment (optional),
+  Sep 30, 2026, Once the payment date passes, it moves to the next period
+  automatically.` (TR'de aynı biçim).
+
+**Salınım hücresi, tarih seçili** (`subtrack_tester_api33`, release, koyu,
+tr-TR, `wm density 440`, yazı 1.25). Metin 1.25'te iki satıra sarıyor ve
+sheet'i **tam boya** çıkarıyor: dinlenmede üst kenar **128** = durum
+çubuğunun alt kenarı (tarihsiz 182), Kaydet **2101** (değişmedi, görünür).
+Metnin ikinci satırı formun kaydırma alanında; form ~70 px kayıyor,
+kaydırınca tamamı görünüyor.
+
+| İtiş | Sonuç |
+|---|---|
+| Orta (218 dp / 130 ms), 2 koşu | formu kaydırdı; sheet kıpırdamadı (Kaydet her karede dinlenmede, ±1 px) |
+| Hızlı (440 dp / 90 ms), 1. koşu | **tek sıçrama** 193 px = 70 dp, tepe karesinde üst kenar y=1 (16n'de kabul edilen tek sıçrama); ilk yer değiştirmeden ~0,21 sn sonra dinlenmede |
+| Hızlı, 2. koşu | fiskeyi form aldı; sheet kıpırdamadı |
+
+Tekrar eden döngü yok; 3 sn sonraki dokunuştan sonra dinlenme 128 / 2101,
+tarih seçili. Kontrol: aynı derlemede 16m'nin hücresi (tarihsiz, `cell.sh`) —
+pay 19,6 dp, orta tek sıçrama 25 dp, hızlı 73 dp; 16m/16n ile aynı.
+
+Protokolden sapma: son dokunuş (899, 1688) değil (30, 1688) — form kaydığı
+için tarih alanına denk gelebiliyordu; sol boşlukta tıklanabilir düğüm yok.
+Sayılmayan ilk koşuda tutamağa (540, 194) dokunuldu ve sheet kapandı:
+material3 1.4.0'da tam açık sheet'in tutamağına dokunmak onu kapatıyor
+(`ModalBottomSheet.kt:386`, `Expanded -> animateToDismiss()`). Kütüphanenin
+davranışı. Aynı koşuda 130 ms'lik kaydırma forma hiç ulaşmadı (kayıtta kare
+değişmedi); sonraki koşularda ulaştı.
+
+**Ekran görüntüleri** `docs/screenshots/phase-16q/b-{sheet,edit}-{tr,en}-{light,dark}.png`
+(api33, 411dp, yazı 1.0, `wm` sıfır; sheet'te 30 Eylül seçildi, düzenleme
+ekranı Spotify, 28 Eylül). Sekizinde de metin tarih alanının altında, iki
+satır; sheet tam boy değil, Kaydet görünür.
+
+### Görev C — 26.09.2026 geri bildirimleri
+
+1. Geçişlerde beyaz parlama — bu turda düzeltildi (A)
+2. Ödemelerin yenilenip yenilenmediği belirsiz — bu turda açıklandı (B)
+3. Abonelik ikonları — üretimden sonra. Ad yazılınca ikon kendiliğinden
+   değişecek (bugünkü ada göre ikon seçiminin geliştirilmiş hâli): tanınan
+   servislerde baş harf + servisin bilinen rengi, türüne göre simge;
+   kullanıcı dilerse kendi resmini, emoji ya da renk seçer. Hazır marka
+   logosu olmayacak (marka hakları; uygulamanın internet izni yok).
+4. Koyu tema yeterince koyu değil; yeni tema ve renk paletleri — üretimden sonra
+5. Duvar kâğıdı renkleri için Android 12 sınırını düşürmek — mümkün değil (platform özelliği); hazır paletler her sürümde çözüm olacak
+6. Bir aboneliği birden çok kategoriye eklemek — üretimden sonra; tasarım gerekiyor (istatistikteki yüzde dağılımını etkiliyor)
+7. Kira, fatura ve kart ödemeleri için kategori — üretimden sonra
+8. Sağa kaydırınca düzenleme — üretimden sonra
+9. Günlük ödeme periyodu — üretimden sonra değerlendirilecek
+10. Olumlu: hata görülmedi, saatlerce açık kaldı ve çökmedi, "böyle bir uygulama lazımmış"
+
+Testçilere 26.09'da bir not gönderildi — beyaz parlama düzeltiliyor; tema,
+ikon, sağa kaydırma ve yeni kategori yayından sonra planlanıyor; hazır
+logoların neden olmayacağı açıklandı; tarih verilmedi.
+
+### Doğrulama
+
+| Koşu | Sonuç |
+|---|---|
+| `assembleDebug` + `assembleRelease` + `testDebugUnitTest` + `lintDebug`, `--rerun-tasks` | geçti; `compileDebugKotlin` ve `compileReleaseKotlin` koştu |
+| Birim testleri | **330 test, 0 hata, 0 atlanan** |
+| `connectedDebugAndroidTest` (`subtrack_wide_api34`) | **19 test, 0 hata, 1 atlanan** (bilinen `PaymentReminderWorkerTest.reminderWorker_notificationsDisabled_*`) |
+| `lintDebug` | **22 uyarı, 0 hata**; HEAD'de (değişiklikler stash'lenip) aynı 22, dağılım birebir; değişen dosyalarda uyarı yok |
+| Derleme uyarısı | yeni yok (yalnız bilinen `android.disallowKotlinSourceSets`) |
+| `app/schemas` | `git diff 30a970b` boş |
+
+### Ortam
+
+- Emülatörler tek tek çalıştırıldı (makinede 7,5 GB bellek); derlemeler
+  emülatör kapalıyken, bağlı test hariç.
+- api34: tur sonunda açık, en-US, yazı 1.0, `wm` sıfır. Bir kapatmadan önce
+  `cmd uimode night no` verilmişti ama yeniden açılışta `yes` geldi (sebebinden
+  emin değilim); son kapatmadan önce 5 sn beklenip
+  `settings get secure ui_night_mode` = 1 doğrulandı.
+  Uygulama **kurulu değil**: `connectedDebugAndroidTest` sonunda Gradle debug
+  ve test APK'larını kaldırıyor.
+- api29: sistem açık (`ui_night_mode 1`; koyu için iki yeniden başlatma), en-US,
+  yazı 1.0, `wm` sıfır. `settings put secure ui_night_mode 2`'nin hemen
+  ardından yeniden başlatınca değer 1'e dönmüştü; 5 sn bekleyip yeniden
+  başlatınca tuttu (her ölçümden önce `dumpsys uimode` ile bakıldı). Kurulu:
+  16q'nun **yalnız A** release'i (upload anahtarı) ve üç abonelik.
+- api33: başlangıç hâlinde (açık, en-US, uygulama dili boş, yazı 1.0, `wm`
+  sıfır, `show_ime_with_hard_keyboard 0`); uygulama teması Light (tur
+  sırasında "sistemi izle" yapıldı, geri alındı). Kurulu: **16q'nun son
+  release'i (A+B)**, `versionCode 2` — yani artık 1.0.1'in kendisi değil;
+  fikstür (beş abonelik, EUR) korunuyor.
+- Üç cihazda da `/sdcard`'da kayıt dosyası yok. Fiziksel telefona
+  dokunulmadı; `adb devices` yalnız emülatörü gösterdi.
+- Kayıtlar, kareler, betikler ve APK'lar (`before-`, `exp-magenta-`,
+  `afterA-`, `final-release.apk`) repoya girmedi; oturumun geçici klasöründe:
+  `%LOCALAPPDATA%\Temp\claude\C--Users-cane7-Documents-GitHub-SubTrack\7ab42d98-6756-4965-9179-e613783fb6a4\scratchpad\f16q\`
+  (`rec/<etiket>/<geçiş>/`, `rec/launch/`, `cell/rec/`, `table.json`).
+
+### Rapor edilen, dokunulmadı
+
+- ARCHITECTURE §23'e pencere zemini kararı yazılmadı (prompt istemedi);
+  gerekçe KDoc'ta ve bu kayıtta. Eklenip eklenmeyeceği sohbette.
+- TESTING'e parlama için regresyon maddesi eklenmedi; #118'in tam boy hâlinde
+  (tarih seçili ya da yazı ≥ 1.26) son dokunuşun tarih alanına denk
+  gelebileceği ve tutamağa dokunmanın sheet'i kapattığı da henüz yazılı değil.
+- Testçinin "modal" dediği: ölçümde sheet ve seçicide parlama yok; parlayan
+  her şey tam ekran geçişler, düzenleme ekranı dahil (satırdan fade ile
+  açılıyor). Testçinin düzenleme ekranını kastetmiş olması muhtemel — emin
+  değilim.
+
+**Değişen dosyalar**
+- `app/src/main/java/com/elinacn/subtrack/MainActivity.kt` — `WindowBackgroundFollowsTheTheme()`
+- `app/src/main/java/com/elinacn/subtrack/ui/common/SubscriptionFormFields.kt` — tarih alanının notu
+- `app/src/main/res/values/strings.xml`, `values-tr/strings.xml` — `next_payment_date_rolls_over`
+- `docs/screenshots/phase-16q/` — 11 görüntü (A için 3, B için 8)
+- `docs/PROGRESS.md` — bu kayıt
+
+**Commit'ler**
+- `ef5f747` fix: paint the window background in the colour the app draws in
+- `eba4dc7` fix: say under the date field that the payment date moves on by itself
+- (bu kayıt) docs: record the tester feedback round and its two fixes
+
+**Sonraki faz için not**
+- 1.0.2 sürüm turu (`versionCode 3`): iki düzeltme AAB'ye girmeli. Yükseltme
+  testinin eski tarafı 1.0.1; api33'te artık 16q derlemesi kurulu olduğu için
+  1.0.1 APK seti (16n'nin geçici klasöründe) önce yeniden kurulmalı.
+- Sürüm notlarına iki madde: geçişlerdeki parlama, tarih alanının açıklaması.
+
+---
+
 ## [Faz 16p] 1.0.1 Yayında ve Doğrulandı — 2026-09-24
 
 **Durum:** Tamamlandı. Yalnızca belge; kod değişmedi. Aşağıdakiler Console'da
