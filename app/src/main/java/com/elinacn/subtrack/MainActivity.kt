@@ -15,6 +15,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.graphics.toArgb
+import androidx.core.graphics.drawable.toDrawable
 import androidx.core.splashscreen.SplashScreen
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -71,6 +72,7 @@ class MainActivity : ComponentActivity() {
             // they are the ones the splash below keeps off the screen.
             val theme = themeState ?: ThemeState()
             SubTrackTheme(themeMode = theme.mode, dynamicColor = theme.dynamicColor) {
+                WindowBackgroundFollowsTheTheme()
                 SystemBarsFollowTheTheme(
                     darkTheme = isDarkTheme(theme.mode),
                     isThemeKnown = themeState != null
@@ -138,6 +140,39 @@ class MainActivity : ComponentActivity() {
          * start the user is already waiting through.
          */
         const val THEME_READ_TIMEOUT_MS = 1_000L
+    }
+}
+
+/**
+ * Paints the window behind the app in the background colour the app is drawing in.
+ *
+ * The window's own background comes from Theme.SubTrack, whose parent is a light platform theme:
+ * #FAFAFA, whatever the user picked. Compose covers it completely while a screen is at rest, but
+ * not while the navigation graph crossfades - both screens are partly transparent at once, and at
+ * the midpoint about a quarter of what reaches the display is the window. Phase 16q measured it on
+ * API 29 and 34 in the dark theme: every screen change lifted the plain background from #0D1A14 to
+ * about #454F4B for 0.3-0.5 s, the white flash a tester reported, and a magenta window background
+ * turned the same frames purple. In the light theme the same #FAFAFA only brightened the fade
+ * slightly, which is why it went unnoticed there.
+ *
+ * A `values-night` window background cannot fix this: the theme is the app's own preference, not
+ * the device's night mode, and a night resource would put a dark window behind a light app the
+ * other way round. So the colour is read from the scheme actually being composed, and changes the
+ * moment the preference does.
+ *
+ * Unlike [SystemBarsFollowTheTheme] it does not wait for the stored theme. Nothing of this window
+ * is on screen before the preference is read - the splash is held over it - and on the one path
+ * where the read never arrives the app draws in the default theme, which is then exactly the
+ * colour this window should have.
+ */
+@Composable
+private fun WindowBackgroundFollowsTheTheme() {
+    val activity = LocalActivity.current ?: return
+    val background = MaterialTheme.colorScheme.background.toArgb()
+
+    DisposableEffect(activity, background) {
+        activity.window.setBackgroundDrawable(background.toDrawable())
+        onDispose { }
     }
 }
 
