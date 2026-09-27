@@ -27,6 +27,237 @@ Her faz sonunda **en üste** yeni kayıt eklenir. Eski kayıtlar silinmez.
 
 ---
 
+## [Faz 16r] Sürüm 1.0.2 — İkinci Kapalı Test Güncellemesi — 2026-09-27
+
+**Durum:** Tamamlandı. Tek kod değişikliği sürüm satırları
+(`versionCode 2 → 3`, `versionName "1.0.1" → "1.0.2"`). AAB hazır; kapalı test
+kanalına yükleme ve etiket kullanıcıda. İçerik 16q'nun iki düzeltmesi.
+
+### Görev 0 — 16q'nun açık bıraktığı belgeler
+
+- ARCHITECTURE §23, "Pencere zemini uygulamanın temasını izliyor (Faz 16q)":
+  sorun (açık `#FAFAFA` zeminin çapraz geçişte görünmesi), ölçüm ve magenta
+  deneyi, çözüm (`WindowBackgroundFollowsTheTheme`, uygulama içi tercihi
+  izliyor), seçilmeyenler (`values-night`: uygulama sistemin tersindeyken ters
+  yönde parlama; `themes.xml`'de sabit renk: tercih değişince yanlış kalır).
+- TESTING #120 ve "Geçişlerde parlama gerileme testi": dört gidiş + dönüşleri,
+  kontrol olarak sheet ve seçici, üç tema, ölçüm (fazlalık, koyu çukur, süre),
+  beklenen ve bozuk hâlin sayıları.
+- TESTING salınım testi: son dokunuş `30, 1688` (formun sol boşluğu). Neden:
+  material3 1.4.0'da tam açık sheet'in tutamağına dokunmak sheet'i kapatıyor;
+  sağ yarı ise tam boy sheet'te tarih alanına denk gelebiliyor.
+
+16q'nun "Rapor edilen, dokunulmadı" altındaki ilk iki madde böylece kapandı.
+
+### Görev 1 — şema
+
+`git diff v1.0.1 -- app/schemas` → **boş** (0 bayt). `v1.0.1`'den bu yana
+`app/` altındaki fark 16q'nun dört dosyası ve sürüm satırları.
+
+### Görev 2-3 — sürüm ve AAB
+
+`./gradlew :app:assembleDebug :app:testDebugUnitTest :app:bundleRelease
+--rerun-tasks` → geçti; `compileDebugKotlin` ve `compileReleaseKotlin` koştu.
+Yeni uyarı yok (yalnız bilinen `android.disallowKotlinSourceSets`).
+
+| Alan | Değer |
+|---|---|
+| Kaynak commit | **`81332c1`** chore: bump version to 1.0.2 (versionCode 3) |
+| AAB | `app/build/outputs/bundle/release/app-release.aab`, **4.576.266 B**, 148 girdi (1.0.1: 4.576.383 B, 148 girdi) |
+| AAB SHA-256 | `4ffe38ab…b02d3268` |
+| `jarsigner -verify` | `jar verified.`, `CN=ElinaDorothea, OU=Development, O=SubTrack, L=Denizli, ST=Denizli, C=TR`; uyarılar 1.0.1 AAB'sininkiyle satır satır aynı (kendinden imzalı zincir, zaman damgası yok, 2054-02-02, POSIX öznitelik notu — sonuncusu 16n'de sayılmamıştı ama 1.0.1 AAB'sinde de var) |
+| `bundletool dump manifest` | `versionCode="3"`, `versionName="1.0.2"`, `minSdkVersion="24"`, `targetSdkVersion="36"`, `supportsRtl="false"` |
+| Birim testleri | **330 test, 0 hata, 0 atlanan** |
+
+AAB 16q'nun kodu eklendiği hâlde 117 B küçük; sıkıştırma farkı olduğunu
+düşünüyorum, bakılmadı.
+
+**İzin listesi — 1.0.1 ile birebir aynı.** İki AAB'nin `bundletool dump
+manifest` çıktısından `<permission>` ve `<uses-permission>` satırları, sıralı,
+satır satır:
+
+| İzin | 1.0.1 | 1.0.2 |
+|---|---|---|
+| `android.permission.POST_NOTIFICATIONS` | var | var |
+| `android.permission.WAKE_LOCK` | var | var |
+| `android.permission.ACCESS_NETWORK_STATE` | var | var |
+| `android.permission.RECEIVE_BOOT_COMPLETED` | var | var |
+| `android.permission.FOREGROUND_SERVICE` | var | var |
+| `com.elinacn.subtrack.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION` (tanım + kullanım) | var | var |
+
+İki manifestin tamamı da karşılaştırıldı: tek fark ilk satırdaki
+`versionCode`/`versionName`. `INTERNET` ve `AD_ID` yok.
+
+### Görev 4 — yükseltme testi (api33)
+
+`subtrack_tester_api33`, başlangıç hâli (açık, en-US, yazı 1.0, `wm` sıfır).
+Cihazdaki 16q derlemesi (`versionCode 2`) önce kaldırıldı.
+
+- **Eski taraf: gerçek 1.0.1.** 16n'nin AAB'si (geçici klasörde duruyordu,
+  SHA-256 `d79d5e4d…57ff80` — 16n kaydıyla aynı) → `build-apks` (upload
+  anahtarı) → `install-apks`. Yeniden üretilen APK seti 16n'ninkiyle bayt bayt
+  aynı. 16n'de eski taraf universal APK'ydı; bu kez **iki taraf da AAB'den
+  bölünmüş APK** — testçilere giden biçim (imza yine upload anahtarı, Play'inki
+  değil).
+- **Yeni taraf:** 1.0.2 AAB'si → `build-apks` → `install-apks`.
+
+**Fikstür (1.0.1 arayüzünden):** Netflix ₺159,99 aylık Eğlence; Spotify $10,99
+aylık Eğlence, sonraki ödeme 30.09.2026 (kaydedince bağlamsal izin istendi →
+Allow); Gym €450 yıllık Sağlık; iCloud £2,49 haftalık Diğer. Ana para USD, tema
+Dark, 1 $ = 41,5 ₺ ("Last edited: Sep 27, 2026 1:23 PM"). Toplam aylık
+**$70,61**, yıllık **$847,27**, istatistik %59/%21/%20 — 16n'nin fikstürüyle
+aynı değerler. 1.0.1'de tarih seçiliyken alanın açıklaması `Next Payment
+(optional), Sep 30, 2026` (not yok); 1.0.2'de aynı alan notu taşıyor (Görev 5).
+
+Saatler cihazın (GMT):
+
+| Kontrol | Güncellemeden önce (1.0.1) | Sonra (1.0.2) |
+|---|---|---|
+| Kurulum | `base.apk` + `split_config.x86_64.apk` | aynı iki parça — **kaldırılmadan** |
+| `versionCode` / `versionName` | 2 / 1.0.1 | **3 / 1.0.2** |
+| `firstInstallTime` | 13:18:40 | **13:18:40** (aynı) — güncelleme, temiz kurulum değil |
+| `lastUpdateTime` | 13:18:40 | 13:24:50 |
+| `userId` | 10176 | **10176** |
+| `POST_NOTIFICATIONS` | `granted=true` | **`granted=true`** |
+| Ana ekran aylık / yıllık, istatistik, ayarlar, kurlar (5 döküm) | kaydedildi | **beşi birebir aynı** (`diff` boş) |
+| Ana ekran görüntüsü | — | durum çubuğu (y 47-80, saat) dışında **piksel piksel aynı** |
+| `payment_reminder` işi (WorkManager tanı yayını) | `1739e29e…` `ENQUEUED`, iş #0 | **aynı kimlik** `ENQUEUED`, iş #0 |
+| JobScheduler | `JOB #u0a176/0`, ertesi 09:00 | açmadan önce aynı kayıt; açınca tazelendi, hedef yine 09:00 |
+| Crash tamponu | — | **boş** |
+
+Açılışta `WM-ForceStopRunnable: Application was force-stopped, rescheduling` —
+güncelleme süreci öldürdüğü için beklenen (TESTING "Yükseltme Testi" adım 6).
+
+### Görev 5 — kısa tur (AAB'den kurulan 1.0.2, api33)
+
+**Parlama, ana ↔ ayarlar** (TESTING #120'nin ölçümü; fazlalık, eşik 5, 16q
+öncesi 42-51):
+
+| Tema | ana → ayarlar | ayarlar → ana |
+|---|---|---|
+| sistem açık + uygulama Koyu (fikstür) | 0,25 | 0,01 |
+| sistem koyu + uygulama "Sistemi takip et" | 0,25 | 0,02 |
+
+Parlama yok. Koyu ana → ayarlar kaydı 30 kare, geçiş boyunca çoğu ~17-20 ms arayla;
+kare ortalaması parlaklığı 47,1'den 27,4'e tek yönde iniyor, hiçbir karede iki
+uçtan açık değil.
+
+**Tarih notu** (en-US, koyu): ekleme sheet'inde 30 Eylül seçilince alan
+`Next Payment (optional), Sep 30, 2026, Once the payment date passes, it moves
+to the next period automatically.` diyor, ekranda alanın altında iki satır;
+düzenleme ekranında (Spotify) aynı.
+
+**Salınım hücresi** (16m'nin `cell.sh`'ı, son dokunuş `30, 1688`; koyu, tr-TR,
+`wm density 440`, yazı 1.25, tarihsiz): dinlenme üst kenar **182**, Kaydet
+**2101**, pay 19,6 dp — TESTING'dekiyle aynı.
+
+| İtiş | Sonuç | 16n |
+|---|---|---|
+| Orta (218 dp / 130 ms) | **tek sıçrama** 68 px = 25 dp; hareket ~0,21 sn | tek sıçrama 25 dp |
+| Hızlı (440 dp / 90 ms) | **tek sıçrama** 200 px = 73 dp, tepe karesinde üst kenar 0 (kabul edilen tek sıçrama); hareket ~0,29 sn | tek sıçrama 73 dp |
+
+İkisinde de tekrar yok; sol boşluğa dokunuştan sonra sheet dinlenmede (182 /
+2101, `cell.sh` yeniden açma istemedi).
+
+**Tur** (hücre geri alındıktan sonra; en-US, sistem koyu, uygulama "Sistemi
+takip et"):
+
+| Adım | Sonuç |
+|---|---|
+| Ekleme — Disney ₺99,99 aylık | eklendi; toplam $70,61 → **$73,01** |
+| Düzenleme — ₺129,99, yıllık | kaydedildi; toplam **$70,87** |
+| Kaydırarak silme | "Subscription deleted" + Undo, toplam $70,61, satır yok |
+| Geri alma (tek shell satırı, `942,2053`) | Disney geri geldi, **$70,87** |
+| Crash tamponu | boş |
+
+### Görev 6 — sürüm notları ("Bu sürümdeki yenilikler")
+
+```
+<tr-TR>
+Bu güncellemede iki düzeltme var:
+• Koyu temada ekranlar arasında geçerken bir anlık beyaz parlama oluyordu; artık olmuyor.
+• Ödeme tarihi alanının altına kısa bir açıklama eklendi: ödeme günü geçince tarih kendiliğinden bir sonraki döneme geçer.
+Abonelikleriniz ve ayarlarınız olduğu gibi kalır. Geri bildirim veren testçilerimize teşekkürler!
+</tr-TR>
+<en-US>
+This update brings two fixes:
+• In dark theme, a brief white flash appeared when moving between screens; it no longer does.
+• A short note under the payment date field now explains that once the date passes, it moves to the next period automatically.
+Your subscriptions and settings stay as they are. Thanks to the testers who sent feedback!
+</en-US>
+```
+
+tr-TR 344, en-US 341 karakter, satır sonları dahil (sınır 500). Metin sohbette
+verildiği gibi; yalnızca istemdeki satır kaydırmaları birleştirildi, her madde
+tek satır.
+
+### 27.09.2026 geri bildirimleri
+
+1. Bir testçi takip edilebilecek servisleri listeledi (YouTube Premium/Music, Google AI, Adobe, VDS/sunucu, kurs, Yemeksepeti, spor salonu, talimatlı faturalar, Kick, Twitch) ve VDS gibi geniş alanlarda genel bir ikonun yeteceğini söyledi — üretimden sonra; ikon planına işlendi (bilinen servislerde renkli baş harf, geniş alanlarda türe göre simge).
+2. Abonelik eklerken "otomatik ödeme talimatlı" / "kendim ödüyorum" seçimi; talimatlıya "bugün çekilecek" bildirimi, kendi ödenene "ödemeyi unutma" hatırlatması — üretimden sonra; yeni bir alan gerektiriyor, yayından sonraki ilk migration olacak. Uygulama bankayı görmediği için "alındı" değil "çekilecek" denecek.
+3. Ana ekranda aylık/yıllık toplam var ama haftalık yok, oysa abonelik eklerken haftalık seçilebiliyor — üretimden sonra değerlendirilecek. Haftalık abonelikler zaten aylık ve yıllık toplamlara çevrilerek giriyor; istek haftalık bir toplam görünümü.
+4. Ad yazılınca logo/ikon görünmesi — ikon planında; bu isteği yapan üçüncü testçi.
+5. Aylık gelir girip gelirin ne kadarının aboneliklere gittiğini görmek — üretimden sonra değerlendirilecek; gelir yalnızca telefonda kalacak.
+6. Testçilere 27.09'da ikonlar ve ödeme türü konularını anlatan bir not gönderildi.
+
+### Doğrulama
+
+| Koşu | Sonuç |
+|---|---|
+| `assembleDebug` + `testDebugUnitTest` + `bundleRelease`, `--rerun-tasks` | geçti; `compileDebugKotlin` ve `compileReleaseKotlin` koştu |
+| Birim testleri | **330 test, 0 hata, 0 atlanan** |
+| Derleme uyarısı | yeni yok |
+| `app/schemas` | `git diff v1.0.1` boş |
+| `lintDebug`, `connectedDebugAndroidTest` | koşulmadı — kod değişikliği yalnız sürüm satırları; 16q'da ikisi de bu kodla koştu |
+
+### Ortam
+
+- Emülatör yalnız `subtrack_tester_api33` (`-gpu host`) çalıştı; derleme
+  emülatör kapalıyken koştu. Tur sonunda `wm size`/`wm density` sıfır, yazı
+  1.0, `cmd uimode night no` (`ui_night_mode` 1, `mCurUiMode=0x11`), uygulama
+  dili boş, `show_ime_with_hard_keyboard 0`; `/sdcard`'da kayıt ya da döküm
+  dosyası yok (önceki turlardan kalan `ui.xml` de silindi). Emülatör kapatıldı.
+- api33'te kurulu: 1.0.2 (AAB'den, upload anahtarı) ve veri: beş abonelik
+  (fikstürün dördü + Disney ₺129,99 yıllık), ana para USD, uygulama teması
+  Dark (ölçüm için "Sistemi takip et" yapıldı, geri alındı). `installDebug`
+  öncesi `adb uninstall` gerekir.
+- Fiziksel telefona dokunulmadı; `adb devices` yalnız emülatörü gösterdi.
+- AAB'nin kopyası, iki APK seti ve ölçüm kayıtları oturumun geçici klasöründe:
+  `%LOCALAPPDATA%\Temp\claude\C--Users-cane7-Documents-GitHub-SubTrack\094fd26a-2f71-4a18-a11c-fc9ed91eb5e6\scratchpad\16r\`
+  (`subtrack-1.0.2-vc3.aab`, `subtrack-1.0.2.apks`, `subtrack-1.0.1.apks`,
+  `before/`, `after/`, `flash/rec/`, `cell/rec/`, `manifest-*.xml`,
+  `perm-*.txt`, `jarsigner*.txt`, `notes-*.txt`).
+
+### Rapor edilen, dokunulmadı
+
+- TESTING "Yükseltme Testi" adım 2 eski tarafı hâlâ 16n'deki gibi universal
+  release APK olarak anlatıyor. Bu tur önceki sürümün AAB'sini kullandı —
+  testçilerdeki biçime daha yakın. Bölümün buna göre güncellenmesi istenmedi,
+  yapılmadı.
+
+**Değişen dosyalar**
+- `docs/ARCHITECTURE.md` §23 — pencere zemini kararı
+- `docs/TESTING.md` — #120, "Geçişlerde parlama gerileme testi", salınım testinde son dokunuş
+- `app/build.gradle.kts` — `versionCode 3`, `versionName "1.0.2"`
+- `docs/ROADMAP.md` — Faz 16'ya 1.0.2 satırı
+- `docs/PROGRESS.md` — bu kayıt
+
+**Commit'ler**
+- `7c53088` docs: record the window background decision and its flash regression test
+- `81332c1` chore: bump version to 1.0.2 (versionCode 3) — **etiket buna**
+- (bu kayıt) docs: record the 1.0.2 release build and the 27.09 tester feedback
+
+**Sonraki faz için not**
+- Yükseltme testinin eski tarafı bir sonraki sürümde 1.0.2 olacak. AAB'si
+  yukarıdaki geçici klasörde; orası kalıcı bir yer değil.
+- Fiziksel telefon dahili test kanalından güncelleniyor (`CLAUDE.md` §6). 1.0.2
+  yalnız kapalı teste yüklenirse telefona gelmeyebilir — 1.0.1 dahili teste
+  kitaplıktan da eklenmişti (16n, 16p). Emin değilim; Console'da bakılmalı.
+- 27.09'un 2. maddesi (ödeme türü) yayından sonraki ilk migration olacak:
+  şema `version` artacak ve yükseltme testi migration'ın sınavı olacak.
+
+---
+
 ## [Faz 16q] Testçi Geri Bildirimleri: Beyaz Parlama ve Yenilenme Açıklaması — 2026-09-27
 
 **Durum:** Tamamlandı. İki düzeltme (A, B); `versionCode`/`versionName`

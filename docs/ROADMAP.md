@@ -728,6 +728,13 @@ Aylık toplamın zaman içindeki anlık görüntüleri. `PROJECT_SPEC.md` §1'de
       test incelemesinden geçti; kapalı ve dahili testte yayında (24.09.2026).
       Titremeyi bildiren testçi düzeltmeyi doğruladı. (Console'da ve testçiyle
       oldu, repoda kanıt yok.)
+- [ ] Sürüm 1.0.2 (`versionCode 3`) — iki testçi bildirimi (16q): koyu temada
+      geçişlerdeki beyaz parlama (pencere zemini artık uygulamanın temasını
+      izliyor) ve tarih alanının altındaki yenilenme açıklaması. AAB 16r'de
+      üretildi ve doğrulandı: şema `v1.0.1`'den beri değişmedi, izin listesi
+      aynı, 1.0.1'in üzerine güncelleme olarak kurulunca veri korundu
+      (`TESTING.md` "Yükseltme Testi"). Kaynak commit `81332c1`. **Açık
+      kalan:** kapalı test kanalına yükleme ve etiket — kullanıcıda.
 - [ ] Üretim erişimi ve yayın — 12 testçi 14 gün kesintisiz katılımda kalınca
       başvurulacak (Faz 16k).
 
