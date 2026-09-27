@@ -30,8 +30,9 @@ Her faz sonunda **en üste** yeni kayıt eklenir. Eski kayıtlar silinmez.
 ## [Faz 16r] Sürüm 1.0.2 — İkinci Kapalı Test Güncellemesi — 2026-09-27
 
 **Durum:** Tamamlandı. Tek kod değişikliği sürüm satırları
-(`versionCode 2 → 3`, `versionName "1.0.1" → "1.0.2"`). AAB hazır; kapalı test
-kanalına yükleme ve etiket kullanıcıda. İçerik 16q'nun iki düzeltmesi.
+(`versionCode 2 → 3`, `versionName "1.0.1" → "1.0.2"`). AAB hazır; kapalı teste
+yükleme, aynı AAB'nin kitaplıktan dahili teste eklenmesi ve etiket kullanıcıda
+(aşağıdaki "Karar — sürüm yayınlama sırası"). İçerik 16q'nun iki düzeltmesi.
 
 ### Görev 0 — 16q'nun açık bıraktığı belgeler
 
@@ -191,6 +192,28 @@ tr-TR 344, en-US 341 karakter, satır sonları dahil (sınır 500). Metin sohbet
 verildiği gibi; yalnızca istemdeki satır kaydırmaları birleştirildi, her madde
 tek satır.
 
+### Karar — sürüm yayınlama sırası (16r ek)
+
+Depoda Console'daki sürüm adımlarını anlatan bir belge yok; adım yalnızca
+ROADMAP'in sürüm satırlarında ve PROGRESS kayıtlarında "açık kalan" olarak
+geçiyor. Kural bu yüzden burada:
+
+**Yeni sürüm önce kapalı teste (alpha) yüklenir, sonra aynı AAB App Bundle
+kitaplığından dahili teste de eklenir.**
+
+- **Gerekçe:** dahili teste katılmış bir hesap kapalı ve açık test sürümlerini
+  almaz (Play Console Yardım, answer/9845334 — "Can I run multiple tests per
+  app at the same time?" ve "Version codes and testing track statuses"
+  bölümleri; sayfa 27.09.2026'da okundu). Kullanıcının telefonu dahili testte.
+  Sürüm yalnız kapalı teste giderse telefona hiç gelmez. O zaman Play imzalı →
+  Play imzalı güncellemenin tek görüldüğü yer de kaybolur (TESTING "Yükseltme
+  Testi", "Bu turun ölçmediği").
+- İki kanala **aynı AAB** gider: yeniden derleme ya da ikinci yükleme yok,
+  dahili teste kitaplıktan eklenir.
+- 1.0.1 bu sırayla çıktı (16n, 16p). 16r'nin ilk hâli 1.0.2 için yalnız kapalı
+  testi yazmıştı; Durum satırı, ROADMAP'in 1.0.2 satırı ve "Sonraki faz için
+  not" bu ekte düzeltildi.
+
 ### 27.09.2026 geri bildirimleri
 
 1. Bir testçi takip edilebilecek servisleri listeledi (YouTube Premium/Music, Google AI, Adobe, VDS/sunucu, kurs, Yemeksepeti, spor salonu, talimatlı faturalar, Kick, Twitch) ve VDS gibi geniş alanlarda genel bir ikonun yeteceğini söyledi — üretimden sonra; ikon planına işlendi (bilinen servislerde renkli baş harf, geniş alanlarda türe göre simge).
@@ -233,7 +256,8 @@ tek satır.
 - TESTING "Yükseltme Testi" adım 2 eski tarafı hâlâ 16n'deki gibi universal
   release APK olarak anlatıyor. Bu tur önceki sürümün AAB'sini kullandı —
   testçilerdeki biçime daha yakın. Bölümün buna göre güncellenmesi istenmedi,
-  yapılmadı.
+  yapılmadı. **16r ek'te yapıldı:** ana yol artık iki tarafın da AAB'den
+  bölünmüş APK olarak kurulması; universal APK yedek yol.
 
 **Değişen dosyalar**
 - `docs/ARCHITECTURE.md` §23 — pencere zemini kararı
@@ -241,18 +265,24 @@ tek satır.
 - `app/build.gradle.kts` — `versionCode 3`, `versionName "1.0.2"`
 - `docs/ROADMAP.md` — Faz 16'ya 1.0.2 satırı
 - `docs/PROGRESS.md` — bu kayıt
+- 16r ek: `docs/TESTING.md` "Yükseltme Testi" (AAB'den bölünmüş APK ana yol),
+  `docs/ROADMAP.md` 1.0.2 satırı (dahili test adımı), `docs/PROGRESS.md` bu
+  kayıt (sürüm yayınlama kararı)
 
 **Commit'ler**
 - `7c53088` docs: record the window background decision and its flash regression test
 - `81332c1` chore: bump version to 1.0.2 (versionCode 3) — **etiket buna**
-- (bu kayıt) docs: record the 1.0.2 release build and the 27.09 tester feedback
+- `5412292` docs: record the 1.0.2 release build and the 27.09 tester feedback
+- (16r ek) docs: make split APKs the upgrade test path and record the release order
 
 **Sonraki faz için not**
 - Yükseltme testinin eski tarafı bir sonraki sürümde 1.0.2 olacak. AAB'si
   yukarıdaki geçici klasörde; orası kalıcı bir yer değil.
 - Fiziksel telefon dahili test kanalından güncelleniyor (`CLAUDE.md` §6). 1.0.2
-  yalnız kapalı teste yüklenirse telefona gelmeyebilir — 1.0.1 dahili teste
-  kitaplıktan da eklenmişti (16n, 16p). Emin değilim; Console'da bakılmalı.
+  kapalı teste yüklendikten sonra kitaplıktan dahili teste de eklenmeli
+  ("Karar — sürüm yayınlama sırası"; ilk hâlindeki "emin değilim" sorusu 16r
+  ekte bununla kapandı). Güncelleme telefona gelince abonelikler, toplam ve
+  ayarlar gözle kontrol edilir.
 - 27.09'un 2. maddesi (ödeme türü) yayından sonraki ilk migration olacak:
   şema `version` artacak ve yükseltme testi migration'ın sınavı olacak.
 

@@ -1738,32 +1738,92 @@ git diff <önceki-sürüm-etiketi> -- app/schemas
 Boş olmalı. Doluysa ve şema `version`'ı artmamışsa **dur** (`CLAUDE.md` §6);
 arttıysa bu tur migration'ın testi olur.
 
-### 2. İki derleme — ikisi de upload anahtarıyla
+### 2. İki APK seti — ikisi de AAB'den, upload anahtarıyla
 
-- **Eski:** önceki yayının release derlemesi. 16n'de 16m'nin ürettiği
-  `old-release.apk` kullanıldı: `v1.0` ile kodu aynı commit'ten (`65ea072`;
-  `git diff v1.0 65ea072 -- app gradle` boş) `assembleRelease`, `versionCode 1`.
-  Elde yoksa önceki sürümün etiketinden üretilir (bu yol 16n'de denenmedi).
-- **Yeni:** bu sürümün AAB'sinden `build-apks` ile üretilen set (yukarıdaki AAB
-  bölümü, adım 4).
-- **Play'den indirilen APK eski taraf olamaz.** Play App Signing onu Google'daki
-  uygulama imzalama anahtarıyla imzalıyor, yerel derleme upload anahtarını
-  taşıyor; imzalar tutmadığı için güncelleme `INSTALL_FAILED_UPDATE_INCOMPATIBLE`
-  ile reddedilir (16j'deki imza tuzağıyla aynı kural).
+**Ana yol (16r'den beri): eski ve yeni sürümün ikisi de AAB'den bölünmüş APK
+olarak kurulur**, çünkü testçilere giden biçim bu — Play universal APK değil,
+AAB'den türetilmiş `base` + ABI parçası gönderiyor (yukarıdaki "AAB ile Test
+Etme").
+
+- **Eski:** önceki sürümün **Console'a yüklenen** AAB'si. `app/build/` her
+  derlemede eziliyor; o yüzden her sürüm turu AAB'nin bir kopyasını
+  `subtrack-<versionName>-vc<versionCode>.aab` adıyla ayrı bir klasöre koyar ve
+  SHA-256'sını PROGRESS'e yazar. Kopya bu hash'le doğrulanır:
+
+  ```bash
+  sha256sum subtrack-1.0.1-vc2.aab   # d79d5e4d…57ff80 (PROGRESS 16n)
+  sha256sum subtrack-1.0.2-vc3.aab   # 4ffe38ab…b02d3268 (PROGRESS 16r)
+  ```
+
+  Kopya bulunamazsa önceki sürümün etiketinden, **ayrı bir geçici worktree'de**
+  `bundleRelease` ile üretilir; ana çalışma ağacına dokunulmaz. İmzalama
+  malzemesi `local.properties`'te ve o dosya depoda olmadığı için worktree'ye
+  ayrıca konması gerekir. Bu yol henüz denenmedi.
+- **Yeni:** bu sürümün `bundleRelease` çıktısı (AAB bölümü, adım 1-2).
+
+Her AAB'den bir APK seti — imzalama malzemesi `local.properties`'ten okunur
+(`subtrack.storeFile`, `subtrack.storePassword`, `subtrack.keyAlias`,
+`subtrack.keyPassword`), şifreler komut satırına elle yazılmaz. 16r'de bunları
+okuyup bundletool'u çağıran küçük bir betik kullanıldı; çağrının kendisi:
+
+```bash
+java -jar bundletool-all-1.18.3.jar build-apks \
+  --bundle=subtrack-<eski>.aab --output=old.apks --overwrite \
+  --ks="$STORE" --ks-pass="pass:$STOREPW" \
+  --ks-key-alias="$ALIAS" --key-pass="pass:$KEYPW"
+java -jar bundletool-all-1.18.3.jar build-apks \
+  --bundle=app/build/outputs/bundle/release/app-release.aab --output=new.apks --overwrite \
+  --ks="$STORE" --ks-pass="pass:$STOREPW" \
+  --ks-key-alias="$ALIAS" --key-pass="pass:$KEYPW"
+```
+
+Setin içindeki sürüm kurmadan önce okunur:
+
+```bash
+unzip -o -q old.apks -d old-apks
+aapt2 dump badging old-apks/splits/base-master.apk | head -1   # versionCode='<eski>'
+```
+
+bundletool çıktısı belirlenimci: 16r'de 1.0.1 AAB'sinden yeniden üretilen set,
+16n'de aynı AAB'den üretilenle bayt bayt aynı çıktı.
+
+> **Git Bash'te yol biçimi.** `MSYS_NO_PATHCONV=1` açıkken `java -jar`'a
+> `/c/Users/...` biçiminde yol verilirse `Unable to access jarfile` hatası
+> alınır. Java'ya giden yollar `C:/Users/...` biçiminde yazılır.
+
+**Yedek yol — universal APK** (16n'de böyle yapıldı). Eski sürümün AAB'si de
+etiketi de kullanılamıyorsa: eski sürümle kodu aynı commit'ten `assembleRelease`
+(16n: `65ea072`, `git diff v1.0 65ea072 -- app gradle` boş), sonra
+`adb install old-release.apk`. İmza ve sürüm şöyle doğrulanır:
 
 ```bash
 apksigner verify --print-certs old-release.apk | grep SHA-256   # fce85346…26da0
 aapt2 dump badging old-release.apk | head -1                    # versionCode='<eski>'
 ```
 
+Bu yol bölünmüş kurulumdan universal kuruluma geçişi ölçer, testçilerin
+yaşadığı bölünmüşten bölünmüşe geçişi değil. Raporda bu yazılır.
+
+**Play'den indirilen APK eski taraf olamaz.** Play App Signing onu Google'daki
+uygulama imzalama anahtarıyla imzalıyor, yerel derleme upload anahtarını
+taşıyor; imzalar tutmadığı için güncelleme `INSTALL_FAILED_UPDATE_INCOMPATIBLE`
+ile reddedilir (16j'deki imza tuzağıyla aynı kural).
+
 ### 3. Eski sürümü temiz kur ve fikstürü gir
 
-Cihaz `subtrack_tester_api33`, başlangıç hâlinde (AVD tablosu).
+Cihaz `subtrack_tester_api33`, başlangıç hâlinde (AVD tablosu). Üzerinde başka
+bir derleme varsa önce kaldırılır:
 
 ```bash
 adb uninstall com.elinacn.subtrack
-adb install old-release.apk
+java -jar bundletool-all-1.18.3.jar install-apks --apks=old.apks --device-id=<serial>
+adb shell pm path com.elinacn.subtrack
+adb shell dumpsys package com.elinacn.subtrack | grep -E "versionCode|versionName|firstInstallTime|userId=|POST_NOTIFICATIONS: granted"
 ```
+
+Beklenen: `base.apk` + `split_config.x86_64.apk`, eski `versionCode`,
+`firstInstallTime` kurulum anı, bildirim izni `granted=false` (temiz kurulum).
+`install-apks` `ANDROID_HOME` ister (AAB bölümü, adım 4).
 
 Fikstür **eski sürümün arayüzünden** girilir, en az:
 
@@ -1773,8 +1833,10 @@ Fikstür **eski sürümün arayüzünden** girilir, en az:
 - ana para birimi değiştirilir, tema değiştirilir, bir kur değiştirilir (kur
   ekranındaki "Last edited" satırı da karşılaştırmaya girer).
 
-16n fikstürü: Netflix ₺159,99 aylık; Spotify $10,99 aylık, 28.09.2026; Gym €450
-yıllık; iCloud £2,49 haftalık; ana para USD, tema Dark, 1 $ = 41,5 ₺.
+16n ve 16r fikstürü: Netflix ₺159,99 aylık; Spotify $10,99 aylık, tarihli (16n
+28.09.2026, 16r 30.09.2026 — tarih gelecekte seçilir); Gym €450 yıllık; iCloud
+£2,49 haftalık; ana para USD, tema Dark, 1 $ = 41,5 ₺. Toplam aylık $70,61,
+yıllık $847,27.
 
 ### 4. Güncellemeden önce kayıt
 
@@ -1801,7 +1863,7 @@ okunamaz; WorkManager'ın tanı yayını onun yerine geçiyor ve release'te de
 ### 5. Kaldırmadan güncelle
 
 ```bash
-java -jar bundletool-all-1.18.3.jar install-apks --apks=subtrack.apks --device-id=<serial>
+java -jar bundletool-all-1.18.3.jar install-apks --apks=new.apks --device-id=<serial>
 adb shell pm path com.elinacn.subtrack
 adb shell dumpsys package com.elinacn.subtrack | grep -E "versionCode|versionName|firstInstallTime|lastUpdateTime|userId=|POST_NOTIFICATIONS: granted"
 ```
@@ -1827,15 +1889,18 @@ bunu zorla durdurma sayıp işleri yeniden kuruyor. İş kimliği aynı kalıyor
 (`ExistingPeriodicWorkPolicy.KEEP`), JobScheduler kaydı tazeleniyor, hedef saat
 (ertesi 09:00) değişmiyor.
 
-**16n'de (v1.0 → 1.0.1, api33):** beş dump aynı, görüntü durum çubuğu altında
-aynı, `firstInstallTime` 10:53:25 ve `userId` 10175 korundu, izin korundu, iş
-`3a84cfc8…` iki tarafta `ENQUEUED`, çökme yok.
+| Tur | Eski taraf | Sonuç |
+|---|---|---|
+| 16n (v1.0 → 1.0.1, api33) | universal APK (yedek yol) | beş dump aynı, görüntü durum çubuğu altında aynı, `firstInstallTime` 10:53:25 ve `userId` 10175 korundu, izin korundu, iş `3a84cfc8…` iki tarafta `ENQUEUED`, çökme yok |
+| 16r (1.0.1 → 1.0.2, api33) | 1.0.1 AAB'sinden bölünmüş APK (ana yol) | beş dump aynı, görüntü durum çubuğu altında aynı, `firstInstallTime` 13:18:40 ve `userId` 10176 korundu, izin korundu, iş `1739e29e…` iki tarafta `ENQUEUED`, çökme yok |
 
-**Bu turun ölçmediği:** eski taraf universal APK'ydı; testçilere giden v1.0
-AAB'den bölünmüş APK'lardı. Play imzalı → Play imzalı güncellemeyi yalnızca
-fiziksel telefon görüyor; ona Claude dokunmaz (`CLAUDE.md` §6). Kullanıcı dahili
-test kanalından güncelleme gelince aboneliklerin, toplamın ve ayarların yerinde
-olduğunu gözle kontrol eder.
+**Bu turun ölçmediği:** iki taraf da upload anahtarıyla imzalı; testçilere
+giden APK'lar Play'in uygulama imzalama anahtarını taşıyor. Play imzalı → Play
+imzalı güncellemeyi yalnızca fiziksel telefon görüyor; ona Claude dokunmaz
+(`CLAUDE.md` §6). Telefon dahili testte; sürüm dahili teste de eklendiği için
+güncelleme oradan geliyor (sürüm yayınlama kuralı, PROGRESS 16r). Kullanıcı
+güncelleme gelince aboneliklerin, toplamın ve ayarların yerinde olduğunu gözle
+kontrol eder.
 
 ---
 

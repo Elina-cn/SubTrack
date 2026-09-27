@@ -734,7 +734,9 @@ Aylık toplamın zaman içindeki anlık görüntüleri. `PROJECT_SPEC.md` §1'de
       üretildi ve doğrulandı: şema `v1.0.1`'den beri değişmedi, izin listesi
       aynı, 1.0.1'in üzerine güncelleme olarak kurulunca veri korundu
       (`TESTING.md` "Yükseltme Testi"). Kaynak commit `81332c1`. **Açık
-      kalan:** kapalı test kanalına yükleme ve etiket — kullanıcıda.
+      kalan:** kapalı teste yükleme, aynı AAB'nin App Bundle kitaplığından
+      dahili teste eklenmesi (kullanıcının telefonu dahili testte; kural
+      PROGRESS 16r, "Karar — sürüm yayınlama sırası") ve etiket — kullanıcıda.
 - [ ] Üretim erişimi ve yayın — 12 testçi 14 gün kesintisiz katılımda kalınca
       başvurulacak (Faz 16k).
 
