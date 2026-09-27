@@ -172,6 +172,7 @@ etmeden bildirin; sonraki maddeler zaten bozuk bir durumun üstüne binebilir.
 | 117 | (API 29) ₺ karakteri | **Çiziliyor**, tofu kutusu değil — dashboard'daki en büyük punto dahil | 14b |
 | 118 | (`subtrack_tester_api33` hücresi — "Ekleme sheet'i salınım gerileme testi") Formda tek kısa yukarı kaydırma, orta ve hızlı; parmağı kaldır, 3 sn bekle, tek dokunuş | **Tek sıçrama**, ~0,25 sn'de dinleniyor; tekrar eden döngü **yok**. Dokunuştan sonra sheet dinlenme konumunda, yukarıda donmuyor | 16m |
 | 119 | Sheet'i ekranı dolduracak kadar uzat: klavye açık, 360dp ekran veya büyük yazı | Üst kenar durum çubuğunun **altında**, arkasında değil; form kayıyor, Kaydet görünür; aşağı kaydırma ve geri tuşu kapatıyor | 16m |
+| 120 | Koyu temada ana ↔ ayarlar, ayarlar ↔ kurlar, ana ↔ istatistik, ana ↔ düzenleme geçişleri; bir kez de uygulama teması sistemin **tersindeyken** (iki yönde) | Geçiş boyunca zemin **koyu kalıyor** — gri/beyaz parlama yok; tersine temada koyu çukur da yok. Ölçüm "Geçişlerde parlama gerileme testi" başlığında | 16q |
 
 **96-105 için not:** düzenleme maddeleri ekleme sheet'iyle **aynı** bileşenlerden
 kurulu bir formu sınıyor. #102 bilerek ikisini karşılaştırıyor: mesajlar
@@ -645,12 +646,29 @@ düğmesinin üst kenarı y=**2101**, durum çubuğu 128 px.
 
 **Hareket** — formun sağ yarısından (x=899, çiplerin dışında), Kaydet'in
 ~150 dp üstünden (y=1688) tek kısa yukarı kaydırma; parmak kalkar, 3 sn
-beklenir, tek dokunuş:
+beklenir, formun **sol boşluğuna** (x=30) tek dokunuş:
 
 ```bash
-adb shell "input swipe 899 1688 899 1088 130; sleep 3; input tap 899 1688"   # orta: 218 dp / 130 ms
-adb shell "input swipe 899 1688 899 478 90; sleep 3; input tap 899 1688"     # hızlı: 440 dp / 90 ms
+adb shell "input swipe 899 1688 899 1088 130; sleep 3; input tap 30 1688"   # orta: 218 dp / 130 ms
+adb shell "input swipe 899 1688 899 478 90; sleep 3; input tap 30 1688"     # hızlı: 440 dp / 90 ms
 ```
+
+**Son dokunuş neden sol boşlukta** (16q'dan beri; 16m ve 16n `899, 1688`'e
+dokunuyordu). Dokunuşun işi sheet'i durdurmak, bir şeye basmak değil — o yüzden
+tıklanabilir düğümü olmayan bir yere düşmeli:
+
+- **Tutamak olmaz.** material3 1.4.0'da tam açık sheet'in tutamağına dokunmak
+  sheet'i **kapatıyor** (`ModalBottomSheet.kt:386`, `Expanded ->
+  animateToDismiss()`); 16q'nun sayılmayan ilk koşusunda `540, 194` tam bunu
+  yaptı.
+- **Formun sağ yarısı da olmaz.** Sheet tam boy olduğunda (tarih seçili ya da
+  yazı ≥ 1.26) form kayıyor ve `899, 1688` tarih alanına denk gelebiliyor;
+  dokunuş seçiciyi açar.
+- Sol 30 px'te hiçbir düğüm tıklanabilir değil; hangi kaydırma konumunda
+  olursa olsun yalnız sheet'e dokunulmuş olur.
+
+Tarih seçiliyken sheet tam boy: dinlenmede üst kenar **128** (tarihsiz 182),
+Kaydet yine **2101** (16q).
 
 **Beklenen** (16m'de ölçülen; 16m öncesi derleme aynı hücrede aynı oturumda):
 
@@ -708,6 +726,67 @@ adb shell cmd locale set-app-locales com.elinacn.subtrack --locales ""
 `subtrack_edge_api36`'nın başlangıçtaki uygulama dili `tr-TR`'dir, orada boş
 değil `tr-TR` geri yazılır. API 29'da son iki komut yok: dil ve tema Ayarlar
 arayüzünden geri alınır ("Cihaz dili", "Koyu tema").
+
+### Geçişlerde parlama gerileme testi (#120, Faz 16q)
+
+16q'da düzeltilen hata: pencerenin zemini temadan bağımsız açık `#FAFAFA`'ydı ve
+gezinme geçişlerinin çapraz geçişinde görünüyordu; koyu temada her ekran
+değişiminde zemin 0,3-0,5 sn griye çıkıyordu (`ARCHITECTURE.md` §23, "Pencere
+zemini uygulamanın temasını izliyor").
+
+**Geçişler** — dört gidiş, dördünün dönüşü (dönüş sistem geri tuşuyla,
+`input keyevent 4`):
+
+| Gidiş | Nasıl |
+|---|---|
+| ana → ayarlar | üst çubuktaki ayarlar ikonu |
+| ayarlar → kurlar | Ayarlar → Döviz Kurları satırı |
+| ana → istatistik | üst çubuktaki grafik ikonu |
+| ana → düzenleme | bir satıra dokunma — ortası gezinme çubuğuna düşmeyen bir satır (api29'un üç tuşlu çubuğunda Netflix satırının ortası çubuğa düşüyordu, 16q Spotify'ı kullandı) |
+
+Ekleme sheet'i ve tarih seçici açılış/kapanışı **kontrol** olarak eklenir:
+ikisi tam ekran geçiş değil, 16q'dan önce de parlamıyordu. Açık temada orada
+görülen koyu çukur scrim ve diyalog karartması — ürünün kendisi, bu maddenin
+konusu değil.
+
+**Temalar** — tema tercihinin ne dediğine önce bakılır (aşağıdaki "Tema
+tercihi" başlığı):
+
+1. sistem koyu + uygulama "Sistemi takip et" — testçinin bildirdiği hâl;
+2. sistem açık + uygulama **Koyu**;
+3. sistem koyu + uygulama **Açık**.
+
+2 ve 3, pencere zeminini sistemin gece moduna bağlayan bir düzeltmenin
+(`values-night`) düşeceği hücreler: 2'de parlama geri gelir, 3'te ters yönde
+koyu çukur olur. Düzeltme uygulamanın tercihini izlemeyi bırakırsa burada
+görünür.
+
+**Gözle:** koyu temada geçiş boyunca zemin bir an bile açılmamalı. Bozuk hâlde
+gri yıkama çıplak gözle görülüyordu (testçi böyle buldu).
+
+**Sayıyla:** release derlemesi, emülatör `-gpu host` (`swiftshader_indirect`
+kayıtları geçişi yarım örnekliyor), her geçiş için ayrı `screenrecord`, kareler
+çeyrek ölçekte çıkarılır, üst %6 ve alt %8 (durum ve gezinme çubuğu bantları)
+kesilir. Her kare geçişin **ilk ve son karesiyle** (iki dinlenme hâli)
+parlaklık (luma) olarak piksel piksel karşılaştırılır:
+
+- **fazlalık** = `max(0, kare − max(ilk, son))`, piksel başına, kare
+  ortalaması (0-255). İki ekranın kendi zemini üstündeki çapraz geçiş hiçbir
+  pikseli iki uçtan birden parlak yapamaz; fazlalık yalnızca arkadan daha açık
+  bir şey görünürse doğar.
+- **koyu çukur** = aynısı ters yönde, `max(0, min(ilk, son) − kare)` — tema 3
+  için.
+- **süre** = fazlalığın 5'i aştığı ilk kareden altına indiği ilk kareye.
+
+**Beklenen** (16q sonrası; tema 1 ve açık tema api29 ve api34'te, tema 2 ve 3
+api34'te ölçüldü): sekiz gezinme geçişinin hepsinde fazlalık **< 5** — ölçülen
+en büyük 2,5, api29 ana → düzenleme, dokunulan satırın dalgası (eşik üstü
+pikseller tam satırın sınırında). Tema 3'te gezinme geçişlerinde koyu çukur en
+fazla 1,2. **Bozuk hâl:** fazlalık 40-51, tepe karede düz zemin `#0D1A14`
+yerine ~`#454F4B`, 0,3-0,5 sn; açık temada 3,4-5,9.
+
+16q'nun betikleri depoda değil; üç sayının tanımı yukarıda, ölçüm ondan yeniden
+kurulur.
 
 ### Bildirim izni durumunu adb ile kurma ve okuma
 

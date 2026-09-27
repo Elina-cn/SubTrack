@@ -2305,6 +2305,64 @@ Ekran görüntüleri
 Navigasyon çubuğu stiline dokunulmadı; `onCreate` zaten yalnızca durum
 çubuğunu veriyor.
 
+### Pencere zemini uygulamanın temasını izliyor (Faz 16q)
+
+**Sorun.** Pencerenin kendi zemini `Theme.SubTrack`'ten geliyordu; ebeveyni
+`android:Theme.Material.Light.NoActionBar` olduğu için kullanıcı hangi temayı
+seçerse seçsin açık **`#FAFAFA`**. Ekran dururken Compose onu tamamen örtüyor.
+Gezinme geçişinde örtmüyor: NavHost'un varsayılan çapraz geçişinde giren ve
+çıkan ekran aynı anda yarı saydam, aradan pencere görünüyor. Bir testçi bunu
+koyu temada "ekranlar arasında beyaz parlama" diye bildirdi (26.09.2026).
+
+**Ölçüm (16q, release, api29 ve api34).** `screenrecord` kare kare; her kare
+geçişin iki ucundaki dinlenme karesiyle karşılaştırıldı ve pikselin iki uçtan
+da ne kadar parlak olduğu ("fazlalık", 0-255) ölçüldü. İki ekranın kendi zemini
+üstündeki çapraz geçiş hiçbir pikseli iki uçtan birden parlak yapamaz; fazlalık
+ancak arkadan daha açık bir şey görünürse doğar. Koyu temada sekiz gezinme
+geçişinin sekizinde, iki cihazda da fazlalık **40-51**; düz zemin pikseli
+`#0D1A14` → ~`#454F4B`, **0,3-0,5 sn**. Açık temada aynı pencere zeminden
+(`#D3E2D8`) yalnız biraz açık olduğu için geçiş hafifçe soluklaşıyordu
+(3,4-5,9) — orada fark edilmemesinin sebebi bu. Sheet ve tarih seçici tam ekran
+geçiş değil; onlarda parlama yoktu. Tablolar PROGRESS 16q'da.
+
+**Sebep deneyle doğrulandı.** `android:windowBackground` geçici olarak
+`#FF00FF` yapıldı (commit edilmedi): aynı geçişin (ana → düzenleme, api34 koyu)
+tepe karesi gri yerine **mor** çıktı, düz zemin pikseli `(69,80,75)` →
+`(68,19,73)`. Pencerenin tepe karedeki payı ~%23-24 — çapraz geçişin ortasında
+beklenen ~¼. Kareler `docs/screenshots/phase-16q/a-flash-api34-dark-*.png`.
+
+**Çözüm: `WindowBackgroundFollowsTheTheme()` (`MainActivity.kt`).** Pencerenin
+zemini o an çizilen `MaterialTheme.colorScheme.background`'dan yazılıyor;
+`DisposableEffect`'in anahtarı renk olduğu için renk değişince yeniden.
+
+- **Uygulama içi tercihi izliyor, sistemin gece modunu değil.** Renk Compose'un
+  çizdiği şemanın kendisinden okunuyor; sistem/açık/koyu ve dynamic color
+  dahil, pencere ile içerik ayrışamaz.
+- **Tercihin okunmasını beklemiyor** (`SystemBarsFollowTheTheme`'in aksine).
+  Tercih gelene kadar pencere splash'ın altında, ekranda değil; 1000 ms son
+  tarih yolunda uygulama varsayılan temayla çiziyor ve pencerenin olması
+  gereken renk de o.
+- `themes.xml`'e dokunulmadı. Açılış zinciri ("Açılışta ilk kare TUTULUYOR")
+  bozulmadı: 16q soğuk açılışı iki cihazda iki temada yeniden ölçtü, splash →
+  uygulama arasındaki kareler yine yalnız iki rengin doğrusunda.
+
+Sonra: sekiz geçişin hepsinde fazlalık gürültü düzeyinde (en büyüğü 2,5 —
+dokunulan satırın dalgası) — iki cihazda koyu ve açık temada, api34'te uygulama
+teması sistemin **tersindeyken iki yönde de**. Gerileme maddesi TESTING #120.
+
+**Seçilmeyenler:**
+
+- **`values-night`'ta koyu pencere zemini.** Kaynak cihazın gece modunu izler,
+  uygulamanın tercihini değil. Uygulama sistemin tersindeyken pencere yine
+  yanlış olurdu: sistem açık + uygulama koyu bugünkü parlamayı aynen tutar,
+  sistem koyu + uygulama açık ise sorunu **ters yönde** getirir — açık
+  uygulamanın arkasında koyu pencere, her geçişte koyu bir çukur. 16q'nun
+  tersine tema tablosu tam bu iki hücreyi ölçüyor; düzeltme ikisinde de temiz.
+- **`themes.xml`'de sabit bir renk** (`#0D1A14` ya da `#D3E2D8`). Tek renk iki
+  temadan birinde yanlış, ve tercih değişince pencere değişmez, yanlış kalır.
+  Dynamic color açıkken zemin duvar kâğıdından geldiği için hiçbir sabit renk
+  onu tutturamaz.
+
 ### Para birimi: HER YERDE SEMBOL
 
 `NumberFormat` para işaretini okuyucunun locale'inden alır ve o locale'de o
