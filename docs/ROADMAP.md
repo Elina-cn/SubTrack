@@ -775,19 +775,25 @@ Gerekçe:
   hatanın düzeltmesi yeni bir sürüm olarak hemen çıkabilmeli, içinde yarım
   kalmış bir özellik olmadan.
 
-- [ ] **İlk iş:** mevcut `iconKey` alanının yeni ikon türlerini şema
-      değişikliği olmadan taşıyıp taşıyamayacağı doğrulanır. Taşıyamıyorsa
-      bu sürüm migration gerektirir ve `ARCHITECTURE.md` "Şema sürümlemesi"
-      kuralı uygulanır
+- [ ] **İlk iş:** hedef, ikon türünün (otomatik, resim, emoji, renk) mevcut
+      `iconKey` değerinin içinde tutulması ve şemanın değişmemesi; doğrulama
+      bunun uygulanabilir olduğunu teyit eder. Migration gerektiği ortaya
+      çıkarsa Faz 21'deki "ilk migration" gerekçesi geçersiz kalır ve sürüm
+      sırası sohbette yeniden ele alınır
 - [ ] Ad yazılırken ikon kendiliğinden gelir: bilinen servislerde renkli baş
       harf, geniş alanlarda (kurs, sunucu gibi) türe göre simge. Hazır marka
       logosu yok (marka hakları; uygulamanın internet izni yok)
 - [ ] Kullanıcı kendi resmini, bir emojiyi ya da bir rengi seçebilir; resim
       seçimi sistemin fotoğraf seçicisiyle, yeni izin olmadan
+- [ ] Kullanıcı resimleri Auto Backup ve cihazdan cihaza aktarım kurallarına
+      girer, yedek kotasına sığması için küçük boyutta saklanır; resim
+      dosyası bulunamazsa otomatik ikon gösterilir (`ARCHITECTURE.md` §25
+      kural uygulanırken güncellenir)
 - [ ] v1.0'dan gelen aboneliklerin ikonları korunur
 
 **Bitti:** Ad yazılınca ikon geliyor; resim, emoji ve renk seçilebiliyor;
-v1.0'dan gelen aboneliklerin ikonu korunuyor.
+resimli bir abonelik yedekten geri yüklenince resmi de geliyor; v1.0'dan
+gelen aboneliklerin ikonu korunuyor.
 
 ---
 

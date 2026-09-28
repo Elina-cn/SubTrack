@@ -50,6 +50,7 @@ Console'da ve testçilerle oldu; repoda kanıtı yok (etiket hariç).
 - ROADMAP: eski Faz 17 yerine Faz 17 İkonlar ve 18 Tema (v1.1), 19 Kolaylıklar (v1.2), 20 Dışa/İçe Aktarma (v1.3), 21 Ödeme Türü (v1.4), hepsi ⬜; her sürüm son fazından sonra bir sürüm turuyla çıkar.
 - "Üretim erişimiyle başlar" kuralı ve ilk iki gerekçesi Faz 17'ye taşındı, içe aktarmaya özgü üçüncü gerekçe Faz 20'de kaldı; kural değişmedi.
 - Eski numaralara gönderme yapan ileriye dönük cümleler güncellendi (PROJECT_SPEC §5 ve §6, CLAUDE.md §4); ROADMAP'in tamamlanmış gizlilik politikası maddesine "sürüm numarası 2026-09-27'de değişti" notu eklendi, eski tarihli notlar değişmedi.
+- ROADMAP Faz 17, PROJECT_SPEC v1.1'le eşitlendi: "İlk iş" maddesi, kullanıcı resimlerinin yedeğe girmesi ve Bitti satırı (16s EK-2).
 
 **Rapor edilen, dokunulmadı**
 - v1.1'in `iconKey` doğrulaması migration çıkarırsa v1.4'teki "ilk migration" ve gerekçesi (önce yedek dosyası) tutmaz; belgeye yazılı bir karar eklenmedi.
