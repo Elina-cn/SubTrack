@@ -27,6 +27,178 @@ Her faz sonunda **en üste** yeni kayıt eklenir. Eski kayıtlar silinmez.
 
 ---
 
+## [Faz 16t] Teşhis: Kur ve Ayarlar Geri Bildirimi — 2026-09-28
+
+**Durum:** Tamamlandı (yalnız teşhis). Kod değişmedi; düzeltme, teşhis sohbette değerlendirildikten sonra ayrı turda 1.0.3 olarak yapılacak. **1. sorun yeniden üretilemedi:** varsayılan kurla hesap iki yönde de elle hesapla aynı çıktı, gösterilen kur ile hesaptaki kur tek kaynaktan geliyor. 2. ve 3. sorun yeniden üretildi, kök nedenleri koddan gösterildi.
+
+### 28.09.2026 geri bildirimleri
+
+1. Bir testçi: kurlara hiç dokunmadan, varsayılan USD kuru (42,85) ile USD seçildiğinde aylık/yıllık toplam 42,85'le açıklanamayan bir değer gösteriyor; kur elle güncellenince hesap doğru. Para doğruluğu sorunu (PROJECT_SPEC §3 madde 1), bu yüzden öncelikli.
+2. Ödeme hatırlatmaları açıkken ayarlara girince satır bir an kapalı görünüyor, sonra "Açık" oluyor. Kullanıcı aynı şeyi kendi telefonunda da (OPPO A15s, Android 10) gözle gördü.
+3. Kur ekranında Kaydet'e basınca hiçbir geri bildirim yok, klavye de kapanmıyor; testçi kaydedilmedi sanıp birkaç kez bastı, oysa kaydedilmişti.
+4. Testçi kurların canlı (internetten) gelmesini önerdi. Plan: PROJECT_SPEC §4 "Ağ bağlantısı" — zamanlaması açık; bu turda karar verilmedi.
+
+### Ortam ve yöntem
+
+- 16r'nin 1.0.2 AAB'si (SHA-256 `4ffe38ab…b02d3268`, 16r kaydıyla aynı) ve ondan üretilmiş APK seti, `install-apks` ile bölünmüş APK (testçilerdeki biçim, imza upload anahtarı). İki emülatörde de uygulama önce kaldırılıp temiz kuruldu.
+- `subtrack_narrow_api29`: Android 10 (kullanıcının telefonuyla aynı sürüm), 720×1280, en-US.
+- `subtrack_tester_api33`: Android 13, 1080×2400, uygulama dili `tr-TR` (`cmd locale set-app-locales`).
+- Kare kare ölçüm: api29'da `screenrecord` + ffmpeg, tam boy kareler ve sunum zamanlarıyla. api33'te misafir `screenrecord` takıldı (boş dosya, süreç `do_wait`'te); yerine emülatörün kendi kaydedicisi (`adb emu screenrecord start --fps 60`) kullanıldı. Bu kaydedici geçişin ilk soluk karelerini kaçırabiliyor; oradaki süreler "en az" diye okunmalı.
+- DataStore ve veritabanı api29'da `adb backup` ile alınıp çözüldü: release derlemesi `run-as`'a izin vermiyor, yedek kuralları `datastore/` ve veritabanını kapsıyor. api33'te denenmedi.
+
+### Sorun 1 — varsayılan kur: yeniden üretilemedi
+
+**Yeniden üretim.** Kurlara hiç dokunulmadı; kur ekranında "hiç düzenlenmedi" uyarısı duruyordu.
+
+| Cihaz / fikstür | Ana para | Ekran | Elle hesap |
+|---|---|---|---|
+| api29 en-US: Spotify $10,99 aylık | TRY | aylık ₺470.92, yıllık ₺5,651.06, istatistik ₺470.92 | 10,99 × 42,85 = 470,9215; × 12 = 5.651,058 |
+| api29: + Netflix ₺159,99 aylık | USD | aylık $14.72, yıllık $176.68, istatistik Netflix $3.73 | 159,99 / 42,85 = 3,7337 → 3,73; + 10,99 = 14,72; yıllık 44,80 + 131,88 = 176,68 |
+| api33 tr-TR: Netflix ₺229,99 aylık, Spotify $10,99 aylık, Kick $4,99 haftalık, Adobe $239,88 yıllık, Gym €450 yıllık, Disney £7,99 aylık | TRY | aylık ₺4.647,20, yıllık ₺55.766,44 | 4.647,2038; 55.766,446 |
+| aynı fikstür | USD | aylık $108,45, yıllık $1.301,44 | 108,4528; 1.301,4346 |
+
+- Elle hesap kesirlerle ve tek yuvarlamayla yapıldı. Dört aylık toplamın dördü de kuruşu kuruşuna aynı.
+- İki yıllıkta 1 kuruş fark var: uygulama her para birimini ayrı toplayıp bir kez yuvarlıyor (CurrencyConverter.kt:36-50, "differ by a kuruş or two" — bilinçli tasarım). Ekrandaki değer bu yöntemle elle de çıkıyor: TRY yıllık 2.759,88 + 27.048,63 + 20.790,00 + 5.167,93 = 55.766,44. "42,85'le açıklanamayan" düzeyinde bir fark değil.
+- İstatistikteki satır başı aylıklar aynı zincirden: Kick "ayda ₺926,56" (4,99 × 52 / 12 × 42,85), Adobe "ayda ₺856,57", Gym "ayda ₺1.732,50".
+
+**Kök neden: bulunamadı — gösterilen kur ile hesaptaki kur aynı değer, aynı kaynak.**
+- Tek kaynak `ExchangeRateTable.Default` (ExchangeRateTable.kt:61-68): USD `428_500L` = 42,8500, ölçek `RATE_SCALE = 10_000` (satır 26).
+- Okuma: `SettingsRepositoryImpl.observeRates()` (SettingsRepositoryImpl.kt:54-63) yalnız kayıtlı anahtarları okur, gerisini `ExchangeRateTable.of` (ExchangeRateTable.kt:76-77) `Default`'tan doldurur; hiç kayıt yoksa tablo tam olarak `Default`.
+- Ekrandaki değer: kur ekranı aynı akıştan `rates.rateOf(it).asText()` (ExchangeRatesViewModel.kt:41, 174-175) → 428500 → "42.85".
+- Hesaptaki değer: aynı akış, her yayında yeni `CurrencyConverter(rates)` — ana ekran HomeViewModel.kt:66 ve 93, istatistik StatisticsViewModel.kt:62, ay kaydı MonthlySnapshotRecorder.kt:80.
+- Ölçek farkı yok: saklama, tablo ve ayrıştırma aynı dört ondalık (`RATE_DECIMAL_DIGITS = 4`, ExchangeRatesViewModel.kt:194). Yön farkı yok: kur "1 birim yabancı = kaç ₺" (ARCHITECTURE §15), dönüşüm `tutar × kur(kaynak) / kur(hedef)` (CurrencyConverter.kt:32, 112-120); USD → TRY çarpıyor, TRY → USD bölüyor, iki yön ekranda doğrulandı.
+- Ölçüm R8'li release derlemesinde yapıldı; küçültme de sonucu değiştirmiyor.
+
+**Testçinin görmüş olabileceği (tahmin, doğrulanmadı):**
+- Periyot çevirimi: haftalık fiyat aya 52/12 ile, yıllık 1/12 ile girer. Kick $4,99 haftalık aylık toplama ₺926,56 ekler; "4,99 × 42,85 = 213,82" ya da "× 4 hafta = 855,29" ile açıklanamaz.
+- Karışık para birimi: EUR ve GBP de kendi varsayılanlarıyla (46,2 / 53,9) toplama girer; yalnız 42,85'le hesaplayan biri toplamı açıklayamaz.
+- Kategori süzgeci açıksa toplam yalnız görünen satırları kapsar (HomeViewModel.kt:90-93).
+- Gerçek kurla kıyas: 42,85, 29.08.2026 tarihli bir tahmin. Banka ekstresi ya da güncel kurla karşılaştıran testçi kuru güncelleyince sayıları "doğru" bulur. "Kur elle güncellenince doğru" gözlemiyle uyuşan açıklama bu; ama "42,85'le açıklanamayan" sözüyle çelişiyor.
+- Testçiden istenecek: ana ekranın ve listenin ekran görüntüsü; her aboneliğin para birimi ve periyodu; ana para; süzgeç açık mıydı; beklediği sayı ve nasıl hesapladığı; "düzelince" girdiği kur.
+
+**Kalıcılık.**
+- Kur hiç düzenlenmediyse DataStore'da kur anahtarı yok. api29'da temiz kurulum + USD abonelik + kur ekranını açıp çıkma sonrası yedekte `settings.preferences_pb` dosyası **hiç yok**. (API 33+'da izin istenince dosya `reminder_permission_requested` ile oluşur; kur anahtarı yine olmaz.)
+- Kuru bir kez kaydeden kullanıcıda **üç kurun üçü de** yazılı. Yedekte `rate_USD = 415500`, `rate_EUR = 462000`, `rate_GBP = 539000`, `rates_updated_at`; EUR ve GBP'ye dokunulmadığı hâlde varsayılan değerleriyle, çünkü Kaydet her alanı yazıyor (ExchangeRatesViewModel.kt:93-107).
+- Hesap hatası olmadığı için bu kullanıcılar da etkilenmiyor. Ama ileride varsayılanlar güncellenirse onlara ulaşmaz: ARCHITECTURE §15'in "sıfırlayan kullanıcı yeni değerleri alır" gerekçesi yalnız sıfırlayanı kapsıyor. Auto Backup bu anahtarları da taşır.
+
+**Etki.**
+- Ana ekran, istatistik ve ay kaydı aynı tablodan ve aynı `CurrencyConverter`'dan geçiyor; üçü de doğru çıktı. api29 temiz kurulumda `monthly_snapshots` = `(202609, 47092, 'TRY')` = ₺470,92; kur 41,55 kaydedilince `(202609, 1484, 'USD')` = $14,84, ekranla aynı.
+- Bildirim metni tutar içermiyor: "ad — bugün/yarın" (PaymentReminderNotifier.kt:71-72, `notification_entry`).
+- Geçmişe yanlış tutar yazılmadı. Not: geçmiş ay satırı yalnız toplamı ve para birimini tutar (kur ve liste tutulmaz), o yüzden kapanmış bir ay yeniden hesaplanamaz; içinde bulunulan ay her değişiklikte, kur kaydı dahil, yeniden yazılır (ARCHITECTURE §19).
+
+**Birim testleri neden yakalamadı?** Yakalanacak bir hata bulunmadı; yolun kendisi test ediliyor (CurrencyConverterTest 42,85 ile dönüşüm; HomeViewModelTest `uiState_editedRate_…`, `uiState_ratesReset_…`, `uiState_mainCurrencyChanges_…`; PeriodNormalisationTest; StatisticsViewModelTest; MonthlySnapshotRecorderTest). Boşluk: gerçek `SettingsRepositoryImpl`'in kur işlevleri (`observeRates`, `setRate`, `resetRates`, `observeRatesUpdatedAt`) için birim testi yok; SettingsRepositoryImplTest yalnız ana para, tema ve duvar kâğıdını sınıyor. ViewModel testleri `FakeSettingsRepository` ile koşuyor ve sahte depo `ExchangeRateTable.of`'u kendisi çağırıyor. "Dosya yok → `Default`" yolu bu turda yalnız emülatörde görüldü.
+
+### Sorun 2 — hatırlatma satırının ilk anı: yeniden üretildi
+
+**Ölçüm** ("yanlış" = satırın `SETTINGS_ONLY` metni):
+
+| Cihaz | Gerçek durum | İlk karelerde satır | Süre |
+|---|---|---|---|
+| api29 en-US, uygulama Koyu | Açık (`ENABLED`, "On") | "Off — turn on in system settings", 22 kare | 616 ms (1799 → 2415) |
+| api29, ikinci kayıt | Açık | aynı | 625 ms (1663 → 2288) |
+| api33 tr-TR, açık tema | izin hiç istenmedi (`CAN_REQUEST`, "Kapalı — açmak için dokunun") | "Kapalı — sistem ayarlarından açılmalı" | ≥ 432 ms (ilk soluk kareler kayıtta yok) |
+| api33 tr-TR, USD + Koyu | `CAN_REQUEST` | aynı | 688 ms (2087 → 2775) |
+
+Yanlış metin satırın ilk göründüğü kareden itibaren giriş geçişi boyunca duruyor, geçiş biterken düzeliyor. Emülatörde bile 0,6-0,7 sn; kullanıcının telefonunda gözle görülmesiyle uyumlu.
+
+**Kök neden.**
+- İlk değer: `ReminderScreenState.permission` varsayılanı `SETTINGS_ONLY` (SettingsViewModel.kt:223). `stateIn`'in `initialValue`'su `SettingsUiState()` (SettingsViewModel.kt:62), onun varsayılanı da `SETTINGS_ONLY` (SettingsUiState.kt:50). Satır bunu "Kapalı — sistem ayarlarından açılmalı" diye çiziyor.
+- Gerçek durum yalnız `RefreshReminderPermission` olayıyla hesaplanıyor (SettingsViewModel.kt:102-112, DataStore'dan `wasPermissionRequested()` okuyan bir coroutine içinde). Olay yalnız `ON_RESUME`'da (SettingsScreen.kt:86-98) ve izin cevabında (satır 74-78) gönderiliyor.
+- Navigation Compose 2.9.5'te giren hedef, geçiş bitene kadar `STARTED`'da kalıyor, ancak geçiş tamamlanınca `RESUMED` oluyor (navigation-common `NavigatorState.kt:137`); varsayılan giriş geçişi `fadeIn(tween(700))` (navigation-compose `NavHost.kt:134`). Ölçülen 616-688 ms bu 700 ms.
+- Ayarlara her girişte yeni `SettingsViewModel` oluşuyor (hedef geri yığından çıkınca siliniyor), yani her girişte tekrarlanıyor. Ayarlar yığındayken kur ekranından ya da sistem ayarlarından dönüşte durum ViewModel'de kaldığı için tekrarlanmıyor.
+
+**Yanlış değer görünürken dokunulursa.** `onReminderRowTapped` (SettingsViewModel.kt:139-159) `screenState.value.permission`'a bakıyor; `SETTINGS_ONLY` → `OPEN_SYSTEM_SETTINGS`.
+- api29, gerçek durum Açık: dokunuş satır "Off — …" derken düştü (2812 ms), sistem bildirim ayarları (`AppNotificationSettingsActivity`) açıldı; dönünce satır "On". Açık durumdaki doğru davranış da sistem ayarlarını açmak, yani fark yok.
+- api33, gerçek durum `CAN_REQUEST`: dokunuş "Kapalı — sistem ayarlarından açılmalı" derken düştü (3815 ms); **izin penceresi yerine** sistem bildirim ayarları açıldı ("You haven't allowed notifications from this app"). Bu yol `setPermissionRequested` çağırmıyor, kayıt yazılmaz. Kullanıcı orada da açabilir, zarar yok; ama tek dokunuşluk izin penceresi atlanıyor. Dönünce satır "Kapalı — açmak için dokunun".
+- Koddan: gerçek durumu `SETTINGS_ONLY` olan kullanıcıda fark yok.
+
+**Aynı desen başka yerde** (yalnız liste):
+- Ayarlar, tema satırı: `initialValue`'da `ThemeMode.Default` (SettingsUiState.kt:42). api33'te (USD + Koyu) ilk 4 karede (~146 ms) "Sistemi takip et", sonra "Koyu". api29'da ilk kareden doğruydu.
+- Ayarlar, duvar kâğıdı renkleri: `isDynamicColorSupported` `initialValue`'da `false` (SettingsUiState.kt:48), gerçek değer `combine` içinde okunuyor (SettingsViewModel.kt:53). api33'te ilk karede(lerde) "Android 12 ve üzeri gerekir" + devre dışı anahtar (bir kayıtta 1 kare, diğerinde ~146 ms), sonra "Kapalı — uygulamanın kendi paleti". Android 12 altında zaten doğru metin.
+- Ayarlar, ana para çipi: `initialValue`'da `Currency.Base` = TRY (SettingsUiState.kt:40). api29'da USD ilk kareden seçiliydi; api33 kaydında ilk karelerde alttaki ana ekranın yeşil kartı yüzünden hangi çipin dolu olduğu ayırt edilemedi. Koddan aynı desen.
+- Kur ekranı: `initialValue` `ExchangeRatesUiState()` → alanlar boş, `updatedAt = null` → "hiç düzenlenmedi" uyarısı (ExchangeRatesViewModel.kt:50; ExchangeRatesUiState.kt:17, 21). Emülatörde yanlış metin görülmedi (değerler ve "Last edited" ilk çizilen kareden doğru). Yalnız hiç düzenlenmemiş durumda alan etiketi girişte içten kenara kayıyor; alan ilk kompozisyonda boş.
+
+### Sorun 3 — kur ekranında kaydetme: yeniden üretildi
+
+**Ne oluyor** (api29 en-US 720×1280; api33 tr-TR 1080×2400):
+- Veri Kaydet'e basınca hemen yazılıyor: her para birimi için ayrı bir DataStore `edit`'i, her biri zaman damgasıyla (ExchangeRatesViewModel.kt:105-110 → SettingsRepositoryImpl.kt:65-72). Başarıda tek iş taslakları `null` yapmak (satır 110); olay, mesaj ya da gezinme yok. Düğme yalnız olayı gönderiyor (ExchangeRatesScreen.kt:165-175); ekranda odak ve klavye kodu yok, `KeyboardOptions` yalnız `Decimal` (satır 146), `imeAction` ve `KeyboardActions` yok.
+- api29: klavye açıkken Kaydet görünmüyor, kaydırmak gerekiyor; kaydırınca "Last edited / never edited" satırı ve USD alanı ekran dışında kalıyor. Kaydet'e basınca 21 karelik kayıtta görünür tek değişiklik düğmenin dalga efekti (~400 ms); klavye açık (`mInputShown=true`), odak USD alanında (yukarı kaydırınca altın çerçeve). Yukarıda "Last edited: Sep 28, 2026 9:34 AM" — yazılmıştı.
+- api33: Kaydet klavyeyle birlikte görünüyor. İlk kayıtta iki satırlık "Kurlar hiç düzenlenmedi…" uyarısı tek satırlık "Son düzenleme: 28 Eyl 2026 10:04"e dönüyor (alanlar ve düğme 42 px yukarı kayıyor) ve "42,85" "42.85" olarak yeniden yazılıyor; klavye açık kalıyor. Aynı dakikada ikinci kayıtta ekranda **hiçbir şey** değişmiyor.
+- Klavyedeki ✓ tuşu klavyeyi kapatıyor, kaydetmiyor, odak alanda kalıyor.
+- Diğer iki formda başarı görünür: ekleme sheet'i kapanıyor, düzenleme ekranı geri dönüyor (EditSubscriptionScreen.kt:77-78). Kur ekranı başarılı kayıttan sonra yerinde kalan tek form; tek işaret "Son düzenleme" satırı, dakika çözünürlüğünde ve küçük ekranda Kaydet'e ulaşınca ekran dışında.
+
+**Boş, sıfır, geçersiz giriş** (gözlem). Biri geçersizse hiçbiri yazılmıyor (ExchangeRatesViewModel.kt:93-103); hata alan değişince siliniyor (satır 62).
+
+| Giriş | Sonuç |
+|---|---|
+| boş (api29) | "Enter a rate" USD alanının altında; alan ekran dışında olduğu için Kaydet'in olduğu yerden görünmüyor, klavye açık, "Last edited" değişmedi |
+| `0` (api29) | "The rate must be greater than zero"; aynı şekilde yalnız yukarı kaydırınca görünüyor |
+| `41,55` (api29) | kabul; alan "41.55" olarak yeniden yazıldı, kayıt zamanı 9:37 |
+| `42,85` (api33, varsayılanla aynı) | kabul; üç anahtar yazıldı, toplam değişmedi ($108,45) |
+| 5+ ondalık, 1000 üstü, `4.2.1`, negatif | koddan (satır 140-171): "Use at most four decimal places", "The rate must be under 1000", "Enter a valid number", "…greater than zero"; denenmedi |
+
+Küçük ekranda başarılı ve başarısız Kaydet, düğmenin olduğu yerden birebir aynı görünüyor. Kaydetmeden geri çıkılırsa taslak uyarısız atılır (ViewModel geri yığından çıkınca siliniyor; koddan, denenmedi).
+
+### Düzeltme seçenekleri ve riskleri (seçim yapılmadı)
+
+**Sorun 1**
+- a) Önce testçiden ekran görüntüsü ve liste istemek (yukarıdaki sorular). Risk: bekleme; ama bulunmamış bir hatayı düzeltmeye çalışmak yanlış yeri değiştirebilir.
+- b) Varsayılan kurları güncellemek. Risk: yine eskir; kuru bir kez kaydedenlere ulaşmaz (üç anahtar yazılı); hiç düzenlememişlerin içinde bulunulan ay kaydı sonraki açılışta yeni kurla yeniden yazılır, geçmiş aylar değişmez.
+- c) Kur alanını Türkçe ondalıkla göstermek ("42,85"): alan her dilde `toPlainString()` ile noktalı (ExchangeRatesViewModel.kt:174-175), tutarlar "₺4.647,20". Ayrıştırma ikisini de kabul ediyor, risk küçük; ama bu şikâyeti açıkladığı gösterilmedi.
+- d) Toplamın nasıl oluştuğunu görünür kılmak (periyot/para birimi notu, satır başı çevrilmiş tutar). Risk: kapsam büyür; "ekranda satır başı çevrilmiş tutar yok" kararı (CurrencyConverter.kt:44-45) yeniden açılır.
+- e) Canlı kur (PROJECT_SPEC §4 "Ağ bağlantısı"). Risk: `INTERNET` izni, gizlilik politikası, Data Safety, mağaza metni, gizli bilgi kuralı (CLAUDE.md §4); yama sürümünün kapsamında değil.
+- f) Gerçek `SettingsRepositoryImpl` için kur testleri (dosya yok → `Default`; `setRate` anahtar + zaman; `resetRates`). Risk: yalnız test, davranış değişmez.
+
+**Sorun 2**
+- a) Durumu ViewModel oluşurken hesaplamak (`init`'te ya da `combine`'a bir akış olarak) ve `ON_RESUME`'u sistem ayarlarından dönüş için tutmak. Risk: `canShowRationale` Activity'den gelir; API 33+'da "istendi ve reddedildi" durumunda ilk değer yine tahmin olur. DataStore okuması asenkron, bir iki kare kalabilir.
+- b) Olayı `ON_START`'ta göndermek (hedef ilk kompozisyonda `STARTED`). Risk: süre ~700 ms'den DataStore okumasına iner, sıfırlanmaz; sistem ayarlarından dönüşte `ON_START` de geldiği için o yol korunur.
+- c) "Bilinmiyor" ara durumu: açıklama boş ya da yer tutucu, dokunuş yok sayılır. Risk: satır ilk anda boş görünür; erişilebilirlik okuması ve testler değişir. a ya da b ile birlikte en güvenlisi.
+- d) Gezinme geçişini kısaltmak ya da kapatmak. Risk: bütün geçişleri değiştirir (16q'nun parlama ölçümleri bu geçişlerle yapıldı); kök nedeni çözmez.
+- Diğer satırlar: `isDynamicColorSupported` cihaza bağlı sabit, `initialValue`'ya konabilir (risk çok küçük). Tema ve ana para için ya "yüklenmedi" durumu ya da ilk kareyi bekletmek (MainActivity tema için bunu yapıyor). Risk: yanlış bir kare yerine boş bir kare; `initialValue`'ya dayanan testler.
+
+**Sorun 3**
+- a) Başarıda kısa bir onay (ör. "Kurlar kaydedildi" snackbar'ı), klavyeyi kapatmak ve odağı bırakmak. Risk: yeni tr/en metni; tek seferlik olay (hata mesajındaki `DismissError` şekli kullanılabilir); testler.
+- b) Başarıda geri dönmek (düzenleme ekranıyla tutarlı). Risk: kullanıcı ekranda kalıp bakmak isteyebilir; "Son düzenleme" satırını görmeden çıkar.
+- c) Hatada ilk geçersiz alanı görünür yapıp odaklamak (gerekirse snackbar). Risk: kaydırma ve odak kodu; küçük ekran ve büyük yazıda denenmeli.
+- d) Klavye ✓ ile kaydetmek (`ImeAction.Done` + `KeyboardActions`). Risk: istemeden kayıt; geri bildirim sorununu tek başına çözmez.
+- e) Kaydı tek `edit`'te ve yalnız değişen kurlarla yapmak. Risk: davranış değişir (dokunulmayan kur artık yazılmaz, gelecekteki varsayılanlar ona ulaşır); anahtarlar aynı, migration yok. Geri bildirimi çözmez; Sorun 1 (b) ile ilişkili.
+
+### Rapor edilen, dokunulmadı
+
+- Kaydet üç ayrı `edit` yapıyor; ikincisi başarısız olursa ilki yazılmış kalır. ExchangeRatesViewModel.kt:83-85'teki "kısmi kayıt olmasın" yorumu doğrulamayı kapsıyor, yazmayı değil.
+- Kaydet dokunulmayan EUR/GBP'yi de yazıyor ("Kalıcılık"); ARCHITECTURE §15'in "sıfırlama varsayılanı yazmaz" gerekçesiyle aynı yöne bakmıyor.
+- Türkçe arayüzde fiyat ipucu "Fiyat (Örn: 159.99)" ve kur alanı noktalı, tutarlar virgüllü.
+- api33'te misafir `screenrecord` takıldı (süreç `pkill -9` ile kapatıldı); TESTING'deki parlama testi bu kaydediciye dayanıyor. Emülatörün kendi kaydedicisi çalıştı.
+- api29'un `/sdcard`'ında önceki turlardan kalma ~170 döküm/görüntü dosyası var (`a.xml` … `z2.xml`, `*.png`, `frame.raw`, `fr/`); bu turun değil, silinmedi. `ui.xml`'in içeriği bu turun dökümüyle değişti.
+- Hatırlatma testleri (SettingsViewModelReminderTest) hep önce `RefreshReminderPermission` gönderiyor; olaydan önceki durumu ya da o anda dokunmayı sınayan test yok.
+
+### Doğrulama
+
+| Kontrol | Sonuç |
+|---|---|
+| `git diff --stat` | yalnız `docs/PROGRESS.md` |
+| Derleme, birim testleri | koşulmadı — kod değişmedi |
+| Crash tamponu (api33, tur sonu) | boş |
+
+### Ortam (tur sonu)
+
+- api29: başta 16q derlemesi (`versionCode 2`) ve verisi vardı, kaldırıldı. Şimdi 1.0.2 (AAB'den) temiz kurulum: Spotify $10,99, ana para TRY, tema "Follow the system", kurlar hiç düzenlenmedi. `wm` 720×1280 / 320 (değişmedi), yazı 1.0, `cmd uimode night no`, en-US.
+- api33: başta 16r'nin fikstürüyle 1.0.2 vardı, kaldırıldı. Şimdi 1.0.2 temiz kurulum: Türkçe fikstürün altı aboneliği, ana para USD, uygulama teması Koyu, kurlar varsayılan değerleriyle bir kez kaydedildi (10:04), bildirim izni verilmedi. Uygulama dili geri boş, `wm` sıfır, yazı 1.0, `cmd uimode night no` (`ui_night_mode` 1), `system_locales` en-US, `show_ime_with_hard_keyboard 0`; `/sdcard`'da bu turdan dosya yok. İki emülatör de kapatıldı.
+- Fiziksel telefona dokunulmadı; `adb devices` her seferinde yalnız emülatörü gösterdi.
+- Kayıtlar, yedek dökümleri ve 1.0.2 AAB'sinin kopyası oturumun geçici klasöründe: `%LOCALAPPDATA%\Temp\claude\C--Users-cane7-Documents-GitHub-SubTrack\f98c12e2-6db3-4ffb-b618-701b8078a0ae\scratchpad\16t\` (`rec/`, `rec33/`, `ab_fresh/`, `ab_edited/`, ekran görüntüleri). Kalıcı bir yer değil.
+
+**Değişen dosyalar**
+- `docs/PROGRESS.md` — bu kayıt
+
+**Commit'ler**
+- (bu kayıt) docs: record the diagnosis of the 28.09 rate and settings feedback
+
+**Sonraki faz için not**
+- Sorun 1 için bulunmuş bir hata yok; düzeltmeye geçmeden testçiden ekran görüntüsü ve liste alınmalı.
+- 1.0.3'ün yükseltme testinde eski taraf 1.0.2; AAB'si 16r'nin ve bu turun geçici klasöründe.
+
+---
+
 ## [Faz 16s] 1.0.2 Yayında ve Üretim Sonrası Sürüm Planı — 2026-09-27
 
 **Durum:** Tamamlandı. Yalnızca belge; kod değişmedi. İlk bölümdekiler
