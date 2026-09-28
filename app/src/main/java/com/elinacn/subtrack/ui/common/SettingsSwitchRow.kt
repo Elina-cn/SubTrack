@@ -39,17 +39,23 @@ import com.elinacn.subtrack.ui.theme.Dimens
  *
  * A row that is [enabled] = false still reads out: it says what the setting is and the description
  * says why it cannot be used. Removing it instead would leave the reason unsaid.
+ *
+ * A null [checked] or [description] is a value still being read (ARCHITECTURE section 29). The
+ * switch keeps its place without being drawn, the line keeps its height without text, and the row
+ * cannot be toggled - flipping a switch whose position nobody has seen would write a guess.
  */
 @Composable
 fun SettingsSwitchRow(
     title: String,
-    description: String,
-    checked: Boolean,
+    description: String?,
+    checked: Boolean?,
     onCheckedChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true
 ) {
-    val rowDescription = stringResource(id = R.string.settings_row_description, title, description)
+    val rowDescription = description
+        ?.let { stringResource(id = R.string.settings_row_description, title, it) }
+        ?: title
     val titleColor = MaterialTheme.colorScheme.onBackground.atContentAlpha(enabled)
     val descriptionColor = MaterialTheme.colorScheme.onSurfaceVariant.atContentAlpha(enabled)
 
@@ -57,13 +63,15 @@ fun SettingsSwitchRow(
         modifier = modifier
             .fillMaxWidth()
             .toggleable(
-                value = checked,
-                enabled = enabled,
+                value = checked == true,
+                enabled = enabled && checked != null,
                 onValueChange = onCheckedChange
             )
             .semantics(mergeDescendants = true) {
                 contentDescription = rowDescription
-                toggleableState = ToggleableState(checked)
+                // Left out while unknown: "off" would be a claim, and the row is not yet able to
+                // make one.
+                if (checked != null) toggleableState = ToggleableState(checked)
             }
             .defaultMinSize(minHeight = Dimens.MinTouchTarget)
             .padding(vertical = Dimens.SpacerMedium),
@@ -78,8 +86,10 @@ fun SettingsSwitchRow(
                 style = MaterialTheme.typography.titleMedium,
                 color = titleColor
             )
+            // Empty rather than left out, for the same reason as SettingsRow: the line keeps its
+            // height, so nothing moves when the value arrives.
             Text(
-                text = description,
+                text = description.orEmpty(),
                 style = MaterialTheme.typography.bodyMedium,
                 color = descriptionColor
             )
@@ -89,7 +99,12 @@ fun SettingsSwitchRow(
 
         // Null, not a lambda: the row above already owns the gesture, and a switch with its own
         // handler would be a second focus stop sitting inside the merged one.
-        Switch(checked = checked, onCheckedChange = null, enabled = enabled)
+        Switch(
+            checked = checked == true,
+            onCheckedChange = null,
+            modifier = Modifier.reservedUntilKnown(isKnown = checked != null),
+            enabled = enabled
+        )
     }
 }
 

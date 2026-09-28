@@ -9,6 +9,7 @@ import com.elinacn.subtrack.domain.repository.ReminderStateRepository
 import com.elinacn.subtrack.domain.repository.SettingsRepository
 import com.elinacn.subtrack.reminder.ReminderNotificationStatus
 import com.elinacn.subtrack.ui.common.UiText
+import com.elinacn.subtrack.ui.common.startingUnknown
 import com.elinacn.subtrack.ui.theme.DynamicColorSupport
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
@@ -30,18 +31,38 @@ class SettingsViewModel @Inject constructor(
     private val dynamicColorSupport: DynamicColorSupport
 ) : ViewModel() {
 
-    /** Everything that is not stored in the settings file. */
-    private val screenState = MutableStateFlow(ReminderScreenState())
+    /**
+     * Everything that is not stored in the settings file.
+     *
+     * The reminder row starts from what the platform can answer on the spot, so a device where
+     * reminders are on shows "On" in the very first frame instead of a placeholder. Phase 16t
+     * measured the old start: "off - turn on in system settings" for the whole 700 ms enter
+     * transition, because the state was only worked out on ON_RESUME and the navigation graph holds
+     * a destination at STARTED until its transition ends.
+     */
+    private val screenState = MutableStateFlow(
+        ReminderScreenState(
+            permission = notificationStatus.resolveReminderPermission(
+                wasRequested = null,
+                canShowRationale = null
+            )
+        )
+    )
 
     /**
      * The stored preference is the single source of truth: a tap writes and the screen updates
      * because the store emits again, not because the ViewModel guessed. A write that fails
      * therefore leaves the chips where they were, which is the truth.
+     *
+     * Each stored value starts as null, "not read yet", and the screen draws nothing for it until
+     * the store answers (ARCHITECTURE section 29). Starting each one on its own rather than waiting
+     * for all of them lets the reminder row, which does not depend on the store at all, be right
+     * from the first emission.
      */
     val uiState: StateFlow<SettingsUiState> = combine(
-        repository.observeMainCurrency(),
-        repository.observeThemeMode(),
-        repository.observeDynamicColor(),
+        repository.observeMainCurrency().startingUnknown(),
+        repository.observeThemeMode().startingUnknown(),
+        repository.observeDynamicColor().startingUnknown(),
         screenState
     ) { currency, themeMode, dynamicColor, reminder ->
         SettingsUiState(
@@ -59,8 +80,23 @@ class SettingsViewModel @Inject constructor(
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
-        initialValue = SettingsUiState()
+        // What the screen draws before anything has been collected. The two platform answers are
+        // filled in here too - an initial value that left them out would be the one frame where
+        // the screen still guessed.
+        initialValue = SettingsUiState(
+            isDynamicColorSupported = dynamicColorSupport.isAvailable(),
+            reminderPermission = screenState.value.permission
+        )
     )
+
+    init {
+        // The one stored input the reminder row needs. Read now rather than on the first resume,
+        // which comes only after the enter transition.
+        viewModelScope.launch {
+            val wasRequested = reminderState.wasPermissionRequested()
+            updateReminder { it.copy(wasRequested = wasRequested) }
+        }
+    }
 
     /** Single entry point for everything the screen can ask for. */
     fun onEvent(event: SettingsEvent) {
@@ -79,6 +115,9 @@ class SettingsViewModel @Inject constructor(
 
             is SettingsEvent.RefreshReminderPermission -> refreshReminders(event.canShowRationale)
 
+            is SettingsEvent.ReminderPermissionAnswered ->
+                refreshReminders(event.canShowRationale, requestAnswered = true)
+
             SettingsEvent.ReminderRowTapped -> onReminderRowTapped()
 
             SettingsEvent.ReminderRationaleConfirmed -> requestPermission()
@@ -94,51 +133,66 @@ class SettingsViewModel @Inject constructor(
     }
 
     /**
-     * Works out which of the three states the row is in.
+     * Works out which of the three states the row is in, again.
      *
      * [canShowRationale] is passed in because only an Activity can answer it. Everything else is
-     * read here, so the screen never decides anything.
+     * read here, so the screen never decides anything. The platform half is applied at once - on
+     * the way back from the system settings that is the half that changed - and the stored flag
+     * follows when the read returns.
      */
-    private fun refreshReminders(canShowRationale: Boolean) {
+    private fun refreshReminders(canShowRationale: Boolean, requestAnswered: Boolean = false) {
+        updateReminder {
+            it.copy(
+                canShowRationale = canShowRationale,
+                isRequestInFlight = it.isRequestInFlight && !requestAnswered
+            )
+        }
         viewModelScope.launch {
             val wasRequested = reminderState.wasPermissionRequested()
-            screenState.update {
-                it.copy(
-                    permission = resolvePermission(canShowRationale, wasRequested),
-                    wasRequested = wasRequested
-                )
-            }
+            updateReminder { it.copy(wasRequested = wasRequested) }
         }
     }
 
-    private fun resolvePermission(
-        canShowRationale: Boolean,
-        wasRequested: Boolean
-    ): ReminderPermissionState = when {
-        // Covers every build: on older ones there is no permission to hold, only the switch.
-        notificationStatus.areRemindersVisible() -> ReminderPermissionState.ENABLED
-
-        // No runtime permission on this build, so nothing to request - the switch or the channel
-        // is off and only the system screen can undo that.
-        !notificationStatus.isRuntimePermissionRequired() -> ReminderPermissionState.SETTINGS_ONLY
-
-        // Permission held but reminders still invisible: the app switch or this channel is off.
-        notificationStatus.isPermissionGranted() -> ReminderPermissionState.SETTINGS_ONLY
-
-        // Never asked. The system would say "no rationale needed" here too, which is exactly why
-        // the flag exists rather than trusting the system's answer alone.
-        !wasRequested -> ReminderPermissionState.CAN_REQUEST
-
-        // Asked before and the system still lets us explain: one more request is allowed.
-        canShowRationale -> ReminderPermissionState.CAN_REQUEST
-
-        // Asked, no rationale offered: denied for good, the system screen is the only way back.
-        else -> ReminderPermissionState.SETTINGS_ONLY
+    /**
+     * Applies a change to the row's inputs and re-derives the state from them.
+     *
+     * The one place the state is worked out, so no path can leave it out of step with its inputs.
+     * A tap that arrived while the state was still unknown is carried out here, the moment it
+     * becomes known.
+     *
+     * While a permission request is out the state is held where it was. The request marks the app
+     * as having asked, and the system's rationale answer only changes once the user has replied, so
+     * working the table out in between gives "asked, no rationale" - "turn on in system settings" -
+     * behind a dialog that is in fact asking. Measured in 16u before this hold existed.
+     */
+    private fun updateReminder(change: (ReminderScreenState) -> ReminderScreenState) {
+        screenState.update { state ->
+            val changed = change(state)
+            val permission = if (changed.isRequestInFlight) {
+                state.permission
+            } else {
+                notificationStatus.resolveReminderPermission(
+                    changed.wasRequested,
+                    changed.canShowRationale
+                )
+            }
+            changed.copy(permission = permission)
+        }
+        val state = screenState.value
+        if (state.isRowTapPending && state.permission != null) {
+            screenState.update { it.copy(isRowTapPending = false) }
+            onReminderRowTapped()
+        }
     }
 
     private fun onReminderRowTapped() {
         val state = screenState.value
         when (state.permission) {
+            // Held rather than dropped or guessed. Phase 16t tapped the row while it still showed
+            // its placeholder and was sent to the system settings instead of the permission
+            // dialog; now the tap waits a few frames for the answer and then does the right thing.
+            null -> screenState.update { it.copy(isRowTapPending = true) }
+
             // Tapping an already-on row opens the same system screen, so turning reminders back
             // off is where turning them on was.
             ReminderPermissionState.ENABLED,
@@ -150,7 +204,7 @@ class SettingsViewModel @Inject constructor(
             ReminderPermissionState.CAN_REQUEST ->
                 // First time, no preamble: an extra dialog before the system one costs a refusal
                 // more often than it earns a grant. A repeat ask gets a sentence of context.
-                if (state.wasRequested) {
+                if (state.wasRequested == true) {
                     screenState.update { it.copy(isRationaleVisible = true) }
                 } else {
                     requestPermission()
@@ -159,13 +213,14 @@ class SettingsViewModel @Inject constructor(
     }
 
     private fun requestPermission() {
-        screenState.update {
+        updateReminder {
             it.copy(
                 isRationaleVisible = false,
                 pendingAction = ReminderPermissionAction.REQUEST_PERMISSION,
                 // Recorded as the request goes out, not when it comes back: the answer does not
                 // change the fact that the user has now been asked once.
-                wasRequested = true
+                wasRequested = true,
+                isRequestInFlight = true
             )
         }
         viewModelScope.launch {
@@ -220,13 +275,20 @@ class SettingsViewModel @Inject constructor(
 
     /** The part of the screen's state the settings file knows nothing about. */
     private data class ReminderScreenState(
-        val permission: ReminderPermissionState = ReminderPermissionState.SETTINGS_ONLY,
+        /** Derived from the inputs below by [updateReminder]; never set on its own. */
+        val permission: ReminderPermissionState? = null,
         val isRationaleVisible: Boolean = false,
         /** The theme chooser is screen state too: nothing about it is stored. */
         val isThemeDialogVisible: Boolean = false,
         val pendingAction: ReminderPermissionAction? = null,
-        /** Mirrors the stored flag so a tap does not have to wait on a read. */
-        val wasRequested: Boolean = false,
+        /** Mirrors the stored flag so a tap does not have to wait on a read; null until read. */
+        val wasRequested: Boolean? = null,
+        /** The Activity's answer, from the last refresh; null until the screen has sent one. */
+        val canShowRationale: Boolean? = null,
+        /** A row tap that came in while [permission] was still unknown. */
+        val isRowTapPending: Boolean = false,
+        /** Between a permission request going out and its answer coming back. */
+        val isRequestInFlight: Boolean = false,
         val errorMessage: UiText? = null
     )
 

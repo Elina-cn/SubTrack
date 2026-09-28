@@ -208,7 +208,14 @@ fun HomeScreen(
             item {
                 DashboardCard(
                     label = stringResource(id = uiState.totalPeriod.totalLabelRes()),
-                    totalAmount = moneyFormatter.format(uiState.total, uiState.baseCurrency),
+                    // Nothing until the list and the rates have arrived. Phase 16u measured a
+                    // cold start on API 33 drawing "₺0,00" for ten frames - the empty state's
+                    // zero in the base currency, to a user whose total was $110,27.
+                    totalAmount = if (uiState.isLoading) {
+                        null
+                    } else {
+                        moneyFormatter.format(uiState.total, uiState.baseCurrency)
+                    },
                     conversionNote = conversionNote
                 )
 

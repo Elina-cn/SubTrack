@@ -13,6 +13,12 @@ import com.elinacn.subtrack.ui.common.UiText
  * they say. It also means a rotation keeps what was typed without a saver.
  */
 data class ExchangeRatesUiState(
+    /**
+     * False until the store has answered. Until then [drafts] and [updatedAt] say nothing true -
+     * empty boxes and "never edited" are what a user with saved rates would otherwise see first -
+     * so the screen draws neither (ARCHITECTURE section 29).
+     */
+    val isLoaded: Boolean = false,
     /** What each editable field currently shows, keyed by currency. */
     val drafts: Map<Currency, String> = emptyMap(),
     /** Errors under the field they belong to, never a single banner at the top. */

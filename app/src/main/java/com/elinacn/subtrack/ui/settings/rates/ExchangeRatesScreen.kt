@@ -41,6 +41,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import com.elinacn.subtrack.R
 import com.elinacn.subtrack.domain.model.Currency
 import com.elinacn.subtrack.ui.common.UiText
+import com.elinacn.subtrack.ui.common.reservedUntilKnown
 import com.elinacn.subtrack.ui.theme.Dimens
 import com.elinacn.subtrack.ui.theme.SubTrackTheme
 import java.text.DateFormat
@@ -120,8 +121,11 @@ fun ExchangeRatesScreen(
 
             Spacer(modifier = Modifier.height(Dimens.SpacerSmall))
 
+            // "Never edited" is exactly what a user with saved rates must not see while the store
+            // is still being read, so the line waits for it (ARCHITECTURE section 29).
             Text(
                 text = uiState.updatedAtText(),
+                modifier = Modifier.reservedUntilKnown(isKnown = uiState.isLoaded),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onBackground
             )
@@ -131,7 +135,14 @@ fun ExchangeRatesScreen(
             ExchangeRatesViewModel.editableCurrencies.forEach { currency ->
                 val error = uiState.fieldErrors[currency]
                 OutlinedTextField(
-                    value = uiState.drafts[currency].orEmpty(),
+                    // Until the store answers the box is laid out but not drawn, and it holds a
+                    // stand-in rather than nothing: an empty box puts its label in the middle, and
+                    // the label would then be seen sliding to the border as the rate arrived.
+                    value = if (uiState.isLoaded) {
+                        uiState.drafts[currency].orEmpty()
+                    } else {
+                        LAYOUT_STAND_IN
+                    },
                     onValueChange = { onEvent(ExchangeRatesEvent.RateEdited(currency, it)) },
                     label = {
                         Text(
@@ -142,7 +153,11 @@ fun ExchangeRatesScreen(
                             )
                         )
                     },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .reservedUntilKnown(isKnown = uiState.isLoaded),
+                    // Disabled while hidden, so a tap cannot focus a box nobody can see.
+                    enabled = uiState.isLoaded,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     singleLine = true,
                     isError = error != null,
@@ -220,12 +235,19 @@ private fun ExchangeRatesUiState.updatedAtText(): String {
     return stringResource(id = R.string.rates_updated_at, format.format(Date(updated)))
 }
 
+/**
+ * Occupies a rate box while it is hidden, so the box is laid out as it will be once filled. Never
+ * drawn and never announced.
+ */
+private const val LAYOUT_STAND_IN = "0"
+
 @Preview(showBackground = true, showSystemUi = true)
 @Composable
 private fun ExchangeRatesScreenPreview() {
     SubTrackTheme {
         ExchangeRatesScreen(
             uiState = ExchangeRatesUiState(
+                isLoaded = true,
                 drafts = mapOf(
                     Currency.USD to "42.85",
                     Currency.EUR to "46.2",
@@ -245,6 +267,7 @@ private fun ExchangeRatesScreenErrorPreview() {
     SubTrackTheme {
         ExchangeRatesScreen(
             uiState = ExchangeRatesUiState(
+                isLoaded = true,
                 drafts = mapOf(
                     Currency.USD to "0",
                     Currency.EUR to "46.2",

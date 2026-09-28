@@ -42,6 +42,7 @@ import com.elinacn.subtrack.domain.model.ThemeMode
 import com.elinacn.subtrack.ui.common.CurrencySelector
 import com.elinacn.subtrack.ui.common.SettingsRow
 import com.elinacn.subtrack.ui.common.SettingsSwitchRow
+import com.elinacn.subtrack.ui.common.reservedUntilKnown
 import com.elinacn.subtrack.ui.theme.Dimens
 import com.elinacn.subtrack.ui.theme.SubTrackTheme
 
@@ -74,7 +75,7 @@ fun SettingsScreen(
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { _ ->
-        onEvent(SettingsEvent.RefreshReminderPermission(activity.canShowNotificationRationale()))
+        onEvent(SettingsEvent.ReminderPermissionAnswered(activity.canShowNotificationRationale()))
     }
 
     LaunchedEffect(errorText) {
@@ -85,9 +86,16 @@ fun SettingsScreen(
 
     DisposableEffect(lifecycleOwner, activity) {
         val observer = LifecycleEventObserver { _, event ->
-            // Coming back from the system settings is the case that matters: without this the row
-            // would still read "off" right after the user switched reminders on.
-            if (event == Lifecycle.Event.ON_RESUME) {
+            // ON_START is the first one. The observer is added while the destination is already
+            // STARTED, so it arrives straight away, a frame after the first composition - where
+            // ON_RESUME waits for the 700 ms enter transition to finish (phase 16t). The row needs
+            // the rationale answer only after a refusal, but that is exactly the case it would
+            // otherwise leave blank.
+            //
+            // ON_RESUME stays for the way back: without it the row would still read "off" right
+            // after the user switched reminders on in the system settings, or answered the
+            // permission dialog, which pauses the app without stopping it.
+            if (event == Lifecycle.Event.ON_START || event == Lifecycle.Event.ON_RESUME) {
                 onEvent(
                     SettingsEvent.RefreshReminderPermission(activity.canShowNotificationRationale())
                 )
@@ -160,9 +168,17 @@ fun SettingsScreen(
 
             Spacer(modifier = Modifier.height(Dimens.SpacerMedium))
 
+            // Laid out but not drawn until the stored currency is known. Drawn with a guess, the
+            // chips would mark one currency as the choice before anyone had read it; left out, the
+            // whole screen would jump down when they appeared. The selection handed in meanwhile is
+            // never seen, and a tap on the invisible chips goes nowhere.
+            val mainCurrency = uiState.mainCurrency
             CurrencySelector(
-                selected = uiState.mainCurrency,
-                onSelect = { onEvent(SettingsEvent.SelectMainCurrency(it)) }
+                selected = mainCurrency ?: Currency.Base,
+                onSelect = { currency ->
+                    if (mainCurrency != null) onEvent(SettingsEvent.SelectMainCurrency(currency))
+                },
+                modifier = Modifier.reservedUntilKnown(isKnown = mainCurrency != null)
             )
 
             Spacer(modifier = Modifier.height(Dimens.SpacerXLarge))
@@ -179,7 +195,9 @@ fun SettingsScreen(
 
             SettingsRow(
                 title = stringResource(id = R.string.reminder_notifications_title),
-                description = stringResource(id = uiState.reminderPermission.statusTextId()),
+                description = uiState.reminderPermission?.let {
+                    stringResource(id = it.statusTextId())
+                },
                 onClick = { onEvent(SettingsEvent.ReminderRowTapped) }
             )
 
@@ -187,7 +205,7 @@ fun SettingsScreen(
 
             SettingsRow(
                 title = stringResource(id = R.string.theme_mode_title),
-                description = stringResource(id = uiState.themeMode.labelId()),
+                description = uiState.themeMode?.let { stringResource(id = it.labelId()) },
                 onClick = { onEvent(SettingsEvent.ThemeRowTapped) }
             )
 
@@ -200,7 +218,7 @@ fun SettingsScreen(
             // makes when it says "only the system settings can turn this on".
             SettingsSwitchRow(
                 title = stringResource(id = R.string.dynamic_color_title),
-                description = stringResource(id = uiState.dynamicColorTextId()),
+                description = uiState.dynamicColorTextId()?.let { stringResource(id = it) },
                 checked = uiState.isDynamicColorEnabled,
                 onCheckedChange = { onEvent(SettingsEvent.SetDynamicColor(it)) },
                 enabled = uiState.isDynamicColorSupported
@@ -208,9 +226,13 @@ fun SettingsScreen(
         }
     }
 
-    if (uiState.isThemeDialogVisible) {
+    // Only once the stored mode is known: the chooser marks the current choice, and a tap on the
+    // row in the first few frames would otherwise open it with a guess marked. The tap is not lost
+    // - the dialog appears as soon as the mode arrives.
+    val themeMode = uiState.themeMode
+    if (uiState.isThemeDialogVisible && themeMode != null) {
         ThemeModeDialog(
-            selected = uiState.themeMode,
+            selected = themeMode,
             onSelect = { onEvent(SettingsEvent.SelectThemeMode(it)) },
             onDismiss = { onEvent(SettingsEvent.ThemeDialogDismissed) }
         )
@@ -236,13 +258,15 @@ fun SettingsScreen(
 }
 
 /**
- * The one line of the wallpaper-colours row that changes.
+ * The one line of the wallpaper-colours row that changes, or null while it cannot be said yet.
  *
  * Unsupported outranks on and off: below Android 12 the stored value is real but has no effect,
- * and saying "off" for it would be a different claim than the truth.
+ * and saying "off" for it would be a different claim than the truth. It is also the one answer
+ * that needs no stored value, so on those devices the line is right from the first frame.
  */
-private fun SettingsUiState.dynamicColorTextId(): Int = when {
+private fun SettingsUiState.dynamicColorTextId(): Int? = when {
     !isDynamicColorSupported -> R.string.dynamic_color_unsupported
+    isDynamicColorEnabled == null -> null
     isDynamicColorEnabled -> R.string.dynamic_color_on
     else -> R.string.dynamic_color_off
 }

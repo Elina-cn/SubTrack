@@ -25,15 +25,20 @@ import com.elinacn.subtrack.ui.theme.Dimens
  * The semantics block names the *node*. clickable's onClickLabel names only the action, and a
  * screen reader would still announce an unnamed button - the mistake phase 10a made twice. Title
  * and description are merged so the row is one focus stop that reads as a sentence.
+ *
+ * A null [description] is a value still being read: the line keeps its height and stays empty,
+ * and the row reads out its title alone (ARCHITECTURE section 29).
  */
 @Composable
 fun SettingsRow(
     title: String,
-    description: String,
+    description: String?,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val rowDescription = stringResource(id = R.string.settings_row_description, title, description)
+    val rowDescription = description
+        ?.let { stringResource(id = R.string.settings_row_description, title, it) }
+        ?: title
 
     Column(
         modifier = modifier
@@ -53,8 +58,10 @@ fun SettingsRow(
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onBackground
         )
+        // Empty rather than left out: an empty line is still one line tall, so the rows below do
+        // not move when the value arrives.
         Text(
-            text = description,
+            text = description.orEmpty(),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )

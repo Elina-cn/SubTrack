@@ -60,7 +60,7 @@ class SettingsViewModelThemeTest {
         collectState()
 
         assertEquals(ThemeMode.SYSTEM, viewModel.uiState.value.themeMode)
-        assertFalse(viewModel.uiState.value.isDynamicColorEnabled)
+        assertEquals(false, viewModel.uiState.value.isDynamicColorEnabled)
     }
 
     @Test
@@ -78,7 +78,7 @@ class SettingsViewModelThemeTest {
         viewModel = buildViewModel()
         collectState()
 
-        assertTrue(viewModel.uiState.value.isDynamicColorEnabled)
+        assertEquals(true, viewModel.uiState.value.isDynamicColorEnabled)
     }
 
     @Test
@@ -177,7 +177,7 @@ class SettingsViewModelThemeTest {
         advanceUntilIdle()
 
         assertEquals(listOf(true), repository.dynamicColorWrites)
-        assertTrue(viewModel.uiState.value.isDynamicColorEnabled)
+        assertEquals(true, viewModel.uiState.value.isDynamicColorEnabled)
     }
 
     @Test
@@ -190,7 +190,7 @@ class SettingsViewModelThemeTest {
         advanceUntilIdle()
 
         assertEquals(listOf(false), repository.dynamicColorWrites)
-        assertFalse(viewModel.uiState.value.isDynamicColorEnabled)
+        assertEquals(false, viewModel.uiState.value.isDynamicColorEnabled)
     }
 
     @Test
@@ -205,7 +205,7 @@ class SettingsViewModelThemeTest {
             UiText.Resource(R.string.error_setting_save_failed),
             viewModel.uiState.value.errorMessage
         )
-        assertFalse(viewModel.uiState.value.isDynamicColorEnabled)
+        assertEquals(false, viewModel.uiState.value.isDynamicColorEnabled)
     }
 
     /**
@@ -224,7 +224,7 @@ class SettingsViewModelThemeTest {
         advanceUntilIdle()
 
         assertEquals(ThemeMode.DARK, viewModel.uiState.value.themeMode)
-        assertTrue(viewModel.uiState.value.isDynamicColorEnabled)
+        assertEquals(true, viewModel.uiState.value.isDynamicColorEnabled)
     }
 
     @Test
@@ -237,7 +237,7 @@ class SettingsViewModelThemeTest {
         advanceUntilIdle()
 
         assertEquals(ThemeMode.LIGHT, viewModel.uiState.value.themeMode)
-        assertTrue(viewModel.uiState.value.isDynamicColorEnabled)
+        assertEquals(true, viewModel.uiState.value.isDynamicColorEnabled)
     }
 
     /** Neither preference is the currency's business, and the currency is not theirs. */
@@ -276,7 +276,7 @@ class SettingsViewModelThemeTest {
         collectState()
 
         assertFalse(viewModel.uiState.value.isDynamicColorSupported)
-        assertTrue(viewModel.uiState.value.isDynamicColorEnabled)
+        assertEquals(true, viewModel.uiState.value.isDynamicColorEnabled)
     }
 
     /** uiState is WhileSubscribed, so it stays cold until something collects it. */

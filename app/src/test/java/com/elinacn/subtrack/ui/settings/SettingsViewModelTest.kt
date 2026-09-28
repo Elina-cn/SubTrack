@@ -54,7 +54,10 @@ class SettingsViewModelTest {
     @Test
     fun uiState_nothingStored_startsOnTheDefaultCurrency() = runTest {
         viewModel.uiState.test {
-            assertEquals(Currency.TRY, awaitItem().mainCurrency)
+            // Not read yet comes first, and is not the default (ARCHITECTURE section 29).
+            assertNull(awaitItem().mainCurrency)
+            this@runTest.advanceUntilIdle()
+            assertEquals(Currency.TRY, expectMostRecentItem().mainCurrency)
 
             cancelAndIgnoreRemainingEvents()
         }

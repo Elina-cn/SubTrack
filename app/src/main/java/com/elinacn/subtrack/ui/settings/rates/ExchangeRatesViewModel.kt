@@ -38,6 +38,7 @@ class ExchangeRatesViewModel @Inject constructor(
         screenState
     ) { rates, updatedAt, screen ->
         ExchangeRatesUiState(
+            isLoaded = true,
             drafts = screen.drafts ?: editableCurrencies.associateWith { rates.rateOf(it).asText() },
             fieldErrors = screen.fieldErrors,
             updatedAt = updatedAt,
@@ -84,6 +85,8 @@ class ExchangeRatesViewModel @Inject constructor(
      * looking at three boxes with no way to tell which of them reached the store.
      */
     private fun save() {
+        // Nothing to validate against yet; the fields are not even drawn (ARCHITECTURE §29).
+        if (!uiState.value.isLoaded) return
         // screenState first: a Save arriving in the same frame as the last keystroke must see that
         // keystroke, and uiState only catches up once the combine re-emits.
         val drafts = screenState.value.drafts ?: uiState.value.drafts

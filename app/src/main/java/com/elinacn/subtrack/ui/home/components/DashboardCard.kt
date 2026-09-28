@@ -31,11 +31,15 @@ import com.elinacn.subtrack.ui.theme.SubTrackTheme
  * [conversionNote] is shown only when there is something to explain - a list priced in more than
  * one currency. Left out of a single-currency list on purpose: a permanent line about exchange
  * rates would be noise for the many users who never leave TRY.
+ *
+ * A null [totalAmount] means the subscriptions and rates have not arrived yet. The line keeps its
+ * height and stays empty, and the card reads out its label alone; the zero the empty state starts
+ * from is not a total (ARCHITECTURE section 29).
  */
 @Composable
 fun DashboardCard(
     label: String,
-    totalAmount: String,
+    totalAmount: String?,
     modifier: Modifier = Modifier,
     conversionNote: String? = null
 ) {
@@ -43,10 +47,17 @@ fun DashboardCard(
     // accessibility tree - the delegate walks the unmerged tree - so the card still offered three
     // stops, and the amount was one of them: "219.89 TL" with nothing saying what it totals.
     // clearAndSetSemantics drops the children and speaks one sentence in an order we choose.
-    val description = if (conversionNote == null) {
-        stringResource(id = R.string.dashboard_description, label, totalAmount)
-    } else {
-        stringResource(id = R.string.dashboard_description_converted, label, totalAmount, conversionNote)
+    val description = when {
+        totalAmount == null -> label
+        conversionNote == null ->
+            stringResource(id = R.string.dashboard_description, label, totalAmount)
+        else ->
+            stringResource(
+                id = R.string.dashboard_description_converted,
+                label,
+                totalAmount,
+                conversionNote
+            )
     }
 
     Card(
@@ -67,8 +78,10 @@ fun DashboardCard(
                 style = MaterialTheme.typography.bodyLarge
             )
             Spacer(modifier = Modifier.height(Dimens.SpacerSmall))
+            // Empty rather than left out while loading: an empty line is still one line tall, so the
+            // card does not grow under the user when the figure arrives.
             Text(
-                text = totalAmount,
+                text = totalAmount.orEmpty(),
                 color = MaterialTheme.colorScheme.onPrimaryContainer,
                 style = MaterialTheme.typography.headlineMedium
             )
