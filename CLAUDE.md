@@ -87,7 +87,8 @@ döneceğini söyler — böylece veritabanı yazarken arayüz donmaz."
 
 **Gizli bilgi repoya girmez.** Şifre, anahtar, token ve API anahtarı
 `local.properties`'ten veya ortam değişkeninden okunur; koda yazılmaz ve
-commit edilmez. Bu kural v1.1'de döviz kuru servisi eklenirken de geçerlidir.
+commit edilmez. Bu kural döviz kuru servisi eklenirken de geçerlidir
+(PROJECT_SPEC §4 "Ağ bağlantısı").
 
 ---
 

@@ -27,6 +27,47 @@ Her faz sonunda **en üste** yeni kayıt eklenir. Eski kayıtlar silinmez.
 
 ---
 
+## [Faz 16s] 1.0.2 Yayında ve Üretim Sonrası Sürüm Planı — 2026-09-27
+
+**Durum:** Tamamlandı. Yalnızca belge; kod değişmedi. İlk bölümdekiler
+Console'da ve testçilerle oldu; repoda kanıtı yok (etiket hariç).
+
+**1.0.2 yayında**
+- 1.0.2 (`versionCode 3`) 27.09.2026'da önce kapalı teste yüklendi, sonra aynı AAB kitaplıktan dahili teste eklendi (16r, "Karar — sürüm yayınlama sırası").
+- Kapalı test incelemeden geçti; 1.0.2 iki kanalda da aynı gün yayında.
+- Kullanıcı `v1.0.2` etiketini `81332c1`'e attı ve GitHub'a gönderdi; yerel etiket ve `git ls-remote --tags origin v1.0.2` ikisi de `81332c1` gösteriyor.
+- Testçilere duyuruldu; bir testçi beyaz parlamanın 1.0.2'de düzeldiğini bildirdi (27.09.2026).
+- ROADMAP Faz 16'daki 1.0.2 satırı işaretlendi; açık kalan üç adım (kapalı test, dahili test, etiket) kapandı.
+
+**Üretim sonrası plan — ne değişti, neden**
+- Sıra kapalı test geri bildirimlerine göre yeniden yazıldı (PROJECT_SPEC §4): en çok ikon ve tema istendi, dışa/içe aktarmayı isteyen olmadı (16q "Görev C", 16r "27.09.2026 geri bildirimleri").
+- v1.1 Görünüm: ikon (16q C3, 16r 1 ve 4), gerçek koyu tema (16q C4; yeni özellik değil, mevcut koyu temanın düzeltmesi), hazır paletler (16q C4-C5); ilk iş `iconKey`'in şema değişmeden yetip yetmediğini doğrulamak.
+- v1.2 Kolaylıklar: haftalık toplam (16r 3), sağa kaydırınca düzenleme (16q C8), aylık gelir ve aboneliklere giden yüzdesi (16r 5).
+- v1.3 Veri taşınabilirliği: eski v1.1 kararlarıyla aynen; kullanıcı resimlerinin dışa aktarmaya girip girmeyeceği sürümün başında kararlaştırılacak.
+- v1.4 Ödeme türü (16r 2): yayından sonraki ilk migration; v1.3'ten sonra, çünkü şemaya ilk kez dokunulmadan önce kullanıcının elinde kendi yedek dosyası olsun.
+- Ağ bağlantısı sürüm numarasını kaybetti, "zamanlaması açık" notuyla kaldı; v2.0 değişmedi.
+- PROJECT_SPEC §4'e "Değerlendirilecek (karar yok)": fatura/kira/kart kategorisi (16q C7), çoklu kategori (16q C6), günlük periyot (16q C9); Android 12 altında duvar kâğıdı renkleri olmayacak (16q C5).
+- ROADMAP: eski Faz 17 yerine Faz 17 İkonlar ve 18 Tema (v1.1), 19 Kolaylıklar (v1.2), 20 Dışa/İçe Aktarma (v1.3), 21 Ödeme Türü (v1.4), hepsi ⬜; her sürüm son fazından sonra bir sürüm turuyla çıkar.
+- "Üretim erişimiyle başlar" kuralı ve ilk iki gerekçesi Faz 17'ye taşındı, içe aktarmaya özgü üçüncü gerekçe Faz 20'de kaldı; kural değişmedi.
+- Eski numaralara gönderme yapan ileriye dönük cümleler güncellendi (PROJECT_SPEC §5 ve §6, CLAUDE.md §4); ROADMAP'in tamamlanmış gizlilik politikası maddesine "sürüm numarası 2026-09-27'de değişti" notu eklendi, eski tarihli notlar değişmedi.
+
+**Rapor edilen, dokunulmadı**
+- v1.1'in `iconKey` doğrulaması migration çıkarırsa v1.4'teki "ilk migration" ve gerekçesi (önce yedek dosyası) tutmaz; belgeye yazılı bir karar eklenmedi.
+- Auto Backup beyaz listeyle çalışıyor (ARCHITECTURE §25: yalnız veritabanı ve DataStore); v1.1'in kullanıcı resimleri kurallara eklenmedikçe yedeğe ve cihazdan cihaza aktarıma girmez.
+- Gelir DataStore'da ya da Room'da tutulursa Auto Backup onu kullanıcının Drive'ına kopyalar; "yalnız cihazda" ifadesinin anlamı v1.2'nin başında netleşmeli.
+- Faz 20'nin "Bitti" satırı yok; eski Faz 17'de de yoktu.
+
+**Değişen dosyalar**
+- `docs/ROADMAP.md` — 1.0.2 satırı, tarihli not, Faz 17-21, gizlilik politikası maddesine sürüm notu
+- `docs/PROJECT_SPEC.md` — §4 (v1.1-v1.4, ağ, değerlendirilecek), §5 ve §6'da ağ göndermesi
+- `CLAUDE.md` — §4 "Gizli bilgi"de döviz kuru servisi cümlesi
+- `docs/PROGRESS.md` — bu kayıt
+
+**Commit'ler**
+- (bu kayıt) docs: record the live 1.0.2 release and reorder the post-production plan
+
+---
+
 ## [Faz 16r] Sürüm 1.0.2 — İkinci Kapalı Test Güncellemesi — 2026-09-27
 
 **Durum:** Tamamlandı. Tek kod değişikliği sürüm satırları

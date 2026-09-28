@@ -15,6 +15,11 @@ geçilmez. Tüm çalışma `Elina` branch'inde yapılır; branch açılmaz. Faz 
 >
 > **Not (2026-09-23):** Sürüm sırası sonradan değişti — v1.1 dışa/içe
 > aktarma, ağ v1.2 (`PROJECT_SPEC.md` §4).
+>
+> **Not (2026-09-27):** Üretim sonrası sıra kapalı test geri bildirimlerine
+> göre yeniden yazıldı (`PROJECT_SPEC.md` §4): v1.1 görünüm (Faz 17 ikonlar,
+> Faz 18 tema), v1.2 kolaylıklar (Faz 19), v1.3 dışa/içe aktarma (Faz 20),
+> v1.4 ödeme türü (Faz 21). Ağın sürüm numarası yok.
 
 ---
 
@@ -616,7 +621,9 @@ Aylık toplamın zaman içindeki anlık görüntüleri. `PROJECT_SPEC.md` §1'de
       https://elina-cn.github.io/subtrack-privacy/ (TR + EN). **v1.1'de**
       (dışa/içe aktarma) politikaya dosya konumu cümlesi eklenecek; **v1.2'de**
       ağ eklendiğinde politika ve Data Safety formu yeniden güncellenecek
-      (PROJECT_SPEC §4). **16f'nin ölçümü politikanın metnini değiştiriyordu:**
+      (PROJECT_SPEC §4). (Sürüm numarası 2026-09-27'de değişti: dışa/içe
+      aktarma v1.3, ağ numarasız.)
+      **16f'nin ölçümü politikanın metnini değiştiriyordu:**
       Auto Backup açık, yani veri kullanıcının kendi Google Drive'ına
       kopyalanıyor. "Veriler cihazdan çıkmıyor" cümlesi olduğu gibi
       kullanılamaz — doğru cümle `PROGRESS.md`'deki 16f kaydında. (Faz 16k: URL
@@ -728,15 +735,19 @@ Aylık toplamın zaman içindeki anlık görüntüleri. `PROJECT_SPEC.md` §1'de
       test incelemesinden geçti; kapalı ve dahili testte yayında (24.09.2026).
       Titremeyi bildiren testçi düzeltmeyi doğruladı. (Console'da ve testçiyle
       oldu, repoda kanıt yok.)
-- [ ] Sürüm 1.0.2 (`versionCode 3`) — iki testçi bildirimi (16q): koyu temada
+- [x] Sürüm 1.0.2 (`versionCode 3`) — iki testçi bildirimi (16q): koyu temada
       geçişlerdeki beyaz parlama (pencere zemini artık uygulamanın temasını
       izliyor) ve tarih alanının altındaki yenilenme açıklaması. AAB 16r'de
       üretildi ve doğrulandı: şema `v1.0.1`'den beri değişmedi, izin listesi
       aynı, 1.0.1'in üzerine güncelleme olarak kurulunca veri korundu
-      (`TESTING.md` "Yükseltme Testi"). Kaynak commit `81332c1`. **Açık
-      kalan:** kapalı teste yükleme, aynı AAB'nin App Bundle kitaplığından
-      dahili teste eklenmesi (kullanıcının telefonu dahili testte; kural
-      PROGRESS 16r, "Karar — sürüm yayınlama sırası") ve etiket — kullanıcıda.
+      (`TESTING.md` "Yükseltme Testi"). Kaynak commit `81332c1` (kullanıcının
+      `v1.0.2` etiketi, GitHub'a gönderildi). **Faz 16s:** 27.09.2026'da önce
+      kapalı teste yüklendi, sonra aynı AAB kitaplıktan dahili teste eklendi
+      (PROGRESS 16r, "Karar — sürüm yayınlama sırası"); kapalı test
+      incelemeden geçti, iki kanalda da aynı gün yayında. Testçilere
+      duyuruldu; bir testçi beyaz parlamanın düzeldiğini bildirdi
+      (27.09.2026). (Console'da ve testçiyle oldu, repoda kanıt yok; etiket
+      repoda.)
 - [ ] Üretim erişimi ve yayın — 12 testçi 14 gün kesintisiz katılımda kalınca
       başvurulacak (Faz 16k).
 
@@ -747,23 +758,115 @@ testçinin 14 gün kesintisiz katılımı bekleniyor) — bu yüzden faz 🟡 ka
 
 ---
 
-## ⬜ Faz 17 — Dışa/İçe Aktarma
+## ⬜ Faz 17 — İkonlar (v1.1)
+
+Aboneliğin ikonu adından kendiliğinden gelsin; kullanıcı isterse kendisi
+seçsin. Kapsam `PROJECT_SPEC.md` §4 "v1.1 — Görünüm".
+
+Faz 17 **üretim erişimiyle başlar**; o güne kadar koda yalnızca kapalı test
+geri bildiriminden gelen düzeltmeler girer (`versionCode 2`'den başlayarak).
+Gerekçe:
+
+- Faz 16'nın bitiş tanımı üretime çıkışı içeriyor ve fazlar sırayla yapılıyor.
+- Tek branch'le çalışılıyor (`WORKFLOW.md` §6): kapalı testte bulunan bir
+  hatanın düzeltmesi yeni bir sürüm olarak hemen çıkabilmeli, içinde yarım
+  kalmış bir özellik olmadan.
+
+- [ ] **İlk iş:** mevcut `iconKey` alanının yeni ikon türlerini şema
+      değişikliği olmadan taşıyıp taşıyamayacağı doğrulanır. Taşıyamıyorsa
+      bu sürüm migration gerektirir ve `ARCHITECTURE.md` "Şema sürümlemesi"
+      kuralı uygulanır
+- [ ] Ad yazılırken ikon kendiliğinden gelir: bilinen servislerde renkli baş
+      harf, geniş alanlarda (kurs, sunucu gibi) türe göre simge. Hazır marka
+      logosu yok (marka hakları; uygulamanın internet izni yok)
+- [ ] Kullanıcı kendi resmini, bir emojiyi ya da bir rengi seçebilir; resim
+      seçimi sistemin fotoğraf seçicisiyle, yeni izin olmadan
+- [ ] v1.0'dan gelen aboneliklerin ikonları korunur
+
+**Bitti:** Ad yazılınca ikon geliyor; resim, emoji ve renk seçilebiliyor;
+v1.0'dan gelen aboneliklerin ikonu korunuyor.
+
+---
+
+## ⬜ Faz 18 — Tema (v1.1)
+
+Kapsam `PROJECT_SPEC.md` §4 "v1.1 — Görünüm".
+
+- [ ] Gerçek koyu tema: koyu yüzeyler gri/siyah. Bugünkü koyu tema bir
+      testçiye yeterince koyu görünmüyor; yeni özellik değil, mevcut koyu
+      temanın düzeltmesi
+- [ ] Renk paletleri: birkaç hazır palet, her Android sürümünde. Mevcut tema
+      ayarının uzantısı; serbest renk seçici yok (`PROJECT_SPEC.md` §3
+      madde 3)
+- [ ] Android 12 ve üstündeki duvar kâğıdı renkleri aynen kalır
+
+**Bitti:** Koyu tema gri/siyah yüzeyli; paletler API 24'ten itibaren
+çalışıyor; kontrast çiftleri WCAG AA'yı geçiyor (Faz 1c'deki gibi).
+
+**Sürüm:** v1.1 bu fazdan sonra, 1.0.1/1.0.2'deki gibi bir sürüm turuyla
+çıkar (PROGRESS 16n, 16r).
+
+---
+
+## ⬜ Faz 19 — Kolaylıklar (v1.2)
+
+Kapsam `PROJECT_SPEC.md` §4 "v1.2 — Kolaylıklar".
+
+- [ ] Haftalık toplam görünümü (aylık/yıllık geçişine ek)
+- [ ] Sağa kaydırınca düzenleme
+- [ ] Aylık gelir ve gelirin aboneliklere giden yüzdesi; gelir yalnız cihazda
+      tutulur
+
+**Bitti:** Üç madde çalışıyor; toplamlarda kuruş hatası yok.
+
+**Sürüm:** v1.2 bu fazdan sonra, 1.0.1/1.0.2'deki gibi bir sürüm turuyla
+çıkar (PROGRESS 16n, 16r).
+
+---
+
+## ⬜ Faz 20 — Dışa/İçe Aktarma (v1.3)
 
 Kullanıcının verisini dosyaya yazması ve geri yüklemesi. Auto Backup (Faz 16f)
 kullanıcının kendi Drive'ına yedekliyor ve kullanıcı o yedeğe elle
 dokunamıyor; bu faz veriyi kullanıcının **elinde tutabileceği bir dosyaya**
 çıkarmakla ilgili.
 
-Kapsam `PROJECT_SPEC.md` §4 "v1.1 — Veri taşınabilirliği" bölümünde karara
-bağlandı. Faz 17 **üretim erişimiyle başlar**; o güne kadar koda yalnızca
-kapalı test geri bildiriminden gelen düzeltmeler girer (`versionCode 2`'den
-başlayarak). Gerekçe:
+Kapsam `PROJECT_SPEC.md` §4 "v1.3 — Veri taşınabilirliği" bölümünde karara
+bağlandı:
 
-- Faz 16'nın bitiş tanımı üretime çıkışı içeriyor ve fazlar sırayla yapılıyor.
-- Tek branch'le çalışılıyor (`WORKFLOW.md` §6): kapalı testte bulunan bir
-  hatanın düzeltmesi `versionCode 2` olarak hemen çıkabilmeli, içinde yarım
-  kalmış bir dışa/içe aktarma olmadan.
+- [ ] JSON; abonelikler + ayarlar + kurlar, aylık anlık görüntüler hariç
+- [ ] İçe aktarma mevcut veriyi üzerine yazar; öncesinde sayılı onay
+- [ ] Dosya konumu sistem dosya seçicisiyle
+- [ ] Şifreleme yok; dışa aktarma ekranında "bu dosya okunabilir" uyarısı
+- [ ] Ayarlar altında ayrı bir "Yedekleme" ekranı
+- [ ] Gizlilik politikasına dosya konumu cümlesi
+- [ ] Sürümün başında: v1.1'deki kullanıcı resimlerinin dışa aktarmaya girip
+      girmeyeceği kararlaştırılır
+
+Faz 17'deki "üretim erişimiyle başlar" kuralının içe aktarmaya özgü gerekçesi
+burada kalıyor:
+
 - Üretim başvurusu, kapalı testten öğrenilenlerle neyin değiştirildiğini
   soruyor; bu dönemde koda yalnızca o düzeltmeler girmeli. İçe aktarma
   kullanıcının verisine dokunan bir işlem, ilk herkese açık sürüme aceleyle
   girmemeli.
+
+**Sürüm:** v1.3 bu fazdan sonra, 1.0.1/1.0.2'deki gibi bir sürüm turuyla
+çıkar (PROGRESS 16n, 16r).
+
+---
+
+## ⬜ Faz 21 — Ödeme Türü (v1.4)
+
+Kapsam `PROJECT_SPEC.md` §4 "v1.4 — Ödeme türü".
+
+- [ ] Aboneliğe "otomatik talimat / kendim ödüyorum" alanı
+- [ ] Hatırlatma buna göre değişir: "bugün çekilecek" / "ödemeyi unutma"
+- [ ] Yeni alan olduğu için ilk migration bu sürümde. Gerekçe: şemaya ilk kez
+      dokunulmadan önce kullanıcının elinde kendi yedek dosyası olsun (Faz 20)
+
+**Bitti:** Şema sürümünü bir artıran migration ve migration testi var; iki
+ödeme türünün hatırlatması doğru.
+
+**Sürüm:** v1.4 bu fazdan sonra, 1.0.1/1.0.2'deki gibi bir sürüm turuyla
+çıkar (PROGRESS 16n, 16r).

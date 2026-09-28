@@ -50,6 +50,11 @@ entegrasyonu isteyen kullanıcılar.
 
 ## 4. Sürüm Kapsamları
 
+> **Sıra (2026-09-27):** v1.0'dan sonraki sürümler kapalı test geri
+> bildirimlerine göre yeniden sıralandı: en çok ikon ve tema istendi,
+> dışa/içe aktarmayı isteyen olmadı. Üretim erişimine kadar koda yalnız
+> kapalı test düzeltmeleri girer (`ROADMAP.md` Faz 17).
+
 ### v1.0 — Play Store'daki ilk sürüm ✓
 
 | Özellik | Açıklama |
@@ -74,7 +79,42 @@ entegrasyonu isteyen kullanıcılar.
 | Tema | Sistem / açık / koyu tercihi; Android 12 ve üstünde isteğe bağlı duvar kâğıdı renkleri |
 | Türkçe + İngilizce | Tüm metinler string kaynaklarından; varsayılan dil İngilizce |
 
-### v1.1 — Veri taşınabilirliği (ilk güncelleme)
+### v1.1 — Görünüm
+
+**İkon**
+
+- Ad yazılırken ikon kendiliğinden gelir. Bilinen servislerde renkli baş
+  harf, geniş alanlarda (kurs, sunucu gibi) türe göre simge.
+- Hazır marka logosu yok: marka hakları, ve uygulamanın internet izni yok.
+- Kullanıcı kendi resmini, bir emojiyi ya da bir rengi seçebilir. Resim
+  seçimi sistemin fotoğraf seçicisiyle, yeni izin olmadan.
+
+**Gerçek koyu tema**
+
+- Koyu yüzeyler gri/siyah. Bugünkü koyu tema bir testçiye yeterince koyu
+  görünmüyor; bu yeni özellik değil, mevcut koyu temanın düzeltmesi.
+
+**Renk paletleri**
+
+- Birkaç hazır palet, her Android sürümünde. Mevcut tema ayarının uzantısı;
+  serbest renk seçici yok (§3 madde 3).
+- Android 12 ve üstündeki duvar kâğıdı renkleri aynen kalır.
+
+**İlk iş**
+
+- Mevcut `iconKey` alanının yeni ikon türlerini şema değişikliği olmadan
+  taşıyıp taşıyamayacağı doğrulanır. Taşıyamıyorsa bu sürüm migration
+  gerektirir ve `ARCHITECTURE.md` "Şema sürümlemesi" kuralı uygulanır.
+- v1.0'dan gelen aboneliklerin ikonları korunur.
+
+### v1.2 — Kolaylıklar
+
+- Haftalık toplam görünümü (aylık/yıllık geçişine ek)
+- Sağa kaydırınca düzenleme
+- Aylık gelir ve gelirin aboneliklere giden yüzdesi; gelir yalnız cihazda
+  tutulur
+
+### v1.3 — Veri taşınabilirliği
 
 Dışa ve içe aktarma. Kararlar verildi:
 
@@ -93,7 +133,17 @@ Dışa ve içe aktarma. Kararlar verildi:
 - Gizlilik politikasına eklenecek: dosya kullanıcının seçtiği yere kaydedilir,
   güvenliği onun sorumluluğundadır
 
-### v1.2 — Ağ bağlantısı (zamanlaması açık)
+> **Not:** v1.1'den sonra kullanıcı resimleri de olacak; dışa aktarmaya girip
+> girmeyecekleri bu sürümün başında kararlaştırılır.
+
+### v1.4 — Ödeme türü
+
+- Aboneliğe "otomatik talimat / kendim ödüyorum" alanı
+- Hatırlatma buna göre değişir: "bugün çekilecek" / "ödemeyi unutma"
+- Yeni alan olduğu için **ilk migration bu sürümde.** Gerekçe: şemaya ilk kez
+  dokunulmadan önce kullanıcının elinde kendi yedek dosyası olsun (v1.3).
+
+### Ağ bağlantısı (zamanlaması açık)
 
 - Otomatik döviz kuru güncellemesi
 - `INTERNET` izni **bu sürümde** ekleniyor
@@ -109,6 +159,20 @@ Dışa ve içe aktarma. Kararlar verildi:
 > **Ön koşul:** Gerçek kullanıcı talebi. Altyapı maliyeti ve KVKK/GDPR
 > yükümlülüğü getirdiği için talep görülmeden yapılmaz.
 
+### Değerlendirilecek (karar yok)
+
+Kapalı test geri bildirimlerinden (`PROGRESS.md` 16q "Görev C", 16r
+"27.09.2026 geri bildirimleri"):
+
+- **Fatura/kira/kart kategorisi:** kira ve faturalar §1'deki abonelik
+  tanımını genişletiyor; faturaların tutarı her ay değişiyor. Karar verilene
+  kadar "Diğer" kategorisi kullanılır.
+- **Bir aboneliğin birden çok kategoride olması:** istatistikteki yüzde
+  dağılımı için tasarım gerekiyor.
+- **Günlük periyot:** abonelik kapsamına uyumu tartışılacak.
+- **Olmayacak:** Android 12 altında duvar kâğıdı renkleri (platform
+  özelliği); renk seçme isteğini v1.1'deki paletler karşılar.
+
 ---
 
 ## 5. Kapsam Kararları
@@ -123,7 +187,8 @@ otomatik kur güncellemesi olurdu ve **çalışan bir alternatifi var** — kull
 kuru elle giriyor. Tek bir özellik için `INTERNET` izni, ağ kütüphanesi, hata
 yönetimi ve çevrimdışı davranış yükünü almak bu aşamada erken.
 
-**Kalıcı bir taahhüt değil.** Ağ v1.2'de ekleniyor.
+**Kalıcı bir taahhüt değil.** Ağ planlı; sürüm numarası ve zamanlaması açık
+(§4 "Ağ bağlantısı").
 
 ### "v1.0'da hesap yok"
 
@@ -178,7 +243,8 @@ Bu maddeler bilinçli olarak **yapılmayacak**:
 - Widget, Wear OS, tablet-özel layout (v2 değerlendirmesi)
 
 > **Not:** "Kullanıcı hesabı" ve "canlı döviz kuru API'si" bu listeden
-> çıkarıldı — artık planlı özellikler (sırasıyla v2.0 ve v1.2).
+> çıkarıldı — artık planlı özellikler (sırasıyla v2.0 ve §4'teki "Ağ
+> bağlantısı"; ikincisinin sürüm numarası yok).
 
 ---
 
