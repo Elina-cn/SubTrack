@@ -746,8 +746,11 @@ Aylık toplamın zaman içindeki anlık görüntüleri. `PROJECT_SPEC.md` §1'de
       (PROGRESS 16r, "Karar — sürüm yayınlama sırası"); kapalı test
       incelemeden geçti, iki kanalda da aynı gün yayında. Testçilere
       duyuruldu; bir testçi beyaz parlamanın düzeldiğini bildirdi
-      (27.09.2026). (Console'da ve testçiyle oldu, repoda kanıt yok; etiket
-      repoda.)
+      (27.09.2026). Kullanıcının telefonu (OPPO A15s, Android 10) Play
+      üzerinden 1.0.1'den 1.0.2'ye güncellendi (28.09.2026): veri korundu,
+      parlama yok, tarih notu görünüyor; upload/Play imza farkı gerçek
+      güncellemede sorun çıkarmadı. (Console'da, testçiyle ve telefonda oldu,
+      repoda kanıt yok; etiket repoda.)
 - [ ] Üretim erişimi ve yayın — 12 testçi 14 gün kesintisiz katılımda kalınca
       başvurulacak (Faz 16k).
 
@@ -814,8 +817,9 @@ Kapsam `PROJECT_SPEC.md` §4 "v1.2 — Kolaylıklar".
 
 - [ ] Haftalık toplam görünümü (aylık/yıllık geçişine ek)
 - [ ] Sağa kaydırınca düzenleme
-- [ ] Aylık gelir ve gelirin aboneliklere giden yüzdesi; gelir yalnız cihazda
-      tutulur
+- [ ] Aylık gelir ve gelirin aboneliklere giden yüzdesi. Gelir bize ya da
+      başka bir şirkete gitmez; diğer ayarlar gibi kullanıcının kendi
+      yedeğine girer (Auto Backup)
 
 **Bitti:** Üç madde çalışıyor; toplamlarda kuruş hatası yok.
 
@@ -850,6 +854,11 @@ burada kalıyor:
   soruyor; bu dönemde koda yalnızca o düzeltmeler girmeli. İçe aktarma
   kullanıcının verisine dokunan bir işlem, ilk herkese açık sürüme aceleyle
   girmemeli.
+
+**Bitti:** Dışa aktarılan dosya içe aktarılınca abonelikler, ayarlar ve
+kurlar birebir geri geliyor; içe aktarmadan önce sayılı onay çıkıyor; dosya
+kullanıcının seçtiği yere kaydediliyor; gizlilik politikasına dosya konumu
+cümlesi eklendi.
 
 **Sürüm:** v1.3 bu fazdan sonra, 1.0.1/1.0.2'deki gibi bir sürüm turuyla
 çıkar (PROGRESS 16n, 16r).

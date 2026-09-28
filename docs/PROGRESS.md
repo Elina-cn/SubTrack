@@ -53,9 +53,15 @@ Console'da ve testçilerle oldu; repoda kanıtı yok (etiket hariç).
 
 **Rapor edilen, dokunulmadı**
 - v1.1'in `iconKey` doğrulaması migration çıkarırsa v1.4'teki "ilk migration" ve gerekçesi (önce yedek dosyası) tutmaz; belgeye yazılı bir karar eklenmedi.
+  - **Karar (16s ek):** hedef ikon türünün (otomatik, resim, emoji, renk) `iconKey` değerinde tutulması, şema değişmez; migration gerekirse sıra sohbette yeniden ele alınır (PROJECT_SPEC §4 v1.1 "İlk iş").
 - Auto Backup beyaz listeyle çalışıyor (ARCHITECTURE §25: yalnız veritabanı ve DataStore); v1.1'in kullanıcı resimleri kurallara eklenmedikçe yedeğe ve cihazdan cihaza aktarıma girmez.
+  - **Karar (16s ek):** resimler iki kurala da eklenir, kotaya sığsın diye küçük saklanır, dosya bulunamazsa otomatik ikon gösterilir; ARCHITECTURE §25 kural uygulanırken güncellenir (PROJECT_SPEC §4 v1.1 "İkon").
 - Gelir DataStore'da ya da Room'da tutulursa Auto Backup onu kullanıcının Drive'ına kopyalar; "yalnız cihazda" ifadesinin anlamı v1.2'nin başında netleşmeli.
+  - **Karar (16s ek):** gelir bize ya da başka bir şirkete gitmez, diğer ayarlar gibi kullanıcının kendi yedeğine girer (PROJECT_SPEC §4 v1.2, ROADMAP Faz 19).
 - Faz 20'nin "Bitti" satırı yok; eski Faz 17'de de yoktu.
+  - **Karar (16s ek):** Bitti satırı eklendi — dosya içe aktarılınca abonelikler, ayarlar ve kurlar birebir geri geliyor, sayılı onay, seçilen konum, gizlilik politikasında dosya konumu cümlesi (ROADMAP Faz 20).
+- 16r'nin "Sonraki faz için not"undaki telefon kontrolü (güncelleme telefona gelince abonelikler, toplam ve ayarlar gözle kontrol edilir) için bilgi gelmemişti.
+  - **Kapandı (2026-09-28):** telefon (OPPO A15s, Android 10) Play üzerinden 1.0.1'den 1.0.2'ye güncellendi; sürüm 1.0.2 görünüyor, abonelikler, toplam ve ayarlar korunmuş, koyu temada geçişlerde parlama yok, tarih alanının açıklaması görünüyor; 16r yükseltme testinin ölçmediği imza farkı (upload anahtarı / Play anahtarı) gerçek güncellemede sorun çıkarmadı (sohbette oldu, repoda kanıt yok).
 
 **Değişen dosyalar**
 - `docs/ROADMAP.md` — 1.0.2 satırı, tarihli not, Faz 17-21, gizlilik politikası maddesine sürüm notu

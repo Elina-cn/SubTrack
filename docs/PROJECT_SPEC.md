@@ -88,6 +88,10 @@ entegrasyonu isteyen kullanıcılar.
 - Hazır marka logosu yok: marka hakları, ve uygulamanın internet izni yok.
 - Kullanıcı kendi resmini, bir emojiyi ya da bir rengi seçebilir. Resim
   seçimi sistemin fotoğraf seçicisiyle, yeni izin olmadan.
+- Kullanıcı resimleri Auto Backup ve cihazdan cihaza aktarım kurallarına
+  eklenir; yedek kotasına sığması için küçük boyutta saklanır. Resim dosyası
+  bulunamazsa otomatik ikon gösterilir. (`ARCHITECTURE.md` §25 kural
+  uygulanırken güncellenir.)
 
 **Gerçek koyu tema**
 
@@ -102,17 +106,20 @@ entegrasyonu isteyen kullanıcılar.
 
 **İlk iş**
 
-- Mevcut `iconKey` alanının yeni ikon türlerini şema değişikliği olmadan
-  taşıyıp taşıyamayacağı doğrulanır. Taşıyamıyorsa bu sürüm migration
-  gerektirir ve `ARCHITECTURE.md` "Şema sürümlemesi" kuralı uygulanır.
+- Hedef: ikon türü (otomatik, resim, emoji, renk) mevcut `iconKey` değerinin
+  içinde tutulur, şema değişmez. Doğrulama bunun uygulanabilir olduğunu
+  teyit eder.
+- Migration gerektiği ortaya çıkarsa v1.4'teki "ilk migration" gerekçesi
+  geçersiz kalır; sürüm sırası sohbette yeniden ele alınır.
 - v1.0'dan gelen aboneliklerin ikonları korunur.
 
 ### v1.2 — Kolaylıklar
 
 - Haftalık toplam görünümü (aylık/yıllık geçişine ek)
 - Sağa kaydırınca düzenleme
-- Aylık gelir ve gelirin aboneliklere giden yüzdesi; gelir yalnız cihazda
-  tutulur
+- Aylık gelir ve gelirin aboneliklere giden yüzdesi. Gelir bize ya da başka
+  bir şirkete gitmez; diğer ayarlar gibi kullanıcının kendi yedeğine girer
+  (Auto Backup)
 
 ### v1.3 — Veri taşınabilirliği
 
