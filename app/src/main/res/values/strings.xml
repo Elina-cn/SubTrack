@@ -77,6 +77,8 @@
     <string name="reset_rates_confirm_title">Reset the rates?</string>
     <string name="reset_rates_confirm_message">The rates you entered will be removed and the values the app ships with will be used.</string>
     <string name="reset_rates_confirm">Reset</string>
+    <string name="rates_saved">Rates saved</string>
+    <string name="rates_restored">Default rates restored</string>
     <string name="cancel">Cancel</string>
 
     <!-- Rate validation -->

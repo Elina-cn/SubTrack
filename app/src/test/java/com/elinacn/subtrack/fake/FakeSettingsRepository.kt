@@ -38,7 +38,8 @@ class FakeSettingsRepository(
 
     val writes = mutableListOf<Currency>()
 
-    val rateWrites = mutableListOf<Pair<Currency, Long>>()
+    /** One entry per write; the real store also writes each call's rates in one edit. */
+    val rateWrites = mutableListOf<Map<Currency, Long>>()
 
     val themeModeWrites = mutableListOf<ThemeMode>()
 
@@ -50,7 +51,7 @@ class FakeSettingsRepository(
     /** Thrown by every writer when set, so the failure path can be exercised. */
     var failOnWrite: Exception? = null
 
-    /** What [setRate] stamps as the edit time, so tests do not depend on the clock. */
+    /** What [setRates] stamps as the edit time, so tests do not depend on the clock. */
     var now: Long = 1_000L
 
     override fun observeMainCurrency(): Flow<Currency> = stored.asStateFlow()
@@ -64,10 +65,10 @@ class FakeSettingsRepository(
     override fun observeRates(): Flow<ExchangeRateTable> =
         storedRates.map { ExchangeRateTable.of(it) }
 
-    override suspend fun setRate(currency: Currency, scaledRate: Long) {
+    override suspend fun setRates(scaledRates: Map<Currency, Long>) {
         failOnWrite?.let { throw it }
-        rateWrites += currency to scaledRate
-        storedRates.value = storedRates.value + (currency to scaledRate)
+        rateWrites += scaledRates
+        storedRates.value = storedRates.value + scaledRates
         updatedAt.value = now
     }
 

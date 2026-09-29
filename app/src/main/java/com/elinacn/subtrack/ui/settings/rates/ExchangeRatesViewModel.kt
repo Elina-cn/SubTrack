@@ -4,7 +4,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.elinacn.subtrack.R
 import com.elinacn.subtrack.domain.model.Currency
-import com.elinacn.subtrack.domain.model.ExchangeRateTable
 import com.elinacn.subtrack.domain.repository.SettingsRepository
 import com.elinacn.subtrack.ui.common.UiText
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -12,14 +11,30 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import java.math.BigDecimal
 import javax.inject.Inject
 
-/** Holds the exchange rate screen's state and turns its events into preference writes. */
+/**
+ * Holds the exchange rate screen's state and turns its events into preference writes.
+ *
+ * **The store is read, not watched** - once when the screen opens and again after each of its own
+ * writes - the same choice the edit screen makes for its row (ARCHITECTURE section 22). This screen
+ * is the only writer of the rates, so nothing else can change them underneath it, and reading back
+ * after a write means the boxes show what the store answered rather than what was sent.
+ *
+ * Watching is what 1.0.2 did, and it let the boxes lag the store: a save or reset dropped the
+ * typed text at once, and until the store's next emission reached the screen the boxes were filled
+ * from the table as it was *before* the write. A Save pressed in that gap stored the old numbers
+ * again (ARCHITECTURE section 29).
+ *
+ * **One write at a time.** A write sets [ScreenState.isWriting] before it starts and every other
+ * write is refused until it has finished and been read back; events arrive on the main thread, so
+ * the check and the set cannot interleave.
+ */
 @HiltViewModel
 class ExchangeRatesViewModel @Inject constructor(
     private val repository: SettingsRepository
@@ -27,37 +42,28 @@ class ExchangeRatesViewModel @Inject constructor(
 
     private val screenState = MutableStateFlow(ScreenState())
 
-    /**
-     * Drafts start as null and are filled from the stored table on the first emission. Saving and
-     * resetting both set them back to null, so the boxes re-seed from whatever is actually stored
-     * instead of keeping the text that produced it.
-     */
-    val uiState: StateFlow<ExchangeRatesUiState> = combine(
-        repository.observeRates(),
-        repository.observeRatesUpdatedAt(),
-        screenState
-    ) { rates, updatedAt, screen ->
-        ExchangeRatesUiState(
-            isLoaded = true,
-            drafts = screen.drafts ?: editableCurrencies.associateWith { rates.rateOf(it).asText() },
-            fieldErrors = screen.fieldErrors,
-            updatedAt = updatedAt,
-            isResetConfirmationVisible = screen.isResetConfirmationVisible,
-            errorMessage = screen.errorMessage
+    /** What the screen draws, derived from the one state the save path reads too. */
+    val uiState: StateFlow<ExchangeRatesUiState> = screenState
+        .map { it.toUiState() }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
+            initialValue = ExchangeRatesUiState()
         )
-    }.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
-        initialValue = ExchangeRatesUiState()
-    )
+
+    init {
+        viewModelScope.launch {
+            val stored = readStore()
+            screenState.update { it.copy(stored = stored) }
+        }
+    }
 
     /** Single entry point for everything the screen can ask for. */
     fun onEvent(event: ExchangeRatesEvent) {
         when (event) {
             is ExchangeRatesEvent.RateEdited -> screenState.update { state ->
-                val drafts = state.drafts ?: uiState.value.drafts
                 state.copy(
-                    drafts = drafts + (event.currency to event.rawRate),
+                    drafts = state.drafts + (event.currency to event.rawRate),
                     // Drop the error as soon as the field changes; leaving it up would keep
                     // contradicting what is now on screen.
                     fieldErrors = state.fieldErrors - event.currency
@@ -65,6 +71,10 @@ class ExchangeRatesViewModel @Inject constructor(
             }
 
             ExchangeRatesEvent.Save -> save()
+
+            ExchangeRatesEvent.NoticeShown -> screenState.update { it.copy(notice = null) }
+
+            ExchangeRatesEvent.FieldFocused -> screenState.update { it.copy(fieldToFocus = null) }
 
             ExchangeRatesEvent.ShowResetConfirmation -> screenState.update {
                 it.copy(isResetConfirmationVisible = true)
@@ -81,112 +91,147 @@ class ExchangeRatesViewModel @Inject constructor(
     }
 
     /**
-     * Every field is validated before anything is written. A partial save would leave the user
-     * looking at three boxes with no way to tell which of them reached the store.
+     * Every box is read before anything is written, and then all of them are written in one go. A
+     * partial save would leave the user looking at three boxes with no way to tell which of them
+     * reached the store.
+     *
+     * Every box is parsed from its text, touched or not. An untouched box holds the stored rate
+     * written out by [RateText.format], which reads back exactly, so this costs nothing - and it
+     * means there is no second source a saved value could come from.
      */
     private fun save() {
-        // Nothing to validate against yet; the fields are not even drawn (ARCHITECTURE §29).
-        if (!uiState.value.isLoaded) return
-        // screenState first: a Save arriving in the same frame as the last keystroke must see that
-        // keystroke, and uiState only catches up once the combine re-emits.
-        val drafts = screenState.value.drafts ?: uiState.value.drafts
+        val state = screenState.value
+        if (!state.canSave()) return
+        val texts = state.rateTexts() ?: return
         val errors = mutableMapOf<Currency, UiText>()
         val parsed = mutableMapOf<Currency, Long>()
 
-        editableCurrencies.forEach { currency ->
-            when (val result = parseRate(drafts[currency].orEmpty())) {
+        texts.forEach { (currency, text) ->
+            when (val result = RateText.parse(text)) {
                 is RateResult.Valid -> parsed[currency] = result.scaledRate
                 is RateResult.Invalid -> errors[currency] = result.reason
             }
         }
 
         if (errors.isNotEmpty()) {
-            screenState.update { it.copy(fieldErrors = errors) }
+            screenState.update {
+                it.copy(
+                    fieldErrors = errors,
+                    // Screen order, so the one pointed at is the first the user would reach.
+                    fieldToFocus = editableCurrencies.firstOrNull { currency -> currency in errors }
+                )
+            }
             return
         }
 
-        viewModelScope.launch {
-            try {
-                parsed.forEach { (currency, scaledRate) -> repository.setRate(currency, scaledRate) }
-                // Clearing the drafts re-seeds the boxes from the store, so what is on screen after
-                // a save is the value that was actually written.
-                screenState.update { it.copy(drafts = null, fieldErrors = emptyMap()) }
-            } catch (cancellation: CancellationException) {
-                throw cancellation
-            } catch (failure: Exception) {
-                screenState.update { it.copy(errorMessage = UiText.Resource(R.string.error_rates_save_failed)) }
-            }
+        write(draftsAtStart = state.drafts, notice = RatesNotice.SAVED) {
+            repository.setRates(parsed)
         }
     }
 
+    /** Stores the defaults straight away; there is no second step for the user to forget. */
     private fun resetRates() {
         screenState.update { it.copy(isResetConfirmationVisible = false) }
-        viewModelScope.launch {
-            try {
-                repository.resetRates()
-                screenState.update { it.copy(drafts = null, fieldErrors = emptyMap()) }
-            } catch (cancellation: CancellationException) {
-                throw cancellation
-            } catch (failure: Exception) {
-                screenState.update { it.copy(errorMessage = UiText.Resource(R.string.error_rates_save_failed)) }
-            }
+        val state = screenState.value
+        if (state.stored == null || state.isWriting) return
+
+        write(draftsAtStart = state.drafts, notice = RatesNotice.RESTORED) {
+            repository.resetRates()
         }
     }
 
     /**
-     * Reads what the user typed into a scaled rate, with the same care as the price field.
+     * Runs one write and reads the store back afterwards.
      *
-     * BigDecimal rather than Double: a rate multiplies every amount that passes through it, so an
-     * inexact reading spreads a proportional error across the whole total rather than losing a
-     * kuruş once.
+     * The drafts that were in the boxes when the write started are dropped, so those boxes show the
+     * stored value again. A box typed into while the write was running keeps its text - it is a
+     * change the store has not seen, and throwing it away would be the silent loss this screen
+     * exists to prevent.
      */
-    private fun parseRate(rawRate: String): RateResult {
-        val normalized = rawRate.trim().replace(',', '.')
-        if (normalized.isEmpty()) {
-            return RateResult.Invalid(UiText.Resource(R.string.error_rate_empty))
+    private fun write(
+        draftsAtStart: Map<Currency, String>,
+        notice: RatesNotice,
+        block: suspend () -> Unit
+    ) {
+        screenState.update { it.copy(isWriting = true) }
+        viewModelScope.launch {
+            try {
+                block()
+                val stored = readStore()
+                screenState.update { state ->
+                    state.copy(
+                        stored = stored,
+                        drafts = state.drafts.filter { (currency, text) ->
+                            draftsAtStart[currency] != text
+                        },
+                        fieldErrors = emptyMap(),
+                        notice = notice,
+                        isWriting = false
+                    )
+                }
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (failure: Exception) {
+                screenState.update {
+                    it.copy(
+                        errorMessage = UiText.Resource(R.string.error_rates_save_failed),
+                        isWriting = false
+                    )
+                }
+            }
         }
-        val amount = normalized.toBigDecimalOrNull()
-            ?: return RateResult.Invalid(UiText.Resource(R.string.error_rate_invalid))
-        if (amount.signum() <= 0) {
-            // The hard one: CurrencyConverter divides by the target rate, so a zero here is a
-            // division by zero rather than a merely odd number.
-            return RateResult.Invalid(UiText.Resource(R.string.error_rate_not_positive))
-        }
-        // Trailing zeros do not count: "42.8500" is two decimals written long.
-        if (amount.stripTrailingZeros().scale() > RATE_DECIMAL_DIGITS) {
-            return RateResult.Invalid(UiText.Resource(R.string.error_rate_too_many_decimals))
-        }
-        if (amount > MAX_RATE_UNITS) {
-            // The limit is handed to the message instead of being written into it, so the two
-            // cannot drift apart when the ceiling changes.
-            return RateResult.Invalid(
-                UiText.Resource(R.string.error_rate_too_large, listOf(MAX_RATE_UNITS.toPlainString()))
-            )
-        }
-        val scaled = amount.movePointRight(RATE_DECIMAL_DIGITS).toLong()
-        if (scaled < ExchangeRateTable.MIN_RATE) {
-            // Unreachable given the two checks above - a positive number with at most four
-            // decimals is at least one scale unit. Kept because what it protects is a correctness
-            // requirement, not a nicety: nothing below this line may hand a zero divisor onward.
-            return RateResult.Invalid(UiText.Resource(R.string.error_rate_not_positive))
-        }
-        return RateResult.Valid(scaled)
     }
 
-    /** Renders a stored rate the way the field should show it: "42.85", not "42.8500". */
-    private fun Long.asText(): String =
-        BigDecimal.valueOf(this, RATE_DECIMAL_DIGITS).stripTrailingZeros().toPlainString()
+    /** One read of the rates and their edit time, as the store holds them now. */
+    private suspend fun readStore(): StoredRates {
+        val table = repository.observeRates().first()
+        return StoredRates(
+            rates = editableCurrencies.associateWith { table.rateOf(it) },
+            updatedAt = repository.observeRatesUpdatedAt().first()
+        )
+    }
+
+    private data class StoredRates(val rates: Map<Currency, Long>, val updatedAt: Long?)
 
     private data class ScreenState(
-        val drafts: Map<Currency, String>? = null,
+        /** What the store held at the last read; null until the first read has answered. */
+        val stored: StoredRates? = null,
+        /** What the user has typed, only for the boxes they touched. */
+        val drafts: Map<Currency, String> = emptyMap(),
         val fieldErrors: Map<Currency, UiText> = emptyMap(),
+        val isWriting: Boolean = false,
         val isResetConfirmationVisible: Boolean = false,
-        val errorMessage: UiText? = null
-    )
+        val errorMessage: UiText? = null,
+        val notice: RatesNotice? = null,
+        val fieldToFocus: Currency? = null
+    ) {
 
-    private sealed interface RateResult {
-        data class Valid(val scaledRate: Long) : RateResult
-        data class Invalid(val reason: UiText) : RateResult
+        /** The text in every box - the one source for both the screen and [save]. */
+        fun rateTexts(): Map<Currency, String>? = stored?.let { store ->
+            editableCurrencies.associateWith { currency ->
+                drafts[currency] ?: RateText.format(store.rates.getValue(currency))
+            }
+        }
+
+        /** A box counts as changed when its text is not how the stored rate is written. */
+        fun canSave(): Boolean {
+            val store = stored ?: return false
+            return !isWriting && drafts.any { (currency, text) ->
+                text != RateText.format(store.rates.getValue(currency))
+            }
+        }
+
+        fun toUiState() = ExchangeRatesUiState(
+            rateTexts = rateTexts(),
+            fieldErrors = fieldErrors,
+            updatedAt = stored?.updatedAt,
+            isSaveEnabled = canSave(),
+            isResetEnabled = stored != null && !isWriting,
+            isResetConfirmationVisible = isResetConfirmationVisible,
+            errorMessage = errorMessage,
+            notice = notice,
+            fieldToFocus = fieldToFocus
+        )
     }
 
     companion object {
@@ -197,9 +242,5 @@ class ExchangeRatesViewModel @Inject constructor(
         const val RATE_DECIMAL_DIGITS = 4
 
         private const val STOP_TIMEOUT_MS = 5_000L
-
-        /** [ExchangeRateTable.MAX_RATE] expressed in whole units, for comparing against input. */
-        private val MAX_RATE_UNITS: BigDecimal =
-            BigDecimal.valueOf(ExchangeRateTable.MAX_RATE, RATE_DECIMAL_DIGITS).stripTrailingZeros()
     }
 }

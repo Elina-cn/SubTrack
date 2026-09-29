@@ -191,7 +191,7 @@ class HomeViewModelTest {
         // At the shipped 42,8500 that is 428,50 TRY.
         assertEquals(Money(42_850), viewModel.uiState.value.total)
 
-        settingsRepository.setRate(Currency.USD, 500_000L) // 50,0000
+        settingsRepository.setRates(mapOf(Currency.USD to 500_000L)) // 50,0000
         advanceUntilIdle()
 
         assertEquals(Money(50_000), viewModel.uiState.value.total)
@@ -203,7 +203,7 @@ class HomeViewModelTest {
             listOf(subscription(id = 1, cents = 1000, currency = Currency.USD))
         )
         collectState()
-        settingsRepository.setRate(Currency.USD, 500_000L)
+        settingsRepository.setRates(mapOf(Currency.USD to 500_000L))
         advanceUntilIdle()
 
         settingsRepository.resetRates()

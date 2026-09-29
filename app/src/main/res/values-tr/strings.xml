@@ -78,6 +78,8 @@
     <string name="reset_rates_confirm_title">Kurlar sıfırlansın mı?</string>
     <string name="reset_rates_confirm_message">Girdiğiniz kurlar silinecek ve uygulamayla gelen değerler kullanılacak.</string>
     <string name="reset_rates_confirm">Sıfırla</string>
+    <string name="rates_saved">Kurlar kaydedildi</string>
+    <string name="rates_restored">Varsayılan kurlar geri yüklendi</string>
     <string name="cancel">Vazgeç</string>
 
     <!-- Rate validation -->

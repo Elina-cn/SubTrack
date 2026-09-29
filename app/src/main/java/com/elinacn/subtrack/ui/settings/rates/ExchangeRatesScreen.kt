@@ -8,9 +8,9 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -22,7 +22,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
@@ -33,19 +32,20 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
 import com.elinacn.subtrack.R
 import com.elinacn.subtrack.domain.model.Currency
 import com.elinacn.subtrack.ui.common.UiText
-import com.elinacn.subtrack.ui.common.reservedUntilKnown
 import com.elinacn.subtrack.ui.theme.Dimens
 import com.elinacn.subtrack.ui.theme.SubTrackTheme
-import java.text.DateFormat
-import java.util.Date
+import kotlinx.coroutines.launch
 
 /**
  * Lets the user correct the fixed exchange rates by hand.
@@ -63,12 +63,44 @@ fun ExchangeRatesScreen(
     modifier: Modifier = Modifier
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
+    val snackbarScope = rememberCoroutineScope()
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val editable = ExchangeRatesViewModel.editableCurrencies
+    val focusRequesters = remember { editable.associateWith { FocusRequester() } }
+    val bringIntoViewRequesters = remember { editable.associateWith { BringIntoViewRequester() } }
     val errorText = uiState.errorMessage?.asString()
+    val noticeText = uiState.notice?.let { stringResource(id = it.messageId()) }
 
     LaunchedEffect(errorText) {
         if (errorText == null) return@LaunchedEffect
         snackbarHostState.showSnackbar(message = errorText, duration = SnackbarDuration.Short)
         onEvent(ExchangeRatesEvent.DismissError)
+    }
+
+    // A write went through. The keyboard has nothing left to do and a cursor left in a box reads
+    // as "still editing", so both go, and the message says what happened. It is shown from its own
+    // scope so the notice is handed back at once and a second one replaces the first.
+    LaunchedEffect(noticeText) {
+        if (noticeText == null) return@LaunchedEffect
+        focusManager.clearFocus()
+        keyboardController?.hide()
+        snackbarHostState.currentSnackbarData?.dismiss()
+        snackbarScope.launch {
+            snackbarHostState.showSnackbar(message = noticeText, duration = SnackbarDuration.Short)
+        }
+        onEvent(ExchangeRatesEvent.NoticeShown)
+    }
+
+    // A rejected save points at the first bad box. Focus first, then one frame so the error line
+    // under it is laid out, then scroll: the requester covers the message too, so it comes into
+    // view with the box instead of staying below the fold on a short screen.
+    LaunchedEffect(uiState.fieldToFocus) {
+        val target = uiState.fieldToFocus ?: return@LaunchedEffect
+        focusRequesters.getValue(target).requestFocus()
+        withFrameNanos { }
+        bringIntoViewRequesters.getValue(target).bringIntoView()
+        onEvent(ExchangeRatesEvent.FieldFocused)
     }
 
     Scaffold(
@@ -121,47 +153,27 @@ fun ExchangeRatesScreen(
 
             Spacer(modifier = Modifier.height(Dimens.SpacerSmall))
 
-            // "Never edited" is exactly what a user with saved rates must not see while the store
-            // is still being read, so the line waits for it (ARCHITECTURE section 29).
-            Text(
-                text = uiState.updatedAtText(),
-                modifier = Modifier.reservedUntilKnown(isKnown = uiState.isLoaded),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onBackground
-            )
+            RatesUpdatedLine(isLoaded = uiState.isLoaded, updatedAt = uiState.updatedAt)
 
             Spacer(modifier = Modifier.height(Dimens.SpacerLarge))
 
-            ExchangeRatesViewModel.editableCurrencies.forEach { currency ->
-                val error = uiState.fieldErrors[currency]
-                OutlinedTextField(
-                    // Until the store answers the box is laid out but not drawn, and it holds a
-                    // stand-in rather than nothing: an empty box puts its label in the middle, and
-                    // the label would then be seen sliding to the border as the rate arrived.
-                    value = if (uiState.isLoaded) {
-                        uiState.drafts[currency].orEmpty()
-                    } else {
-                        LAYOUT_STAND_IN
-                    },
-                    onValueChange = { onEvent(ExchangeRatesEvent.RateEdited(currency, it)) },
-                    label = {
-                        Text(
-                            stringResource(
-                                id = R.string.rate_field_label,
-                                currency.symbol,
-                                Currency.Base.symbol
-                            )
-                        )
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .reservedUntilKnown(isKnown = uiState.isLoaded),
-                    // Disabled while hidden, so a tap cannot focus a box nobody can see.
-                    enabled = uiState.isLoaded,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    singleLine = true,
-                    isError = error != null,
-                    supportingText = error?.let { { Text(it.asString()) } }
+            editable.forEach { currency ->
+                RateField(
+                    currency = currency,
+                    text = uiState.rateTexts?.get(currency),
+                    error = uiState.fieldErrors[currency],
+                    isLast = currency == editable.last(),
+                    focusRequester = focusRequesters.getValue(currency),
+                    bringIntoViewRequester = bringIntoViewRequesters.getValue(currency),
+                    onEdit = { onEvent(ExchangeRatesEvent.RateEdited(currency, it)) },
+                    onDone = {
+                        // With nothing to save, the action key only puts the keyboard away.
+                        if (uiState.isSaveEnabled) {
+                            onEvent(ExchangeRatesEvent.Save)
+                        } else {
+                            focusManager.clearFocus()
+                        }
+                    }
                 )
 
                 Spacer(modifier = Modifier.height(Dimens.SpacerMedium))
@@ -179,6 +191,7 @@ fun ExchangeRatesScreen(
 
             Button(
                 onClick = { onEvent(ExchangeRatesEvent.Save) },
+                enabled = uiState.isSaveEnabled,
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer,
                     contentColor = MaterialTheme.colorScheme.onPrimaryContainer
@@ -193,6 +206,7 @@ fun ExchangeRatesScreen(
 
             OutlinedButton(
                 onClick = { onEvent(ExchangeRatesEvent.ShowResetConfirmation) },
+                enabled = uiState.isResetEnabled,
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(Dimens.CardCorner)
             ) {
@@ -220,26 +234,11 @@ fun ExchangeRatesScreen(
     }
 }
 
-/**
- * "Last edited on ..." once the user has touched the rates, and a warning that the shipped numbers
- * are a guess until then. The date is formatted here because it needs a Locale, which domain does
- * not carry.
- */
-@Composable
-private fun ExchangeRatesUiState.updatedAtText(): String {
-    val updated = updatedAt ?: return stringResource(id = R.string.rates_never_edited)
-    val locale = LocalConfiguration.current.locales[0]
-    val format = remember(locale) {
-        DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT, locale)
-    }
-    return stringResource(id = R.string.rates_updated_at, format.format(Date(updated)))
+/** The message each kind of finished write shows. */
+private fun RatesNotice.messageId(): Int = when (this) {
+    RatesNotice.SAVED -> R.string.rates_saved
+    RatesNotice.RESTORED -> R.string.rates_restored
 }
-
-/**
- * Occupies a rate box while it is hidden, so the box is laid out as it will be once filled. Never
- * drawn and never announced.
- */
-private const val LAYOUT_STAND_IN = "0"
 
 @Preview(showBackground = true, showSystemUi = true)
 @Composable
@@ -247,12 +246,12 @@ private fun ExchangeRatesScreenPreview() {
     SubTrackTheme {
         ExchangeRatesScreen(
             uiState = ExchangeRatesUiState(
-                isLoaded = true,
-                drafts = mapOf(
+                rateTexts = mapOf(
                     Currency.USD to "42.85",
                     Currency.EUR to "46.2",
                     Currency.GBP to "53.9"
-                )
+                ),
+                isResetEnabled = true
             ),
             onEvent = {},
             onNavigateBack = {}
@@ -267,8 +266,7 @@ private fun ExchangeRatesScreenErrorPreview() {
     SubTrackTheme {
         ExchangeRatesScreen(
             uiState = ExchangeRatesUiState(
-                isLoaded = true,
-                drafts = mapOf(
+                rateTexts = mapOf(
                     Currency.USD to "0",
                     Currency.EUR to "46.2",
                     Currency.GBP to "53.9"
@@ -276,7 +274,9 @@ private fun ExchangeRatesScreenErrorPreview() {
                 fieldErrors = mapOf(
                     Currency.USD to UiText.Resource(R.string.error_rate_not_positive)
                 ),
-                updatedAt = 0L
+                updatedAt = 0L,
+                isSaveEnabled = true,
+                isResetEnabled = true
             ),
             onEvent = {},
             onNavigateBack = {}

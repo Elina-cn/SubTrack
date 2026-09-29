@@ -28,12 +28,16 @@ interface SettingsRepository {
     fun observeRates(): Flow<ExchangeRateTable>
 
     /**
-     * Stores one rate, as [ExchangeRateTable.RATE_SCALE]-scaled units of the anchor currency.
+     * Stores [scaledRates] - [ExchangeRateTable.RATE_SCALE]-scaled units of the anchor currency -
+     * in a single write, stamped with a single edit time.
      *
-     * The caller is responsible for validating the value; the range the arithmetic can carry is
+     * One write rather than one per currency, so a failure can never leave some of them stored and
+     * the rest not: the user saved them together and they land together or not at all.
+     *
+     * The caller is responsible for validating the values; the range the arithmetic can carry is
      * [ExchangeRateTable.MIN_RATE] to [ExchangeRateTable.MAX_RATE].
      */
-    suspend fun setRate(currency: Currency, scaledRate: Long)
+    suspend fun setRates(scaledRates: Map<Currency, Long>)
 
     /** Forgets every edited rate, so the defaults apply again. */
     suspend fun resetRates()

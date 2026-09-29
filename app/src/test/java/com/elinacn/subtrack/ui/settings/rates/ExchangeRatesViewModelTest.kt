@@ -49,16 +49,16 @@ class ExchangeRatesViewModelTest {
         collectState()
 
         // 428500 scaled reads back as "42.85", not "42.8500".
-        assertEquals("42.85", viewModel.uiState.value.drafts[Currency.USD])
-        assertEquals("46.2", viewModel.uiState.value.drafts[Currency.EUR])
-        assertEquals("53.9", viewModel.uiState.value.drafts[Currency.GBP])
+        assertEquals("42.85", viewModel.uiState.value.rateTexts?.get(Currency.USD))
+        assertEquals("46.2", viewModel.uiState.value.rateTexts?.get(Currency.EUR))
+        assertEquals("53.9", viewModel.uiState.value.rateTexts?.get(Currency.GBP))
     }
 
     @Test
     fun uiState_theAnchorIsNotEditable() = runTest {
         collectState()
 
-        assertTrue(Currency.TRY !in viewModel.uiState.value.drafts)
+        assertEquals(false, viewModel.uiState.value.rateTexts?.containsKey(Currency.TRY))
         assertTrue(Currency.TRY !in ExchangeRatesViewModel.editableCurrencies)
     }
 
@@ -79,7 +79,7 @@ class ExchangeRatesViewModelTest {
         viewModel.onEvent(ExchangeRatesEvent.Save)
         advanceUntilIdle()
 
-        assertEquals(500_000L, repository.rateWrites.single { it.first == Currency.USD }.second)
+        assertEquals(500_000L, repository.rateWrites.single().getValue(Currency.USD))
         assertEquals(1_000L, viewModel.uiState.value.updatedAt)
     }
 
@@ -92,24 +92,20 @@ class ExchangeRatesViewModelTest {
         advanceUntilIdle()
 
         // The draft is dropped after a save, so the box shows the canonical rendering.
-        assertEquals("50", viewModel.uiState.value.drafts[Currency.USD])
+        assertEquals("50", viewModel.uiState.value.rateTexts?.get(Currency.USD))
     }
 
     @Test
-    fun save_commaAndDotSeparator_produceTheSameRate() = runTest {
+    fun save_commaDecimalMark_isReadAsTheDecimalPoint() = runTest {
         collectState()
         edit(Currency.USD, "50,25")
+
         viewModel.onEvent(ExchangeRatesEvent.Save)
         advanceUntilIdle()
-        val comma = repository.rateWrites.last { it.first == Currency.USD }.second
 
-        edit(Currency.USD, "50.25")
-        viewModel.onEvent(ExchangeRatesEvent.Save)
-        advanceUntilIdle()
-        val dot = repository.rateWrites.last { it.first == Currency.USD }.second
-
-        assertEquals(comma, dot)
-        assertEquals(502_500L, dot)
+        assertEquals(502_500L, repository.rateWrites.single().getValue(Currency.USD))
+        // Written back the way every rate is written, with a dot.
+        assertEquals("50.25", viewModel.uiState.value.rateTexts?.get(Currency.USD))
     }
 
     @Test
@@ -125,7 +121,7 @@ class ExchangeRatesViewModelTest {
             UiText.Resource(R.string.error_rates_save_failed),
             viewModel.uiState.value.errorMessage
         )
-        assertEquals("50", viewModel.uiState.value.drafts[Currency.USD])
+        assertEquals("50", viewModel.uiState.value.rateTexts?.get(Currency.USD))
     }
 
     // --- validation -----------------------------------------------------------------------
@@ -158,7 +154,7 @@ class ExchangeRatesViewModelTest {
         viewModel.onEvent(ExchangeRatesEvent.Save)
         advanceUntilIdle()
 
-        assertEquals(12_345L, repository.rateWrites.single { it.first == Currency.USD }.second)
+        assertEquals(12_345L, repository.rateWrites.single().getValue(Currency.USD))
     }
 
     @Test
@@ -170,7 +166,7 @@ class ExchangeRatesViewModelTest {
         viewModel.onEvent(ExchangeRatesEvent.Save)
         advanceUntilIdle()
 
-        assertEquals(428_500L, repository.rateWrites.single { it.first == Currency.USD }.second)
+        assertEquals(428_500L, repository.rateWrites.single().getValue(Currency.USD))
     }
 
     @Test
@@ -183,7 +179,7 @@ class ExchangeRatesViewModelTest {
 
         assertEquals(
             ExchangeRateTable.MIN_RATE,
-            repository.rateWrites.single { it.first == Currency.USD }.second
+            repository.rateWrites.single().getValue(Currency.USD)
         )
     }
 
@@ -197,7 +193,7 @@ class ExchangeRatesViewModelTest {
 
         assertEquals(
             ExchangeRateTable.MAX_RATE,
-            repository.rateWrites.single { it.first == Currency.USD }.second
+            repository.rateWrites.single().getValue(Currency.USD)
         )
     }
 
@@ -256,7 +252,7 @@ class ExchangeRatesViewModelTest {
         advanceUntilIdle()
 
         assertEquals(1, repository.resetCount)
-        assertEquals("42.85", viewModel.uiState.value.drafts[Currency.USD])
+        assertEquals("42.85", viewModel.uiState.value.rateTexts?.get(Currency.USD))
         assertNull(viewModel.uiState.value.updatedAt)
     }
 

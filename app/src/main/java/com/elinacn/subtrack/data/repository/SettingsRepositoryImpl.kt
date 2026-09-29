@@ -62,11 +62,11 @@ class SettingsRepositoryImpl @Inject constructor(
             )
         }
 
-    override suspend fun setRate(currency: Currency, scaledRate: Long) {
+    override suspend fun setRates(scaledRates: Map<Currency, Long>) {
         dataStore.edit { preferences ->
-            preferences[rateKey(currency)] = scaledRate
-            // Written in the same edit as the rate itself, so the two can never disagree about
-            // whether anything has been edited.
+            scaledRates.forEach { (currency, scaledRate) -> preferences[rateKey(currency)] = scaledRate }
+            // Written in the same edit as the rates themselves, so the two can never disagree
+            // about whether anything has been edited.
             preferences[RATES_UPDATED_AT] = System.currentTimeMillis()
         }
     }
