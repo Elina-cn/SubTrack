@@ -115,6 +115,10 @@ Composable → onEvent(HomeEvent.Delete(id)) → ViewModel
 **Önemli:** Silme sonrası listeyi elle güncellemiyoruz. Room'un Flow'u
 değişikliği kendisi yayınlıyor. Bu tek yönlü veri akışının (UDF) özüdür.
 
+**İstisna (16u):** ana ekranın akışı `WhileSubscribed(5_000)` değil
+`Eagerly`'dir; üstteki ekranlar onun girdilerini değiştirir ve duran akış
+dönüşte eski toplamı çiziyordu (§29).
+
 ---
 
 ## 5. UiState Deseni
@@ -787,6 +791,12 @@ bir çağrı "bulunamayan abonelik" hâline düşer — ekranın zaten çizdiği
 - Üst sınır `Long` taşmasına göre belirlenir ve testle sabitlenir.
 - Son düzenleme zamanı epoch millis olarak saklanır ve kullanıcıya gösterilir.
   Hiç düzenlenmemişse varsayılanların tahmin olduğu söylenir.
+- **Kaydetme üç kuru ve zamanı tek `edit`'te yazar** (16u, `setRates`); kur
+  ekranı yazımları sırayla yapar, kaydedilen değer kutuda görünen değerdir
+  (§29). Kutular her dilde noktayla yazılır (§22).
+- Sıfırlamadan sonra Kaydet etkin değildir: kutular mağazayla aynıdır. 1.0.2'de
+  "Varsayılana dön → Kaydet" varsayılanları anahtar olarak geri yazıyor ve
+  yukarıdaki kuralı boşa çıkarıyordu.
 
 ## 16. Insets: Sistem Çubukları ve Klavye
 
@@ -1416,6 +1426,12 @@ ayarlarından bildirimleri açıp geri döndüğünde satır hâlâ "kapalı" de
 Emülatörde ölçüldü: süreç kimliği değişmeden (aynı pid) satır "Açık"a
 dönüyor.
 
+**İlk durum `ON_RESUME`'u beklemez (16u).** Platformun cevapladığı kısım
+ViewModel kurulurken, "daha önce soruldu mu" bayrağı `init`'te okunur; ekran
+`ON_START`'ta da tazeler. Navigation giren hedefi geçiş bitene kadar `STARTED`'da
+tuttuğu için yalnız `ON_RESUME`'a bakan satır 700 ms yanlış durum gösteriyordu
+(§29).
+
 ### Hangi ayar ekranına gidildiği sürüme bağlıdır
 
 `ACTION_APP_NOTIFICATION_SETTINGS` **API 26'da geldi.** API 26 ve üstünde
@@ -1902,6 +1918,11 @@ Saklanan tutar düzenleme formuna `159.99` diye dönüyor: alanın kendi etiketi
 iki dilde de örnek olarak `159.99` gösteriyor ve parser noktayı da virgülü de
 kabul ediyor. Yerelleştirilmiş para `MoneyFormatter`'dan geçer — o sembol ve
 binlik ayırıcı yazar, ikisini de parser geri alamaz.
+
+**Kur kutusu da aynı kuralı izler (16u):** her dilde `42.85`, gruplama yok;
+giriş virgülü de noktayı da kabul eder (`RateText`). 16u'da Türkçede virgülle
+yazmak denendi ve bu kural için geri alındı: uygulamanın iki sayı alanı iki
+ayrı ondalık işaretiyle yazmamalı.
 
 ### Çıpa gösterilir, ilerletilmiş tarih değil
 
@@ -3176,3 +3197,109 @@ bir Türkçe çoğul, eksik nicelikle sessizce geçmez.
 
 `tools:ignore` ile susturma yolu bilerek kullanılmadı: projede `@SuppressLint`
 yasak ve `tools:ignore` onun XML karşılığıdır.
+
+---
+
+## 29. Ekrana Yanlış Değer Çizilmez
+
+Faz 16u. Tek ilkenin üç yüzü:
+
+1. **Bilinmeyen bir değer ekrana çizilmez.** Okunmamış bir ayarın yerine
+   varsayılanı koymak, "bilmiyorum" yerine "Kapalı" demektir.
+2. **Ekrandaki değer ile yürürlükteki değer sessizce ayrışmaz.** Kaydedilen
+   değer kullanıcının kutuda gördüğü değerdir; kutu da mağazanın söylediğini
+   gösterir.
+3. **Başka ekranda değişen bir değerin eskisi, dönüşte çizilmez.**
+
+### Neden
+
+16t ölçtü: ayarlara her girişte hatırlatma satırı 0,6-0,7 sn "Kapalı — sistem
+ayarlarından açılmalı" gösterdi, gerçek durum "Açık" iken. Tema satırı "Sistemi
+takip et", ana para TRY ile başlıyordu. Kaynak aynı: `stateIn`'in
+`initialValue`'su varsayılanlarla doluydu, ve Navigation giren hedefi 700 ms'lik
+geçiş bitene kadar `STARTED`'da tuttuğu için gerçek durum ancak `ON_RESUME`'da
+hesaplanıyordu. Yanlış değer yalnız görünmedi, **dokunulabildi**: Android 13'te
+izin penceresi açılacakken sistem ayarları açıldı.
+
+16u'da testçinin 28.09 dizisi (kur elle → Kaydet → Varsayılana dön → Kaydet,
+dönüşte toplam) üçüncü yüzü gösterdi: ana ekran dönüşte birkaç kare eski
+toplamı çizdi (aşağıda "Ana ekranın akışı durmaz").
+
+### Bilinmeyen değer: yer tutar, çizilmez
+
+- **Eşzamanlı cevaplar ilk kareden doğrudur.** Bildirim durumu ve Android
+  sürümü ViewModel kurulurken okunur ve `initialValue`'ya yazılır; beklenecek
+  bir şey yok.
+- **Mağazadaki değerler `null` = "henüz okunmadı" ile başlar.** Her kaynak kendi
+  başına gelir (`startingUnknown()`); `combine` hepsini beklemez, böylece
+  mağazaya bağlı olmayan satır ilk yayından doğrudur.
+- **Bilinmeyen değer yerini korur ama çizilmez** (`Modifier.reservedUntilKnown`:
+  alfa 0, semantik boş). Metin satırı boş dizeyle satır yüksekliğini tutar, kur
+  kutusu görünmeyen bir "0" ile etiketini kenarda tutar; değer gelince yalnız
+  görünür olur, düzen kaymaz. Spinner ya da iskelet değildir: bekleme bir iki
+  karedir ve yerine bir şey göstermek, olmayan bir değişimi göstermek olurdu.
+  Ana ekranın tutar satırı da yüklenirken boştur.
+- **Durum bilinmezken gelen dokunuş bekletilir**, varsayılana göre işlenmez.
+  Hatırlatma satırı dokunuşu saklar (`isRowTapPending`) ve durum gelince uygular;
+  Android 13'te geçiş sırasındaki dokunuş izin penceresini açtı. Görünmeyen çip
+  ve anahtar bilinmezken hiçbir şey yazmaz.
+- **İstek uçuştayken önceki durum korunur** (`isRequestInFlight`): izin penceresi
+  açıkken satır arkada "sistem ayarlarından açılmalı"ya dönmez; cevap gelince
+  yeniden hesaplanır.
+
+### Ayar yazımları sırayla ve tek işlemde
+
+- **Bir kayıt = bir `dataStore.edit`.** `setRates` üç kuru ve zaman damgasını tek
+  işlemde yazar; "USD yeni, EUR eski" gibi bir ara durumu hiçbir okuyucu görmez.
+  1.0.2 her kur için ayrı `edit` yapıyordu: üç yayın, her birinde ana ekran ve
+  ay kaydı yeniden hesaplanıyordu.
+- **Kur ekranında aynı anda tek yazım.** Yazım sürerken Kaydet ve Varsayılana dön
+  devre dışıdır ve ViewModel ikinci bir yazımı reddeder. Olaylar ana iş
+  parçacığında geldiği için kontrol ile işaret arasına başka bir olay giremez.
+  1.0.2'de her basış kendi coroutine'ini açıyordu: üç basış dokuz `edit`, ve
+  sırada bekleyen bir sıfırlama bu yazımların arasına düşebiliyordu.
+- Tek anahtarlı ayarlar (ana para, tema, duvar kâğıdı) zaten tek `edit`'tir;
+  DataStore yazımları geliş sırasıyla işler ve her biri dosyanın tamamını okuyup
+  yazdığı için biri ötekinin anahtarını ezmez. Arka arkaya çip dokunuşunda son
+  dokunulan kalır.
+
+### Kaydedilen değer ekrandaki değerdir
+
+- **Kur ekranı mağazayı izlemez, okur:** açılışta bir kez ve kendi her yazımından
+  sonra (düzenleme ekranının §22'deki kararı). Kurların tek yazarı bu ekran,
+  altından değişemezler. 1.0.2 izliyordu: kayıt ya da sıfırlama biter bitmez
+  taslaklar düşüyor, kutular da yeni tablo ekrana ulaşana kadar **yazımdan
+  önceki** tablodan dolduruluyordu; o arada basılan Kaydet eski kurları geri
+  yazardı.
+- **Her kutu kendi metninden kaydedilir**, dokunulmamış olan da. Kutudaki metin
+  `RateText.format`'ın yazdığıdır, `parse` onu kayıpsız geri okur (her
+  saklanabilir değer için testle sabit). İkinci bir kaynak yok.
+- **Kaydet yalnız bir kutu mağazadakinden farklıyken etkindir.** Sıfırlamadan
+  sonra Kaydet'e basmak artık varsayılanları anahtar olarak yazmaz; §15'teki
+  "sıfırlama anahtarları siler" kuralı böylece sıfırlamadan sonraki bir basışla
+  bozulmaz.
+- **Yazım sürerken yazılan metin korunur.** Mağazanın görmediği bir değişikliği
+  atmak, bu ekranın önlemek için var olduğu sessiz kayıptır.
+- **"Varsayılana dön" hemen yazar ve söyler** ("Varsayılan kurlar geri
+  yüklendi"); ikinci bir adım yok. Başarılı kayıt da söyler, klavyeyi kapatır ve
+  odağı bırakır; reddedilen kayıt ilk hatalı kutuya kaydırır.
+
+### Ana ekranın akışı durmaz
+
+Ana ekran başlangıç hedefidir ve her ekranın altında durur; o ekranların
+değiştirdiği ana para, kurlar ve liste onun girdileridir. `WhileSubscribed(5_000)`
+ile akış, başka ekranda beş saniye sonra duruyor ve **son toplamı saklıyordu**.
+Kur değiştirilip dönülünce ekran, yeniden başlayan akış yetişene kadar o eski
+toplamı çiziyordu. Ölçüm (api29, testçinin dizisi, dönüş kare kare): 1.0.2'de
+iki geçerli ölçümün birinde 3 kare (~140 ms) **$73,89**, 16u kur ekranıyla
+üçünün birinde 1 kare; düzeltmeden sonra dört ölçümde sıfır.
+
+- **`HomeViewModel` akışı `SharingStarted.Eagerly`:** ViewModel yaşadıkça
+  (uygulama açık kaldıkça) çalışır ve ekran döndüğünde çoktan yeniden
+  hesaplamıştır. Bedeli, bir veritabanı gözlemcisi ile iki tercih okumasının
+  açık kalması. §4'teki `WhileSubscribed(5_000)` deseninin tek istisnası; alttaki
+  ekranı başka ekranların değiştirmediği yerde desen geçerli kalır.
+- **"Bugün" açıkça tazelenir.** Geri sayımları gün değişince ilerleten şey,
+  farkında olmadan akışın yeniden başlamasıydı. Artık ekran her `ON_START`'ta
+  `ScreenStarted` gönderir, ViewModel tarihi yeniden okur; aynı günse durum
+  değişmez.

@@ -173,12 +173,24 @@ etmeden bildirin; sonraki maddeler zaten bozuk bir durumun üstüne binebilir.
 | 118 | (`subtrack_tester_api33` hücresi — "Ekleme sheet'i salınım gerileme testi") Formda tek kısa yukarı kaydırma, orta ve hızlı; parmağı kaldır, 3 sn bekle, tek dokunuş | **Tek sıçrama**, ~0,25 sn'de dinleniyor; tekrar eden döngü **yok**. Dokunuştan sonra sheet dinlenme konumunda, yukarıda donmuyor | 16m |
 | 119 | Sheet'i ekranı dolduracak kadar uzat: klavye açık, 360dp ekran veya büyük yazı | Üst kenar durum çubuğunun **altında**, arkasında değil; form kayıyor, Kaydet görünür; aşağı kaydırma ve geri tuşu kapatıyor | 16m |
 | 120 | Koyu temada ana ↔ ayarlar, ayarlar ↔ kurlar, ana ↔ istatistik, ana ↔ düzenleme geçişleri; bir kez de uygulama teması sistemin **tersindeyken** (iki yönde) | Geçiş boyunca zemin **koyu kalıyor** — gri/beyaz parlama yok; tersine temada koyu çukur da yok. Ölçüm "Geçişlerde parlama gerileme testi" başlığında | 16q |
+| 121 | Ayarlara gir, kareleri izle: hatırlatma açıkken (API 29) ve Android 13'te izin hiç istenmemişken; bir kez de USD + Koyu kayıtlıyken. Geçiş sürerken hatırlatma satırına dokun | Her satır ilk karede ya **boş** (yeri tutulmuş, düzen kaymıyor) ya **doğru**; "Kapalı — sistem ayarlarından açılmalı", "Sistemi takip et", seçili TRY gibi **yanlış bir değer hiçbir karede yok**. Android 13'te izin hiç istenmemişse erken dokunuş **izin penceresini** açıyor, sistem ayarlarını değil | 16u |
+| 122 | Kur ekranı (en küçük ekranda da): **(a)** USD'yi virgülle değiştir, son kutuda klavyenin ✓'si; **(b)** USD'ye `0` yaz, klavye açıkken aşağı kaydırıp Kaydet; **(c)** Varsayılana dön → Sıfırla; **(d)** bir kutuyu değiştir, Kaydet'e hızlıca üç kez bas; **(e)** testçinin dizisi (28.09): ana para çipleri arasında gez (USD → EUR → GBP → USD), kur kutularında gez, ana ↔ istatistik; USD'yi elle değiştir → Kaydet → ana ekran → kurlar → Varsayılana dön → Kaydet → 5 sn'den uzun bekle → ana ekran. Her adımda ana ekran toplamı ve (debug derlemede) DataStore | **(a)** Klavye kapanıyor, odak bırakılıyor, "Kurlar kaydedildi"; kutu **noktayla** yazılıyor (`41.5`), Kaydet devre dışı, kutular **yerinden oynamıyor**. **(b)** Hiçbir şey yazılmıyor; ekran USD'ye kaydırılıyor, kutu odakta, hata görünür. **(c)** Hemen yazılıyor, "Varsayılan kurlar geri yüklendi", kutular varsayılan, Kaydet devre dışı. **(d)** Tek yazım; yazım sürerken düğmeler basılamıyor. **(e)** Toplam her adımda **kutudaki kurla** elle hesaplananla aynı; Varsayılana dön'den sonra Kaydet devre dışı ve DataStore'da kur anahtarı yok; ana ekrana dönüşte eski toplam **hiçbir karede yok** | 16u |
 
 **96-105 için not:** düzenleme maddeleri ekleme sheet'iyle **aynı** bileşenlerden
 kurulu bir formu sınıyor. #102 bilerek ikisini karşılaştırıyor: mesajlar
 ayrışırsa tek doğrulama kaynağı kuralı kırılmış demektir (`ARCHITECTURE.md` §22).
 #103 ve #104 bu fazın en riskli maddeleri — dokunma, kaydırarak silmenin jestine
 eklendi ve satırın tek odak durağı olması korunmalı.
+
+**121-122 için not:** "hiçbir karede" gözle değil kayıtla doğrulanır —
+geçişler 700 ms, yanlış değer 1-3 kare sürüyordu. API 29'da `screenrecord`,
+API 33'te `adb emu screenrecord start --fps 60`; kareler ffmpeg ile ayrılır.
+#122 (e) için sabit liste: yalnız TRY, ayda ₺2.925,40, ana para USD — 42,85'le
+**$68,27**, 39,59'la **$73,89** (testçinin iki sayısı). Kayıtta dönüş, kur
+değişikliği ana ekrandan **5 sn'den uzun** süre sonra yapılınca anlamlıdır;
+daha kısa sürede ana ekranın eski akışı zaten yeniden hesaplıyordu. DataStore
+debug derlemede `run-as com.elinacn.subtrack cat files/datastore/settings.preferences_pb`
+ile okunur.
 
 ---
 

@@ -27,6 +27,151 @@ Her faz sonunda **en üste** yeni kayıt eklenir. Eski kayıtlar silinmez.
 
 ---
 
+## [Faz 16u] Düzeltme: Ayarların İlk Anı ve Kur Ekranı — 2026-09-29
+
+**Durum:** Tamamlandı. 16t'nin 2. ve 3. sorunu düzeltildi. Testçinin 28.09 dizisi (EK) teşhis edildi: kur ekranındaki yarışlar yapıyla kapatıldı; ana ekranın dönüşte eski toplamı çizmesi yeniden üretildi ve düzeltildi. Kalıcı olarak yanlış bir kur ya da toplam hiçbir dizide üretilemedi. Dönüşüm, toplama ve yuvarlama koduna dokunulmadı; şema, bağımlılık ve sürüm numarası değişmedi.
+
+**Yapılanlar**
+
+*Görev 1 — ayarların ilk anı (`c3ab0f0`).* Kural: ekrana yanlış değer çizilmez (ARCHITECTURE §29).
+- Platformun hemen cevapladığı değerler (bildirim durumu, Android sürümü) ViewModel kurulurken okunuyor; hatırlatma satırı ilk kareden doğru. "Daha önce soruldu mu" bayrağı `init`'te okunuyor; ekran `ON_START`'ta da tazeliyor.
+- DataStore'daki değerler (ana para, tema, duvar kâğıdı) gelene kadar `null`; yerleri tutuluyor ama çizilmiyor (`reservedUntilKnown`), düzen kaymıyor.
+- Durum bilinmezken satıra dokunulursa dokunuş bekletiliyor, durum gelince uygulanıyor. İzin isteği uçuştayken satır eski durumunu koruyor.
+- Ana ekranda yüklenirken tutar satırı boş.
+- Ölçüm: api29'da üç girişte hatırlatma, tema ve duvar kâğıdı bantlarında yanlış piksel payı %0 (1.0.2: hatırlatma %3,6). api33'te üç girişte hatırlatma %0 (1.0.2: %3,9); ilk karelerde açıklamalar boş, sonra doğru metin, tema "Koyu" ve USD seçili. Android 13'te geçiş sırasındaki erken dokunuş: izin hiç istenmemişken **izin penceresi** açıldı (satır "Kapalı — açmak için dokunun"da kaldı, İzin ver'den sonra "Açık"); daha önce sorulmuşken açıklama diyaloğu açıldı.
+- Ana ekran soğuk açılış: api29'da 1.0.2 üç kez ilk kareden doğru (₺456,09). api33'te açılıştan sonraki ilk çalıştırmada 1.0.2 ~190 ms (10 kare) açık tema + "₺0,00" çizdi; düzeltmeden sonra aynı yolda ~227 ms açık tema + **boş** tutar satırı, sonra koyu tema + $110,27.
+
+*Görev 2 — kur ekranında kaydetme (`d8c40f2`).*
+- Başarıda klavye kapanıyor, odak bırakılıyor, "Kurlar kaydedildi" / "Rates saved"; ekranda kalınıyor.
+- Hatada hiçbir şey yazılmıyor; ilk hatalı kutuya kaydırılıyor, odaklanıyor, hata görünür.
+- Klavye eylem tuşu son kutu dışında "sonraki", son kutuda Kaydet'le aynı (Kaydet devre dışıysa yalnız klavyeyi kapatır).
+- Üç kur tek yazımla (`setRates`, tek `edit`, tek zaman damgası). "Son düzenleme" satırı iki metni üst üste ölçüyor; ilk kayıttaki 42 px kayma yok.
+- EK kuralları: kur ekranı mağazayı izlemiyor, açılışta ve her yazımdan sonra okuyor; her kutu kendi metninden kaydediliyor; Kaydet yalnız bir kutu mağazadakinden farklıyken ve yazım sürmüyorken etkin; yazım sürerken ikinci yazım reddediliyor; "Varsayılana dön" hemen tek yazımla kaydediyor ve "Varsayılan kurlar geri yüklendi" / "Default rates restored" diyor.
+- Kur kutusu her dilde noktayla (`42.85`), gruplama yok; giriş virgülü de noktayı da kabul ediyor (`RateText`, §22).
+
+*Görev 3 — testler (`0f746b8`).* 330 → 348, EK düzeltmesiyle 352.
+- `SettingsRepositoryImplRatesTest` (gerçek dosya): dosya yokken varsayılan tablo ve zaman yok; kaydetme ve geri okuma; üç kur **tek işlemde** (işlem sayan `DataStore` sarmalayıcısıyla); arka arkaya iki yazımda ikincisi; sıfırlama; kapanıp açılınca diskte kalma.
+- `RateTextTest`: Türkçe ve İngilizce yerelde biçim (`42.85`, `46.2`, `1000`, `0.0001`) ve ayrıştırma (virgül = nokta, gruplu binlik reddi, tüm ret nedenleri); saklanabilir 512 değerde `parse(format(x)) == x`.
+- `SettingsViewModelTest`: ilk değerde platform cevapları doğru, mağaza değerleri `null`; mağazaya bağlı izin durumu okunana kadar `null`.
+- `ExchangeRatesViewModelTest` (yeni sözleşme) ve `ExchangeRatesViewModelWriteTest` (yarış başına bir test): arka arkaya iki kaydetmede son kalır; üç hızlı basış tek yazım; yazım sürerken iki düğme de kapalı ve basışlar reddediliyor (sıfırlama kaydı ezemiyor); sıfırlama sürerken Kaydet reddediliyor; yazım sırasında yazılan metin korunuyor ve sonraki kayıtta yazılıyor; "Varsayılana dön" hemen yazıp mesaj veriyor; testçinin dizisi (elle → Kaydet → Varsayılana dön → Kaydet) varsayılanları hem kayıtlı hem ekranda bırakıyor; sıfırlamadan sonra kutuya yazılan değer kaydediliyor; her adımda ekrandaki metin = mağazadaki kur.
+
+*Görev 3 (prompt) — kur ekranı görüntüleri.* api29 (720×1280, en-US, ekran klavyesiyle): başarı (virgüllü giriş → son kutuda ✓ → "Rates saved", kutu `41.5`, Kaydet devre dışı, kutular aynı yerde), hata (USD `0`, klavye açıkken aşağıdaki Kaydet → ekran USD'ye kaydı, kutu odakta, hata görünür, DataStore değişmedi), "Varsayılana dön" (onay → mağazada kur anahtarı yok, kutular varsayılan, "Default rates restored"). Görüntüler oturumun geçici klasöründe (`rates_screens_api29.png`).
+
+*Görev 4 — belgeler (bu commit).* ARCHITECTURE §29 (yeni), §4, §15, §18 ve §22'ye notlar; TESTING #121-122; bu kayıt.
+
+### EK — testçinin 28.09 dizisi
+
+**Testçinin cevapları (28.09.2026).**
+- Kuru elle değiştirip Kaydet'e basmış, "Varsayılana dön"e basıp yine Kaydet'e basmış. Öncesinde ana para çipleri arasında (USD, EUR…) ve ekranlar arasında gezinmiş. Toplam 68,27 olması gerekirken ~73,89 görünmüş; aynı son adımlar sonra doğru çalışmış.
+- İlk raporunda Kaydet'e birkaç kez arka arkaya bastığını söylemişti.
+
+**Sayılar.** Yalnız TRY'den oluşan bir liste ana para USD'de tam bu iki toplamı veriyor: ayda ₺2.925,40 → 42,85'le **$68,27**, 39,59'la **$73,89**. Testçinin listesi bilinmiyor; bu, ~73,89'un 39,59 civarında bir USD kuruyla hesaplandığını düşündürüyor ama göstermiyor. Teşhis bu fikstürle yapıldı (api29, debug derleme, DataStore her adımda `run-as` ile okundu).
+
+**Yarış adayları (1.0.2, `v1.0.2` etiketi).**
+
+| # | Yer | Ne olabilir | 16u'da |
+|---|---|---|---|
+| Y1 | ExchangeRatesViewModel.kt:41, 57, 89, 110, 124 | Kayıt/sıfırlama bitince `drafts = null`; kutular, yeni tablo `combine`'a ulaşana kadar **yazımdan önceki** tablodan doluyor. O arada Kaydet `uiState.value.drafts`'ı (89) okuyup eski kurları geri yazar; bir tuş vuruşu (57) üç kutunun eski metnini taslağa dondurur | Kapalı: mağaza izlenmiyor, yazımdan sonra geri okunuyor; kutu metni tek kaynak |
+| Y2 | ExchangeRatesViewModel.kt:105-116; SettingsRepositoryImpl.kt:65-72 | Her basış kendi coroutine'i; her biri üç ayrı `edit`. Üç basış dokuz yazım, arada "USD yeni, EUR eski" yayınları (ana ekran ve ay kaydı her birinde yeniden hesaplanır) | Kapalı: tek `edit`, yazım sürerken ikinci basış reddi |
+| Y3 | ExchangeRatesViewModel.kt:119-130 ile 105-116 | Sıfırlama, süren bir kaydın `edit`'lerinin arasına düşebilir; kaydın kalan yazımları sıfırlamadan sonra gelir. Y1 ile birlikte: sıfırlamanın hemen ardından Kaydet elle girilen kuru geri yazar | Kapalı: yazımlar sırayla, sıfırlama ile kayıt birbirini reddeder |
+| Y4 | HomeViewModel.kt:58-110 (`stateIn` 106-110, `WhileSubscribed(5_000)`) | Başka ekranda 5 sn'den sonra akış durur, son toplam saklanır; dönüşte yeniden başlayan akış yetişene kadar **eski toplam çizilir** | Yeniden üretildi, `bbc7263` ile düzeltildi |
+| Y5 | SettingsViewModel.kt:182-183; HomeViewModel.kt:59-61 | Ana para ve kur yazımları | Yarış değil: ayrı anahtarlar, DataStore yazımları sırayla ve dosyanın tamamı üzerinden; biri ötekini ezmez. Çipler her koşuda son dokunulanı (USD) bıraktı |
+
+Y1 ve Y3'ün penceresi emülatörde bir karenin altında; betiğin en hızlı dokunuş dizisi bile (tek `adb shell` satırında arka arkaya `input tap`) bu pencereye düşmedi. Yavaş bir telefonda (üç `edit`, her biri diske senkron yazım) pencere uzar; bu turda ölçülemedi.
+
+**Denenen diziler.** Her koşu temiz mağazayla başladı (liste korunarak). Adımlar ve değerler her tekrarda aynı çıktı.
+
+| Adım | 1.0.2: toplam / DataStore | 16u: toplam / DataStore |
+|---|---|---|
+| Başlangıç, ana para TRY | ₺2.925,40 / dosya yok | aynı |
+| Çipler USD → EUR → GBP → USD (tek dokunuş dizisinde) | — / `main=USD`, kur anahtarı yok | aynı |
+| Kur kutularında gezinme, yazmadan; ana ekran; istatistik ve geri | $68,27 / değişmedi | aynı |
+| USD'ye 39,59, Kaydet (A, C, D, E: bir kez; B: hızlı üç kez) | — / USD 39,59, EUR 46,2, GBP 53,9, zaman | aynı (B'de 16u tek yazım) |
+| Ana ekran | $73,89 | $73,89 |
+| Varsayılana dön → Sıfırla | — / kur anahtarı yok; kutular 42.85 / 46.2 / 53.9 | aynı + "Default rates restored" |
+| C: USD kutusuna dokun, yazma | kutular aynı | aynı |
+| D: USD'ye 42,85 yaz | kutu "42,85" | aynı |
+| Kaydet (A, C: bir; B: hızlı üç) | — / **varsayılanlar anahtar olarak yazıldı** (42,85 / 46,2 / 53,9 + zaman) | Kaydet devre dışı, **yazılmadı**, anahtar yok |
+| D: Kaydet | — / 42,85 / 46,2 / 53,9 + zaman | aynı ("42,85" ≠ "42.85", değişiklik sayılır) |
+| E: Sıfırla'yla aynı dokunuş dizisinde (tek `adb shell` satırı) Kaydet × 3 | — / 42,85 / 46,2 / 53,9 + zaman | yazılmadı, anahtar yok |
+| Ana ekran, hemen ve 3 sn sonra | $68,27 | $68,27 |
+
+Tekrarlar: 1.0.2'de A×3, B×3, C×3, D×2, E×3 (14 koşu); 16u'da her dizi ×2 (10 koşu). **Hiçbirinde yanlış toplam ya da kutuyla ayrışan bir kur yok.** 1.0.2'deki tek fark sıfırlamadan sonraki Kaydet'in varsayılanları anahtar olarak yazması (toplam doğru, §15 bozuluyor).
+
+**Dönüş kare kare (Y4).** Ana ekran $73,89'u gördükten sonra kurlara gidildi, 6 sn beklendi (ana ekranın akışı durdu), sıfırlandı, ayarlara dönüldü, 1 sn sonra ana ekrana dönüş `screenrecord` ile kaydedildi; kart bölgesi her karede kırpıldı.
+
+| Derleme | Geçerli ölçüm | Eski toplamın çizildiği ölçüm |
+|---|---|---|
+| 1.0.2 | 2 | 1: 3 kare **$73,89** (1315 → 1453 ms, geçişin başında, soluk), sonra $68,27 |
+| 16u, `d8c40f2` | 3 | 1: 1 kare **$73,89** (1288 ms) |
+| 16u, `bbc7263` | 4 | 0 — ilk görünür kareden $68,27 |
+
+- İlk deneme yanlış kurulmuştu: sıfırlama ana ekrandan ayrıldıktan ~4 sn sonra oldu, akış henüz durmamıştı ve dönüş ilk kareden doğruydu. Ölçüm bu yüzden 5 sn'yi aşan bekleyişle yinelendi.
+- Geçersiz sayılan 4 ölçümde betiğin USD çipine dokunuşu tutmadı ve ana para TRY kaldı (büyük olasılıkla soğuk açılışta ekran hazır olmadan dokunuldu; doğrulanmadı). Aynı adım elle denendiğinde çipler normal çalıştı.
+
+**Teşhis sonucu.**
+- Yeniden üretilen tek mekanizma Y4: dönüşte eski toplam. Emülatörde 1-3 kare, geçişin soluk başında; testçinin telefonunda akışın yeniden başlaması daha uzun sürebilir (ölçülmedi). Testçinin "görünmüş, sonra doğru çalışmış" tarifiyle uyuşuyor; kanıt değil.
+- Mağazada kalıcı bir yanlış değer hiçbir dizide oluşmadı. Y1 ve Y3 1.0.2'de kurala göre mümkün ama emülatörde tetiklenemedi; 16u'da yapıca kapalı ve testle sabit.
+- Düzeltme (`bbc7263`): ana ekranın akışı `Eagerly` — ViewModel yaşadıkça çalışıyor ve dönüşte çoktan yeniden hesaplamış oluyor. Geri sayımları gün değişince ilerleten şey akışın yeniden başlamasıydı; ekran artık `ON_START`'ta `ScreenStarted` gönderiyor ve tarih yeniden okunuyor. `HomeViewModelFreshnessTest`: kur, ana para ve liste ana ekran yokken değişince dönüşteki ilk değer yeni toplam; gün değişince geri sayım ilerliyor. Dört test düzeltme geri alınınca kırmızı. `HomeViewModel` 300 satırın altında kalsın diye `ScreenState` ayrı dosyaya (`HomeScreenState.kt`) taşındı.
+
+**Kararlar**
+- Hesap koduna (dönüşüm, toplama, yuvarlama) dokunulmadı; varsayılan kur değiştirilmedi. 16t'de bulunmayan "varsayılan kurla yanlış toplam" için testçiden ayrıntı istendi; gelen cevaplar yukarıda.
+- Kur kutusunu Türkçede virgülle yazmak bu fazda yapıldı ve **geri alındı**: §22'ye göre fiyat alanı her dilde noktayla yazıyor, kur alanı da aynı kurala uyuyor. Giriş iki işareti de kabul ediyor.
+- Kaydet üç kuru da yazıyor (prompt: "üç kur tek yazımla"); kutu metni tek kaynak olduğu için dokunulmamış kur da kutudaki değerle yazılıyor. 16t'deki not geçerli: bir kez kaydeden kullanıcıya ileride güncellenen varsayılanlar ulaşmaz. Sıfırlamadan sonraki Kaydet artık anahtar yazmıyor.
+- Ana ekran §4'teki `WhileSubscribed(5_000)` deseninin tek istisnası (§29).
+
+**Değişen dosyalar**
+- `ui/common/ReservedUntilKnown.kt` (yeni), `SettingsRow.kt`, `SettingsSwitchRow.kt` — bilinmeyen değerin yeri tutulur, çizilmez
+- `ui/settings/ReminderPermissionResolution.kt` (yeni), `SettingsUiState.kt`, `SettingsViewModel.kt`, `SettingsScreen.kt` — ilk an, bekletilen dokunuş, uçuştaki istek
+- `ui/settings/rates/RateText.kt`, `RateFields.kt` (yeni), `ExchangeRatesUiState.kt`, `ExchangeRatesViewModel.kt`, `ExchangeRatesScreen.kt` — okunan mağaza, tek kaynak kutu metni, sıralı yazım, mesajlar, odak
+- `domain/repository/SettingsRepository.kt`, `data/repository/SettingsRepositoryImpl.kt` — `setRate` → `setRates` (tek `edit`)
+- `ui/home/HomeViewModel.kt`, `HomeScreenState.kt` (yeni), `HomeUiState.kt`, `ui/navigation/SubTrackNavHost.kt` — `Eagerly`, `ScreenStarted`; `HomeScreen.kt`, `components/DashboardCard.kt` — yüklenirken boş tutar
+- `res/values/strings.xml`, `res/values-tr/strings.xml` — `rates_saved`, `rates_restored`
+- Testler: `SettingsRepositoryImplRatesTest`, `RateTextTest`, `ExchangeRatesViewModelWriteTest`, `HomeViewModelFreshnessTest` (yeni); `ExchangeRatesViewModelTest`, `SettingsViewModelTest`, `SettingsViewModelThemeTest`, `HomeViewModelTest` ve altı ana ekran testinin yorumu, `FakeSettingsRepository` (`rateWrites`, `rateWriteGate`)
+- `docs/ARCHITECTURE.md` (§29 yeni; §4, §15, §18, §22), `docs/TESTING.md` (#121-122), `docs/PROGRESS.md`
+
+**Commit'ler**
+- `c3ab0f0` fix: never draw a stored value before it has been read
+- `d8c40f2` fix: make saving rates visible and keep the boxes equal to the store
+- `0f746b8` test: cover rate storage, rate text and the order of rate writes
+- `bbc7263` fix: never show home's old total on the way back from settings
+- (bu kayıt) docs: record phase 16u and the rule against drawing wrong values
+
+**Doğrulama**
+
+| Kontrol | Sonuç |
+|---|---|
+| `./gradlew test` | 352 test, 0 hata (`test` yalnız debug birim testlerini koşuyor) |
+| `./gradlew :app:lintDebug` | 0 hata, 22 uyarı — hepsi önceden var olan türler (`GradleDependency`, `InlinedApi`, `PluralsCandidate` …), yenisi yok |
+| `./gradlew :app:connectedDebugAndroidTest` (api29) | 19 test, 0 hata, 1 atlanan (`reminderWorker_notificationsDisabled…`, bildirimler açıkken ön koşulu sağlanmıyor; önceden de böyle) |
+| `app/schemas/`, gradle, sürüm | değişmedi |
+
+**Karşılaşılan sorunlar**
+- Teşhis worktree'si (`v1.0.2`, ayrık HEAD, dal yok) `local.properties`'e yalnız `sdk.dir` yazılarak derlendi; iş bitince kaldırıldı.
+- api29 emülatöründe donanım klavyesi açık olduğu için ekran klavyesi çıkmıyordu; ölçüm süresince `show_ime_with_hard_keyboard 1` yapıldı, sonra 0'a geri alındı.
+- `screenrecord` çıktısında ffmpeg'in `-frame_pts` adlandırması aynı zaman damgalı kareleri üst üste yazdı; kareler sıra numarasıyla ayrılıp zamanlar `showinfo`'dan okundu.
+
+### Rapor edilen, dokunulmadı
+
+- Android 13'te yavaş (açılıştan sonraki ilk) soğuk açılışta tema splash'i aşıyor: ~190-227 ms açık tema, sonra koyu. §23'teki bilinen yol (1000 ms'lik bekleme süresi).
+- Aynı yolda dönüşüm notu ("… sabit kurla … çevrildi") toplam geldiğinde eklendiği için kart bir satır büyüyor.
+- **Bir sonraki yükseltme testinden önce Android 13 emülatörüne (`subtrack_tester_api33`) gerçek 1.0.2 yeniden kurulmalı:** bu fazda üzerine Görev 1'in ölçüm derlemesi kuruldu; 1.0.2'nin AAB'si 16r'nin ve 16t'nin geçici klasöründe.
+- 300 satırı geçen dosyalar: `HomeScreen.kt` 313 (16u öncesi 306; bu faz 7 satır ekledi), `HomeViewModelTest.kt` 563, `SettingsViewModelReminderTest.kt` 322 — bölünmedi.
+- Ayrıca 16t'nin notu duruyor: api29'un `/sdcard`'ında önceki turlardan ~170 dosya; bu turun dosyaları silindi.
+
+### Ortam (tur sonu)
+
+- api29 (`subtrack_narrow_api29`): enstrümantasyon testi uygulamayı kaldırdı, SubTrack kurulu değil. `wm` 720×1280 / 320, yazı 1.0, en-US, `cmd uimode night no`, `show_ime_with_hard_keyboard 0` (ölçüm için açılıp geri alındı).
+- api33 (`subtrack_tester_api33`): Görev 1'in ölçüm derlemesi (temiz kurulum), abonelik yok, bildirim izni verildi; uygulama dili geri boş. Görev 1'den sonra açılmadı.
+- Fiziksel telefona dokunulmadı; `adb devices` her seferinde yalnız emülatörü gösterdi.
+- Kayıtlar, kırpılmış kareler ve betikler oturumun geçici klasöründe (`…\f98c12e2-6db3-4ffb-b618-701b8078a0ae\scratchpad\`: `log_v102*.txt`, `log_16u.txt`, `log_stale_*.txt`, `ret_*/`, `*_strip.png`); kalıcı bir yer değil.
+
+**Sonraki faz için not**
+- 1.0.3 sürüm artışı ve yükseltme testi: eski taraf gerçek 1.0.2 (api33'e yeniden kurulacak).
+- Testçiye sorulacaklar (varsa): listesi ve ana parası; ~73,89'u ne kadar süre gördüğü (bir an mı, kalıcı mı).
+
+---
+
 ## [Faz 16t] Teşhis: Kur ve Ayarlar Geri Bildirimi — 2026-09-28
 
 **Durum:** Tamamlandı (yalnız teşhis). Kod değişmedi; düzeltme, teşhis sohbette değerlendirildikten sonra ayrı turda 1.0.3 olarak yapılacak. **1. sorun yeniden üretilemedi:** varsayılan kurla hesap iki yönde de elle hesapla aynı çıktı, gösterilen kur ile hesaptaki kur tek kaynaktan geliyor. 2. ve 3. sorun yeniden üretildi, kök nedenleri koddan gösterildi.
