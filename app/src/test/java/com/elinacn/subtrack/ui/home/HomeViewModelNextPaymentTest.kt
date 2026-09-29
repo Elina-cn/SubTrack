@@ -172,7 +172,7 @@ class HomeViewModelNextPaymentTest {
         repository.setSubscriptions(listOf(subscription(id = 1, anchor = anchor, period = period)))
     }
 
-    /** WhileSubscribed keeps the state cold until something collects it. */
+    /** Collects the state the way the screen does, and lets it settle. */
     private fun TestScope.collectState() {
         backgroundScope.launch { viewModel.uiState.collect() }
         advanceUntilIdle()

@@ -163,7 +163,7 @@ class HomeViewModelTotalPeriodTest {
         advanceUntilIdle()
     }
 
-    /** WhileSubscribed keeps the state cold until something collects it. */
+    /** Collects the state the way the screen does, and lets it settle. */
     private fun TestScope.collectState() {
         backgroundScope.launch { viewModel.uiState.collect() }
         advanceUntilIdle()

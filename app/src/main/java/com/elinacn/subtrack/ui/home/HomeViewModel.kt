@@ -7,7 +7,6 @@ import com.elinacn.subtrack.domain.model.BillingPeriod
 import com.elinacn.subtrack.domain.model.Currency
 import com.elinacn.subtrack.domain.model.Subscription
 import com.elinacn.subtrack.domain.model.SubscriptionCategory
-import com.elinacn.subtrack.domain.model.TotalPeriod
 import com.elinacn.subtrack.domain.repository.ReminderStateRepository
 import com.elinacn.subtrack.domain.repository.SettingsRepository
 import com.elinacn.subtrack.domain.repository.SubscriptionRepository
@@ -44,16 +43,22 @@ class HomeViewModel @Inject constructor(
 ) : ViewModel() {
 
     /** Everything that is not stored: sheet visibility, validation errors, the pending undo. */
-    private val screenState = MutableStateFlow(ScreenState())
+    private val screenState = MutableStateFlow(HomeScreenState(today = LocalDate.now(clock)))
 
     /**
      * The single source of truth for the screen.
      *
-     * combine merges the stored list with the state above, and stateIn turns the result into a hot
-     * StateFlow that remembers its last value, so a recomposing screen reads it without re-running
-     * the query. WhileSubscribed(5_000) keeps the query alive for five seconds after the last
-     * collector leaves: a rotation tears the activity down and rebuilds it well inside that window,
-     * so the database observer survives and the list does not blink.
+     * combine merges the stored list, the main currency and the rates with the state above.
+     *
+     * **Eagerly, not WhileSubscribed: it keeps running while another screen is on top.** Home is
+     * the start destination and sits under every other screen, and the settings those screens edit
+     * are inputs here. Stopped after five seconds, the flow kept its last total, and a user coming
+     * back from changing a rate was shown the old total until the restarted flow caught up - phase
+     * 16u measured three frames of it on the way back (ARCHITECTURE section 29). Running, it has
+     * already recomputed by the time the screen returns. The cost is a database observer and two
+     * preference reads staying open while this ViewModel lives.
+     *
+     * The restart also used to be what moved "today" on; [HomeEvent.ScreenStarted] does that now.
      */
     val uiState: StateFlow<HomeUiState> = combine(
         repository.observeAll(),
@@ -64,7 +69,7 @@ class HomeViewModel @Inject constructor(
         // Built per emission rather than held as a field: the table is now editable, and a
         // converter that outlived it would keep totalling at yesterday's rates.
         val converter = CurrencyConverter(rates)
-        val today = LocalDate.now(clock)
+        val today = screen.today
         // Filtered here rather than in the DAO: four categories over a list this size is not a
         // query, and a second query would have to be kept in step with the one the screen already
         // observes. The composable gets a list it only draws (ARCHITECTURE section 3).
@@ -105,7 +110,7 @@ class HomeViewModel @Inject constructor(
         )
     }.stateIn(
         scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
+        started = SharingStarted.Eagerly,
         initialValue = HomeUiState()
     )
 
@@ -147,6 +152,9 @@ class HomeViewModel @Inject constructor(
 
             HomeEvent.NotificationRequestHandled ->
                 screenState.update { it.copy(shouldRequestNotificationPermission = false) }
+
+            // Unchanged on the same day, so the state only moves when the date really has.
+            HomeEvent.ScreenStarted -> screenState.update { it.copy(today = LocalDate.now(clock)) }
         }
     }
 
@@ -273,32 +281,7 @@ class HomeViewModel @Inject constructor(
         screenState.update { it.copy(shouldRequestNotificationPermission = true) }
     }
 
-    private data class ScreenState(
-        val isAddSheetOpen: Boolean = false,
-        val nameError: UiText? = null,
-        val priceError: UiText? = null,
-        val dateError: UiText? = null,
-        val errorMessage: UiText? = null,
-        val pendingUndo: Subscription? = null,
-        val shouldRequestNotificationPermission: Boolean = false,
-        /** Survives a rotation with the ViewModel, and dies with the process. */
-        val categoryFilter: SubscriptionCategory? = null,
-        /** The same: a choice about the view, kept for as long as the screen is alive. */
-        val totalPeriod: TotalPeriod = TotalPeriod.MONTHLY
-    )
-
-    /** Opening, dismissing and a successful save all leave the form without complaints. */
-    private fun ScreenState.clearedErrors(open: Boolean) = copy(
-        isAddSheetOpen = open,
-        nameError = null,
-        priceError = null,
-        dateError = null
-    )
-
     private companion object {
-        /** Outlives a configuration change, expires on a real departure. */
-        const val STOP_TIMEOUT_MS = 5_000L
-
         /** The list holds exactly one dated subscription only right after the first one lands. */
         const val FIRST_DATED_SUBSCRIPTION = 1
     }

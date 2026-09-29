@@ -518,8 +518,8 @@ class HomeViewModelTest {
     // --- helpers --------------------------------------------------------------------------
 
     /**
-     * uiState is built with WhileSubscribed, so it stays cold until something collects it.
-     * Reading .value without this would only ever return the initial value.
+     * Collects the state the way the screen does, and lets it settle, so .value is the computed
+     * state rather than the initial one.
      */
     private fun TestScope.collectState() {
         backgroundScope.launch { viewModel.uiState.collect() }

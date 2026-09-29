@@ -146,4 +146,7 @@ sealed interface HomeEvent {
 
     /** The screen has shown the permission request; the trigger must not fire again. */
     data object NotificationRequestHandled : HomeEvent
+
+    /** The screen came into view; if the date has changed since, the countdowns move on. */
+    data object ScreenStarted : HomeEvent
 }

@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.LifecycleStartEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -13,6 +14,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.elinacn.subtrack.ui.edit.EditSubscriptionScreen
 import com.elinacn.subtrack.ui.edit.EditSubscriptionViewModel
+import com.elinacn.subtrack.ui.home.HomeEvent
 import com.elinacn.subtrack.ui.home.HomeScreen
 import com.elinacn.subtrack.ui.home.HomeViewModel
 import com.elinacn.subtrack.ui.settings.SettingsScreen
@@ -43,6 +45,12 @@ fun SubTrackNavHost(
         composable(Destination.HOME) {
             val viewModel: HomeViewModel = hiltViewModel()
             val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+            // Coming back to the screen, from another one or from the background, is when a new
+            // day can have started under the countdowns.
+            LifecycleStartEffect(viewModel) {
+                viewModel.onEvent(HomeEvent.ScreenStarted)
+                onStopOrDispose { }
+            }
 
             HomeScreen(
                 uiState = uiState,
