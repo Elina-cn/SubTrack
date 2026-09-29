@@ -751,6 +751,16 @@ Aylık toplamın zaman içindeki anlık görüntüleri. `PROJECT_SPEC.md` §1'de
       parlama yok, tarih notu görünüyor; upload/Play imza farkı gerçek
       güncellemede sorun çıkarmadı. (Console'da, testçiyle ve telefonda oldu,
       repoda kanıt yok; etiket repoda.)
+- [ ] Sürüm 1.0.3 (`versionCode 4`) — üç testçi bildirimi (16t teşhis, 16u
+      düzeltme): ayarlara girerken satırların bir an yanlış durumu göstermesi,
+      kur ekranında kaydetmenin görünmemesi ("Varsayılana dön" artık hemen
+      kaydediyor) ve ana ekrana dönüşte toplamın bir an eski değeri göstermesi.
+      AAB 16v'de üretildi ve doğrulandı: şema `v1.0.2`'den beri değişmedi, izin
+      listesi aynı, 1.0.2'nin üzerine güncelleme olarak kurulunca veri korundu
+      (`TESTING.md` "Yükseltme Testi"). Kaynak commit `e82f36a`. **Açık
+      kalan:** kapalı teste yükleme, aynı AAB'nin App Bundle kitaplığından
+      dahili teste eklenmesi (PROGRESS 16r, "Karar — sürüm yayınlama sırası")
+      ve etiket — kullanıcıda.
 - [ ] Üretim erişimi ve yayın — 12 testçi 14 gün kesintisiz katılımda kalınca
       başvurulacak (Faz 16k).
 

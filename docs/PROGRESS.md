@@ -27,6 +27,289 @@ Her faz sonunda **en üste** yeni kayıt eklenir. Eski kayıtlar silinmez.
 
 ---
 
+## [Faz 16v] Sürüm 1.0.3 — Üçüncü Kapalı Test Güncellemesi — 2026-09-29
+
+**Durum:** Tamamlandı. Tek kod değişikliği sürüm satırları
+(`versionCode 3 → 4`, `versionName "1.0.2" → "1.0.3"`). AAB hazır; kapalı teste
+yükleme, aynı AAB'nin kitaplıktan dahili teste eklenmesi ve etiket kullanıcıda
+(16r, "Karar — sürüm yayınlama sırası"). İçerik 16u'nun üç düzeltmesi.
+
+### Görev 1 — şema
+
+`git diff v1.0.2 -- app/schemas` → **boş** (0 bayt). `v1.0.2`'den bu yana
+`gradle/`, kök ve `app/build.gradle.kts`, `proguard-rules.pro` ve
+`AndroidManifest.xml`'de de fark yok (sürüm commit'inden önce).
+
+### Görev 2-3 — sürüm ve AAB
+
+`./gradlew :app:assembleDebug :app:testDebugUnitTest :app:bundleRelease
+--rerun-tasks` → geçti (104 görev koştu); `compileDebugKotlin` ve
+`compileReleaseKotlin` koştu, `signReleaseBundle` koştu. Yeni uyarı yok (yalnız
+bilinen `android.disallowKotlinSourceSets`).
+
+| Alan | Değer |
+|---|---|
+| Kaynak commit | **`e82f36a`** chore: bump version to 1.0.3 (versionCode 4) |
+| AAB | `app/build/outputs/bundle/release/app-release.aab`, **4.592.256 B**, 148 girdi (1.0.2: 4.576.266 B, 148 girdi) |
+| AAB SHA-256 | `5b8b5e95ea4dd8834673fa74b3bf6e1ac50c67eec58e47feac8a334bbcc554ff` |
+| `jarsigner -verify` | `jar verified.`, `CN=ElinaDorothea, OU=Development, O=SubTrack, L=Denizli, ST=Denizli, C=TR`; çıktının tamamı 1.0.2 AAB'sininkiyle **bayt bayt aynı** (`diff` boş) — aynı dört uyarı (geçersiz zincir, kendinden imzalı, zaman damgası yok / 2054-02-02, POSIX öznitelik notu) |
+| `bundletool dump manifest` | `versionCode="4"`, `versionName="1.0.3"`, `minSdkVersion="24"`, `targetSdkVersion="36"`, `supportsRtl="false"` |
+| Birim testleri | **352 test, 0 hata, 0 atlanan** |
+
+**İzin listesi — 1.0.2 ile birebir aynı.** İki AAB'nin `bundletool dump
+manifest` çıktısından `<permission>` ve `<uses-permission>` satırları, sıralı
+(`diff` boş): `POST_NOTIFICATIONS`, `WAKE_LOCK`, `ACCESS_NETWORK_STATE`,
+`RECEIVE_BOOT_COMPLETED`, `FOREGROUND_SERVICE`,
+`com.elinacn.subtrack.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION` (tanım +
+kullanım). İki manifestin tamamının tek farkı ilk satırdaki
+`versionCode`/`versionName`. `INTERNET` ve `AD_ID` yok. 1.0.2'nin döküm çıktısı
+16r'nin `manifest-1.0.2.xml`'iyle aynı.
+
+### Görev 4 — yükseltme testi (api33)
+
+`subtrack_tester_api33` (`-gpu host`), başlangıç hâli. Cihazda 16u'nun ölçüm
+derlemesi vardı (`versionCode 3`, `firstInstallTime 2026-09-28 11:41:40`;
+uygulama dili `tr-TR` — 16u kaydı "boş" diyor), kaldırıldı.
+
+- **Eski taraf: gerçek 1.0.2.** 16r'nin AAB kopyası, SHA-256
+  `4ffe38ab…b02d3268` (16r kaydıyla aynı) → `build-apks` (upload anahtarı) →
+  `install-apks`. Yeniden üretilen APK seti 16r'nin `subtrack-1.0.2.apks`'iyle
+  bayt bayt aynı (`3c3431e6…3b14f71`); `aapt2`: `versionCode='3'`,
+  `versionName='1.0.2'`.
+- **Yeni taraf:** 1.0.3 AAB'si → `build-apks` → `install-apks`
+  (`versionCode='4'`, `versionName='1.0.3'`).
+
+**Fikstür (1.0.2 arayüzünden, en-US):** Netflix ₺159,99 aylık Eğlence; Gym €450
+yıllık Sağlık; iCloud £2,49 haftalık Diğer; Spotify $10,99 aylık Eğlence,
+sonraki ödeme 15.10.2026 (kaydedince bağlamsal izin istendi → Allow). Ana para
+USD, tema Dark. Kur ekranında yalnız USD'ye `39,59` (virgülle) yazılıp
+kaydedildi → kutu `39.59`, "Last edited: Sep 29, 2026 7:44 AM"; EUR ve GBP'ye
+dokunulmadı (1.0.2'nin Kaydet'i üçünü de yazar, 16t). Toplam aylık **$73.48**,
+yıllık **$881.78**; istatistik Sağlık $43.76 %60, Eğlence $15.03 %20, Diğer
+$14.69 %20. Elle: ₺159,99 / 39,59 = 4,04; $10,99; €37,5 × 46,2 / 39,59 = 43,76;
+£10,79 × 53,9 / 39,59 = 14,69 → 73,48.
+
+Saatler cihazın (GMT):
+
+| Kontrol | Güncellemeden önce (1.0.2) | Sonra (1.0.3) |
+|---|---|---|
+| Kurulum | `base.apk` + `split_config.x86_64.apk` | aynı iki parça — **kaldırılmadan** |
+| `versionCode` / `versionName` | 3 / 1.0.2 | **4 / 1.0.3** |
+| `firstInstallTime` | 07:39:03 | **07:39:03** (aynı) — güncelleme, temiz kurulum değil |
+| `lastUpdateTime` | 07:39:03 | 07:47:25 |
+| `userId` | 10180 | **10180** |
+| `POST_NOTIFICATIONS` | `granted=true` | **`granted=true`** |
+| Ana ekran aylık ve yıllık, istatistik, ayarlar (4 döküm) | kaydedildi | **birebir aynı** (`diff` boş) |
+| Kur ekranı dökümü | `Last edited: Sep 29, 2026 7:44 AM`, 39.59 / 46.2 / 53.9 | **metinler ve kurlar aynı**; kutular ve düğmeler 42 px aşağıda (aşağıda) |
+| Ana ekran görüntüsü | — | durum çubuğu (y 47-79, saat) dışında **piksel piksel aynı** |
+| `payment_reminder` işi (WorkManager tanı yayını) | `1b86e77e…` `ENQUEUED`, iş #0 | **aynı kimlik** `ENQUEUED`, iş #0 |
+| JobScheduler | `JOB #u0a180/0`, hedef 09:00 | açmadan önce aynı kayıt; açınca tazelendi, hedef yine 09:00 |
+| Crash tamponu | — | **boş** |
+
+- Kur ekranındaki 42 px 16u'nun bilinçli değişikliği: "Son düzenleme" satırı
+  iki metni üst üste ölçüyor ve iki satırlık "hiç düzenlenmedi" uyarısının
+  yüksekliğini tutuyor (`RateFields.kt:42`, `RatesUpdatedLine`). 1.0.3'teki
+  konum (USD kutusu y 655) 1.0.2'nin "hiç düzenlenmedi" hâlindekiyle aynı.
+  Bir sonraki yükseltme testinde (1.0.3 → sonraki) beş döküm yine aynı olmalı.
+- Açılışta `WM-ForceStopRunnable: Application was force-stopped, rescheduling`
+  — beklenen (TESTING "Yükseltme Testi" adım 6).
+
+### Görev 5 — kısa tur (AAB'den kurulan 1.0.3)
+
+Kayıtlar misafir `screenrecord` ile (api33'te bu turda takılmadı; kayıt başına
+17-60 kare, yalnız değişen kareler), kareler ffmpeg ile ayrıldı ve satır
+bantları kare kare okundu.
+
+**#121 — ayarlara giriş.** Her kayıtta ayarların ilk görünür karesinden
+itibaren satırlar:
+
+| Cihaz / durum | Kayıt | Hatırlatma | Tema | Duvar kâğıdı | Ana para çipleri |
+|---|---|---|---|---|---|
+| api33, yükseltilmiş veri (USD + Koyu, izin verilmiş) | 3 | ilk kareden "On" | 1 kare boş, sonra "Dark" | 1 kare boş, sonra "Off — the app's own palette" | 1-2 kare çizilmiyor, ilk göründüğü karede USD seçili |
+| api33, temiz kurulum (izin hiç istenmedi) | 1 | açıklama 1 kare boş, sonra "Off — tap to turn on" | 2 kare boş, sonra "Follow the system" | 2 kare boş, sonra doğru | çizilmiyor, sonra TRY (gerçek değer) |
+| api29 (Android 10, 720×1280), USD + Koyu | 3 | ilk kareden "On" | 2 kayıtta 1 kare boş, birinde ilk kareden "Dark" | ilk kareden "Requires Android 12 or newer" | çizilmiyor, sonra USD |
+
+**Yanlış değer hiçbir karede yok** ("Off — turn on in system settings",
+"Follow the system" ya da seçili TRY, olması gerekmeyen yerde görünmedi).
+Geçiş sürerken hatırlatma satırına erken dokunuş (ayarlar ikonundan 250 ms
+sonra):
+
+- api33, izin hiç istenmemiş: **izin penceresi** açıldı
+  (`GrantPermissionsActivity`); Allow → satır "On".
+- api33 ve api29, izin verilmiş / açık: sistemin uygulama bildirim ayarları
+  (`AppNotificationSettingsActivity`) — açık durum için doğru davranış.
+
+**#122 — kur ekranı** (api33, ekran klavyesi açık
+`show_ime_with_hard_keyboard 1`):
+
+| Adım | Sonuç |
+|---|---|
+| (a) USD `40,25`, klavyenin eylem tuşu: USD ve EUR'da "sonraki", GBP'de ✓ | ✓'ye basınca klavye kapandı (`mInputShown=false`), "Rates saved", kutu `40.25` (noktayla), "Last edited … 7:53 AM", Kaydet devre dışı, kutular yerinde (y 655 / 855 / 1055) |
+| (a) tekrar, yalnız ekran klavyesine dokunarak (`40,5`) | aynı; odak hiçbir düğümde değil (ilk denemede odak geri düğmesindeydi, aşağıda) |
+| (b) USD `0`, klavye açıkken aşağı kaydırıp Kaydet | hiçbir şey yazılmadı ("Last edited … 7:54 AM" değişmedi); USD kutusu odakta, "The rate must be greater than zero" görünür |
+| (c) Reset to defaults → Reset | hemen "The rates have never been edited…" (kur anahtarı yok), "Default rates restored", kutular 42.85 / 46.2 / 53.9, Kaydet devre dışı, kutular yerinde |
+| (d) USD `41`, tek shell satırında Kaydet × 3 | Kaydet ilk basıştan sonraki ilk karede (1289 ms) devre dışı; **tek** "Rates saved" ~3,9 sn görünüp bir kez kayboldu; klavye kapandı |
+
+Yazım sayısı release derlemede görülemiyor (`run-as` yok); tek yazım
+`ExchangeRatesViewModelWriteTest` ile sabit.
+
+**Eski toplam — dönüşte** (api33, ana para USD, ana ekrandan ayrılıp 5 sn'den
+uzun sonra kur değişti, ayarlar → ana dönüş kaydedildi):
+
+| Tekrar | Ayrılırken ana ekran | Kur değişikliği | Dönüşte ilk görünür kare | Eski toplam |
+|---|---|---|---|---|
+| 1 | $73.48 (39,59) | birkaç dakikada 40,25 → 40,5 → sıfırlama → 41 | 1728 ms, **$71.33** | 26 karenin hiçbirinde yok |
+| 2 | $71.33 (41) | 7 sn bekleyip 39,59, Kaydet | 1731 ms, **$73.48** | 24 karenin hiçbirinde yok |
+
+**1.0.2'nin düzeltmeleri yerinde.**
+
+- Parlama (TESTING #120'nin ölçümü; fazlalık, eşik 5, 16q öncesi 42-51):
+  sistem açık + uygulama Koyu: ana → ayarlar **0,04**, ayarlar → ana **0,02**;
+  sistem koyu + "Sistemi takip et": **0,07** / **0,02**.
+- Tarih notu (en-US, koyu): ekleme sheet'inde 15 Ekim seçilince alan `Next
+  Payment (optional), Oct 15, 2026, Once the payment date passes, it moves to
+  the next period automatically.`; ekranda alanın altında iki satır.
+  Düzenleme ekranında (Spotify) aynı.
+
+**Salınım hücresi** (16m'nin `cell.sh`'ı, son dokunuş `30, 1688`; koyu, tr-TR,
+`wm density 440`, yazı 1.25, tarihsiz): dinlenme üst kenar **182**, Kaydet
+**2101**, pay 19,6 dp — TESTING'dekiyle aynı.
+
+| İtiş | Sonuç | 16r |
+|---|---|---|
+| Orta (218 dp / 130 ms) | **tek sıçrama** 68 px = 25 dp; hareket ~0,36 sn | tek sıçrama 25 dp |
+| Hızlı (440 dp / 90 ms) | **tek sıçrama** 201 px = 73 dp, tepe karesinde üst kenar 0 (16r'deki gibi); hareket ~0,32 sn | tek sıçrama 73 dp |
+
+İkisinde de tekrar yok; dokunuştan sonra sheet dinlenmede. (İzde Kaydet'in
+dinlenmesi 2102 okunuyor, ekran görüntüsünde 2101 — 1 px ölçüm farkı, hareket
+değil. Kare aralığı 25-48 ms olduğu için süreler 16r'den kaba.)
+
+**Tur** (api33, en-US, sistem koyu + "Sistemi takip et", kur 39,59):
+
+| Adım | Sonuç |
+|---|---|
+| Ekleme — Disney ₺99,99 aylık | eklendi; toplam $73.48 → **$76.01** |
+| Düzenleme — ₺129,99, yıllık | kaydedildi; toplam **$73.75** (her para birimi ayrı yuvarlanıyor: 4,31 + 10,99 + 43,76 + 14,69) |
+| Kaydırarak silme | "Subscription deleted" + Undo, toplam $73.48, satır yok |
+| Geri alma (tek shell satırı, `942,2053`) | Disney geri geldi, **$73.75** |
+| Crash tamponu (tur sonu, iki cihazda) | boş |
+
+### Görev 6 — sürüm notları ("Bu sürümdeki yenilikler")
+
+```
+<tr-TR>
+Testçilerimizin bildirimleriyle üç düzeltme:
+• Ayarlara girerken bazı satırlar bir an yanlış durumu gösteriyordu; artık göstermiyor.
+• Kurları kaydedince klavye kapanıyor ve onay mesajı çıkıyor. "Varsayılana dön" de hemen kaydediyor.
+• Başka bir ekrandan dönünce toplam bir an eski değeri gösterebiliyordu; düzeltildi.
+Abonelikleriniz ve ayarlarınız olduğu gibi kalır. Teşekkürler!
+</tr-TR>
+<en-US>
+Three fixes based on tester feedback:
+• Some rows on the settings screen briefly showed the wrong state when opened; they no longer do.
+• Saving exchange rates now closes the keyboard and shows a confirmation. Restoring the default rates now saves right away.
+• When returning from another screen, the total could briefly show an old value; this is fixed.
+Your subscriptions and settings stay as they are. Thank you!
+</en-US>
+```
+
+tr-TR **381**, en-US **416** karakter, satır sonları dahil (satır sonsuz 377 /
+412; sınır 500). Metin sohbette verildiği gibi; yalnız istemdeki satır
+kaydırmaları birleştirildi, her madde tek satır. "Varsayılana dön" uygulamadaki
+düğmenin adıyla aynı (`reset_rates`).
+
+### Doğrulama
+
+| Koşu | Sonuç |
+|---|---|
+| `assembleDebug` + `testDebugUnitTest` + `bundleRelease`, `--rerun-tasks` | geçti; `compileDebugKotlin` ve `compileReleaseKotlin` koştu |
+| `./gradlew test --rerun-tasks` | geçti, **352 test, 0 hata, 0 atlanan** (`test` yalnız debug birim testlerini koşuyor); AAB'nin SHA-256'sı sonra da aynı |
+| Derleme uyarısı | yeni yok (`disallowKotlinSourceSets`; `test` koşusunda bir de "SDK XML version 4" — 16r'nin derleme kaydında da var) |
+| `app/schemas` | `git diff v1.0.2` boş |
+| `lintDebug`, `connectedDebugAndroidTest` | koşulmadı — kod değişikliği yalnız sürüm satırları; 16u'da ikisi de bu kodla koştu |
+
+### Karşılaşılan sorunlar
+
+- Git Bash'te `JAVA_HOME` yok; ilk derleme denemesi başlamadan düştü. Android
+  Studio'nun JBR'si (`…\Android Studio\jbr`) verilerek koşuldu.
+- Kısa turun ortasında (parlama ölçümünden sonra) Claude Code oturumu
+  kapandı ve arka planda çalışan emülatör de onunla kapandı. Yeniden soğuk
+  açılışta veri ve ayarlar yerindeydi (1.0.3, yükseltilmiş fikstür, gece modu
+  açık); tur kaldığı yerden sürdü. Yükseltme testi bundan önce bitmişti.
+- Fikstür girilirken (1.0.2, kur ekranından iki geri tuşundan sonra) bildirim
+  paneli ve sistemin **genel** bildirim ayarları
+  (`ConfigureNotificationSettingsActivity`, `NOTIFICATION_SETTINGS`) önde
+  bulundu. Hiçbir şeye dokunmadan geri çıkıldı; ana ekran dökümü doğru
+  değerleri gösterdi. Uygulamanın açtığı ekran (`AppNotificationSettingsActivity`)
+  değil; nedeni anlaşılmadı, yinelenmedi.
+- #122 (a)'nın ilk denemesinde metin `input text`/`input keyevent` ile
+  girildiği için pencere dokunmasız (tuş) kipindeydi; kayıttan sonra odak geri
+  düğmesine geçti ve çevresinde odak halkası çizildi. Aynı adım yalnız ekran
+  klavyesine dokunarak yinelenince odak hiçbir düğümde değildi. Donanım
+  klavyesi ya da yön tuşuyla kullanan biri için standart Android davranışı;
+  dokunmatik telefonda görünmez.
+
+### Ortam (tur sonu)
+
+- api33 (`subtrack_tester_api33`): #121'in "izin hiç istenmemiş" hâli için
+  1.0.3 AAB'den **temiz** kuruldu (yükseltme testi bundan önce bitmişti).
+  Şimdi abonelik yok, ana para TRY, tema "Sistemi takip et", bildirim izni
+  verildi (erken dokunuş testinde Allow). `cmd uimode night no` (`ui_night_mode`
+  1), `wm` sıfır, yazı 1.0, uygulama dili boş, `system_locales` en-US,
+  `show_ime_with_hard_keyboard 0`; `/sdcard`'da bu turdan dosya yok. Kapatıldı.
+- api29 (`subtrack_narrow_api29`): başta SubTrack kurulu değildi; 1.0.3 AAB'den
+  kuruldu, #121'den sonra kaldırıldı. `wm` 720×1280 / 320, yazı 1.0, en-US,
+  `cmd uimode night no`, `show_ime_with_hard_keyboard 0` (hiçbiri
+  değiştirilmedi). `/sdcard` başta ve sonda 187 girdi; `ui.xml` önceki
+  turlardan duruyordu, içeriği bu turun dökümüyle değişti. Kapatıldı.
+- Fiziksel telefona dokunulmadı; `adb devices` her seferinde yalnız emülatörü
+  gösterdi.
+- AAB'nin kopyası, 1.0.2 AAB'sinin kopyası, iki APK seti, dökümler ve kayıtlar
+  oturumun geçici klasöründe:
+  `%LOCALAPPDATA%\Temp\claude\C--Users-cane7-Documents-GitHub-SubTrack\6a8cfc5d-6023-44fa-a4a4-ded56aa6836d\scratchpad\16v\`
+  (`subtrack-1.0.3-vc4.aab`, `subtrack-1.0.2-vc3.aab`, `subtrack-1.0.3.apks`,
+  `subtrack-1.0.2.apks`, `before/`, `after/`, `rec/`, `cell/rec/`, `shots/`,
+  `manifest-*.xml`, `perm-*.txt`, `jarsigner-*.txt`, `notes-*.txt`). Kalıcı bir
+  yer değil.
+
+### Rapor edilen, dokunulmadı
+
+- TESTING "Yükseltme Testi"nin tur tablosu (16n, 16r) ve adım 2'deki SHA-256
+  listesi 1.0.2'de bitiyor; 16v satırı ve 1.0.3 AAB'sinin hash'i eklenmedi
+  (istenmedi). Hash yukarıda.
+- Aynı bölümün adım 6'sı "beş dump birebir aynı" diyor; bu turda kur ekranı
+  16u'nun bilinçli yerleşim değişikliği yüzünden 42 px farklı (metin ve kurlar
+  aynı). Bölüme not düşülmedi.
+- #122 (b)'nin "ekran USD kutusuna kaydırılıyor" kısmı api33'ün 1080×2400
+  ekranında sınanamadı: kutu klavye açıkken de görünüyordu (kaydırma yalnız
+  95 px). 16u'da api29'da görülmüştü.
+- TESTING "121-122 için not" api33 için `adb emu screenrecord` diyor; bu turda
+  misafir `screenrecord` api33'te sorunsuz çalıştı.
+- 300 satırı geçen dosyalar 16u'daki gibi: `HomeScreen.kt` 313,
+  `HomeViewModelTest.kt` 563, `SettingsViewModelReminderTest.kt` 322 —
+  bölünmedi.
+
+**Değişen dosyalar**
+- `app/build.gradle.kts` — `versionCode 4`, `versionName "1.0.3"`
+- `docs/ROADMAP.md` — Faz 16'ya 1.0.3 satırı
+- `docs/PROGRESS.md` — bu kayıt
+
+**Commit'ler**
+- `e82f36a` chore: bump version to 1.0.3 (versionCode 4) — **etiket buna**
+- (bu kayıt) docs: record the 1.0.3 release build
+
+**Sonraki faz için not**
+- Kapalı teste yükleme, aynı AAB'nin kitaplıktan dahili teste eklenmesi ve
+  `v1.0.3` etiketi (`e82f36a`) kullanıcıda. Güncelleme telefona gelince
+  abonelikler, toplam, ayarlar ve kur ekranı gözle kontrol edilir.
+- Bir sonraki yükseltme testinin eski tarafı 1.0.3: AAB'si yukarıdaki geçici
+  klasörde (kalıcı değil); api33'te şu an 1.0.3'ün AAB'den temiz kurulumu var,
+  fikstür yeniden girilmeli.
+- Testçiye sorulacaklar (16u'dan açık): listesi ve ana parası; ~73,89'u ne
+  kadar süre gördüğü.
+
+---
+
 ## [Faz 16u] Düzeltme: Ayarların İlk Anı ve Kur Ekranı — 2026-09-29
 
 **Durum:** Tamamlandı. 16t'nin 2. ve 3. sorunu düzeltildi. Testçinin 28.09 dizisi (EK) teşhis edildi: kur ekranındaki yarışlar yapıyla kapatıldı; ana ekranın dönüşte eski toplamı çizmesi yeniden üretildi ve düzeltildi. Kalıcı olarak yanlış bir kur ya da toplam hiçbir dizide üretilemedi. Dönüşüm, toplama ve yuvarlama koduna dokunulmadı; şema, bağımlılık ve sürüm numarası değişmedi.
