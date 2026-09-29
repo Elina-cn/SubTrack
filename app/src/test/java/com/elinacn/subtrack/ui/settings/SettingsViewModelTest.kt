@@ -51,6 +51,61 @@ class SettingsViewModelTest {
         Dispatchers.resetMain()
     }
 
+    // --- the first frame (ARCHITECTURE section 29) ----------------------------------------
+
+    /**
+     * What the screen draws before anything has been collected. The platform answers are known
+     * synchronously and must already be right; the stored ones are not read yet and must say so
+     * rather than stand in with a default.
+     */
+    @Test
+    fun uiState_firstValue_hasThePlatformAnswersAndNoStoredOnes() = runTest {
+        repository = FakeSettingsRepository(initial = Currency.USD)
+        notificationStatus.remindersVisible = true
+        dynamicColorSupport.available = true
+        viewModel = buildViewModel()
+
+        val first = viewModel.uiState.value
+
+        assertEquals(ReminderPermissionState.ENABLED, first.reminderPermission)
+        assertEquals(true, first.isDynamicColorSupported)
+        assertNull(first.mainCurrency)
+        assertNull(first.themeMode)
+        assertNull(first.isDynamicColorEnabled)
+    }
+
+    @Test
+    fun uiState_firstValue_withoutWallpaperColours_saysSoAtOnce() = runTest {
+        dynamicColorSupport.available = false
+        notificationStatus.runtimePermissionRequired = false
+        viewModel = buildViewModel()
+
+        val first = viewModel.uiState.value
+
+        assertEquals(false, first.isDynamicColorSupported)
+        // Below Android 13 there is no dialog to ask with, so the answer needs nothing stored.
+        assertEquals(ReminderPermissionState.SETTINGS_ONLY, first.reminderPermission)
+    }
+
+    /** Whether the dialog may still be shown depends on a stored flag, so it waits for it. */
+    @Test
+    fun uiState_firstValue_permissionThatDependsOnTheStore_isUnknownUntilRead() = runTest {
+        notificationStatus.remindersVisible = false
+        notificationStatus.runtimePermissionRequired = true
+        notificationStatus.permissionGranted = false
+        viewModel = buildViewModel()
+
+        assertNull(viewModel.uiState.value.reminderPermission)
+
+        collectState()
+
+        assertEquals(ReminderPermissionState.CAN_REQUEST, viewModel.uiState.value.reminderPermission)
+        assertEquals(Currency.TRY, viewModel.uiState.value.mainCurrency)
+        assertEquals(false, viewModel.uiState.value.isDynamicColorEnabled)
+    }
+
+    // --- main currency --------------------------------------------------------------------
+
     @Test
     fun uiState_nothingStored_startsOnTheDefaultCurrency() = runTest {
         viewModel.uiState.test {

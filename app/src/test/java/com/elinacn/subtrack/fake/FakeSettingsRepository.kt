@@ -4,6 +4,7 @@ import com.elinacn.subtrack.domain.model.Currency
 import com.elinacn.subtrack.domain.model.ExchangeRateTable
 import com.elinacn.subtrack.domain.model.ThemeMode
 import com.elinacn.subtrack.domain.repository.SettingsRepository
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -54,6 +55,12 @@ class FakeSettingsRepository(
     /** What [setRates] stamps as the edit time, so tests do not depend on the clock. */
     var now: Long = 1_000L
 
+    /**
+     * When set, [setRates] and [resetRates] wait for it before storing anything, which holds a
+     * write open so a test can act while it is still running.
+     */
+    var rateWriteGate: CompletableDeferred<Unit>? = null
+
     override fun observeMainCurrency(): Flow<Currency> = stored.asStateFlow()
 
     override suspend fun setMainCurrency(currency: Currency) {
@@ -66,6 +73,7 @@ class FakeSettingsRepository(
         storedRates.map { ExchangeRateTable.of(it) }
 
     override suspend fun setRates(scaledRates: Map<Currency, Long>) {
+        rateWriteGate?.await()
         failOnWrite?.let { throw it }
         rateWrites += scaledRates
         storedRates.value = storedRates.value + scaledRates
@@ -73,6 +81,7 @@ class FakeSettingsRepository(
     }
 
     override suspend fun resetRates() {
+        rateWriteGate?.await()
         failOnWrite?.let { throw it }
         resetCount++
         storedRates.value = emptyMap()
