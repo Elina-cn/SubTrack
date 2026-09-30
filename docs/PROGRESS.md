@@ -27,6 +27,157 @@ Her faz sonunda **en üste** yeni kayıt eklenir. Eski kayıtlar silinmez.
 
 ---
 
+## [Faz 16w] Teşhis: Hatırlatma Bildirimleri — 2026-09-29
+
+**Durum:** Tamamlandı (yalnız teşhis). Kod, şema, bağımlılık ve sürüm değişmedi. Testçinin "bildirim uygulamayı açarken düştü" tarifi emülatörde yeniden üretildi: uygulama zorla durdurulmuşken (force-stop) iş hiç koşmuyor, uygulama açılınca 3-5 sn içinde bildirim düşüyor. Aynı "açılışta düşme" Android 13'te `rare` (43 dk beklerken) ve `restricted` gruplarında, Android 10'da arka plan kısıtlamasında ve yeniden başlatmadan sonra da görüldü. Stok Android'de son uygulamalardan kaydırmak işi durdurmuyor. Kanal sesli, ses Android 10 ve 13'te çaldı; **Android 7'de hatırlatma sessiz** (yeni bulgu). Koddan ve ölçümden ikinci yeni bulgu: **09:00 hedefi kayıyor** — her geç çalışma sonraki bütün günleri o kadar geri itiyor.
+
+### 29.09.2026 geri bildirimleri (1.0.3)
+
+1. Ayarlardaki anlık "kapalı" görünümünün düzeldiği doğrulandı (16u, #121).
+2. Testçi yarınki bir ödeme için bildirim aldı ama sesini duymadı; sesin mi olmadığını, kendisinin mi kaçırdığını bilmiyor.
+3. Bildirimin tam uygulamayı açarken düştüğünü düşünüyor; uygulama kapalıyken gönderilmemiş olabilir. Emin değil.
+4. Öneri: liste eklenme sırasıyla görünüyor, ödeme gününe göre de sıralanabilsin (acil değil) → v1.2'ye eklendi (aşağıda "Belgeler").
+
+Testçinin cihazı kayıtta yok. Kapalı testte bilinen iki cihaz OPPO A15s (ColorOS, Android 10 — kullanıcının) ve Xiaomi Redmi Note 12 Pro 5G (MIUI, Android 13 — 16l'deki testçi); ölçüm bu yüzden Android 10 ve 13'te yapıldı.
+
+### Görev 1 — tasarım
+
+**Kurulum** (`PaymentReminderScheduler.kt`):
+- Tür: `PeriodicWorkRequestBuilder<PaymentReminderWorker>(1, DAYS)` (satır 32; `REPEAT_INTERVAL_DAYS = 1`, satır 60). Esneklik (flex) verilmemiş → `flex = interval` = 24 sa, esneklik penceresi yok.
+- İlk gecikme: `secondsUntilNextRun()` (satır 33, 49-54) — `ZonedDateTime.now(clock)`'un bugünkü 09:00'ı (`RUN_AT_HOUR = 9`, satır 63), geçtiyse yarınki. Yalnız **ilk** çalışmayı belirliyor (aşağıda).
+- Kısıt yok (satır 28-30); JobScheduler'da `Requires: charging=false batteryNotLow=false deviceIdle=false`.
+- `enqueueUniquePeriodicWork("payment_reminder", KEEP, …)` (satır 36-40).
+- Çağıran: `SubTrackApplication.onCreate` (SubTrackApplication.kt:49) — her **süreç** başlangıcında; yalnız uygulama açılışında değil, JobScheduler'ın iş için ya da `BOOT_COMPLETED` için başlattığı süreçte de. `KEEP` yüzünden var olan işe dokunmuyor.
+- Worker: günde en fazla bir bildirim (PaymentReminderWorker.kt:38), seçim bugün + 1 gün (PaymentReminderSelection.kt:22), gün yalnız bildirim gösterilince işaretleniyor (PaymentReminderWorker.kt:50-52).
+
+**WorkManager 2.11.2 bunu nasıl koşuyor** (`work-runtime-2.11.2-sources.jar`):
+- JobScheduler'a tek seferlik iş olarak veriliyor: `setMinimumLatency(max(sonraki − şimdi, 0))`, bitiş süresi (deadline) yok, `setPersisted(false)` (SystemJobInfoConverter.java:97-113, 127). Ölçümde `Required constraints: TIMING_DELAY`, tek kısıt.
+- Sonraki çalışma: ilk dönem `lastEnqueueTime + initialDelay`, sonrakiler `lastEnqueueTime + interval` (WorkSpec.kt:438-440). Her çalışma bitince `lastEnqueueTime = şimdi` yazılıyor (WorkerWrapper.kt:466, `resetPeriodic`).
+- **Sonuç — hedef kayıyor.** 09:00 yalnız ilk çalışmanın hedefi. İş bir gün 09:45'te koşarsa ertesi günün hedefi 09:45 oluyor ve hiçbir zaman 09:00'a geri çekilmiyor; gecikmeler birikiyor. api33'te ölçülen hedefler: 01.10 09:00:00.0 → 02.10 09:00:00.6 → 03.10 09:00:32.5 → 04.10 09:05:26 → 05.10 09:05:27 → 06.10 09:13:55 → 07.10 09:57:22 → 08.10 10:01:52. WorkSpec satırı (03.10, uygulama 09:05'te açıldıktan sonra): `last_enqueue_time` = 09:05:26.155, `flex_duration = interval_duration = 86400000`, `period_count = 3`; JobScheduler'da `Minimum latency: +23h59m59s`.
+- Yeniden başlatma: iş kalıcı olmadığı için JobScheduler onu unutuyor; WorkManager'ın `RescheduleReceiver`'ı işi yeniden kuruyor. Alıcı yalnız `BOOT_COMPLETED` dinliyor (aar manifesti); `TIME_SET` ve `TIMEZONE_CHANGED` dinlenmiyor, yani saat ya da saat dilimi değişirse iş eski mutlak anında kalıyor (yolculukta 09:00 başka bir yerel saate denk gelir).
+
+**Uygulama açılışında işi yeniden kuran ya da hemen koşan bir şey var mı?**
+- Uygulamanın kendi kodu: **hayır.** `schedule()` `KEEP` ile var olan işi olduğu gibi bırakıyor.
+- WorkManager: **evet.** Her süreç başlangıcında `ForceStopRunnable` koşuyor (ForceStopRunnable.java:252-265): JobScheduler'da olmayan iş varsa ("Reconciling jobs", SystemJobScheduler.java:303-353) ya da uygulama zorla durdurulmuşsa ("Application was force-stopped, rescheduling") bütün işleri yeniden kuruyor (`rescheduleEligibleWork`, WorkManagerImpl.java:615). Hedef geçmişteyse gecikme 0 oluyor ve süreç içi zamanlayıcı (`GreedyScheduler`) işi hemen başlatıyor: ölçümde açılıştan bildirime 3-10 sn.
+- Android 11+'da zorla durdurma `ApplicationExitInfo.REASON_USER_REQUESTED` ile algılanıyor; stok Android'de son uygulamalardan kaydırma da bu nedenle kaydediliyor ve WorkManager bir sonraki süreç başlangıcında onu da zorla durdurma sayıp işleri yeniden kuruyor (api33'te görüldü; zararsız, iş yine koştu).
+
+**İki yol.** Süreç canlıyken WorkManager işi kendi içinde de bekliyor (`GreedyScheduler` → `DelayedWorkTracker` → `Handler.postDelayed`; DelayedWorkTracker.java:84-86, DefaultRunnableScheduler.java:48) ve zamanı gelince JobScheduler'ı beklemeden koşuyor. `Handler` sayacı CPU uyurken ilerlemiyor ve Android 11+ önbellekteki süreci donduruyor (api33 imajında `use_freezer=true`, `freeze_debounce_timeout=600000`); gece boyunca bekleyen bir telefonda iş JobScheduler yoluyla koşar. Bu yüzden kontrol dışındaki bütün ölçümlerde süreç öldürüldü (`am kill`, force-stop değil).
+
+**Bir gün kaçarsa:** iş bir sonraki fırsatta **bir kez** koşuyor (kaçan her gün için ayrı koşmuyor) ve o anın "bugün + yarın"ına bakıyor; sonraki hedef o andan 24 sa sonra. ARCHITECTURE §18'deki kabul edilmiş bedel geçerli: yalnız iki günün ikisi de kaçarsa ödeme sessiz kalır. Yeni olan: kaçan ya da geciken gün, sonraki günlerin saatini de kaydırıyor.
+
+### Ortam ve yöntem
+
+- Debug derleme (`assembleDebug` `UP-TO-DATE`, girdiler HEAD ile aynı, kaynak 1.0.3). Zamanlama kodu release ile aynı, R8 yok; debug `run-as` için seçildi.
+- `subtrack_tester_api33` (Android 13, GMT) ve `subtrack_narrow_api29` (Android 10, America/New_York); Android 7 ses kontrolü için `subtrack_min_api24` (GMT). Tek tek: host belleği (7,3 GB) iki emülatöre yetmedi.
+- Fikstür: 8 aylık abonelik, çıpalar 02.10-09.10, cihazın yerel gece yarısı (SubscriptionMapper.kt:61-66'daki gibi). Veritabanı host'ta şemanın `1.json`'undan Python'la üretildi, ilk açılıştan önce `run-as` ile `databases/subtrack.db`'ye yazıldı. Her sahte günde bir satır "yarın", bir satır "bugün". api33'te bildirim izni `pm grant` ile.
+- Saat: `settings put global auto_time 0` + `cmd alarm set-time <ms>` — **API 29 ve 33'te çalışıyor** (TESTING API 29 için yalnız Ayarlar arayüzünü yazıyor). API 24'te yok (`No shell command implementation`; `service call alarm 2` izin hatası), orada Ayarlar arayüzü kullanıldı. api29'da ilk saat değişikliğinden sonra otomatik saat dilimi cihazı GMT'ye çekti (`TIMEZONE_CHANGED`, uygulama 09:00'ı GMT'ye göre kurdu); ölçüm boyunca `auto_time_zone 0` + `cmd alarm set-timezone America/New_York` ile sabitlendi ve uygulama temiz kuruldu.
+- Her durum ayrı bir sahte günde. Gün başında: `am force-stop` → saat hedeften 3-5 dk önceye → uygulamayı aç → Home. Açılışta WorkManager işi yeni saate göre yeniden kuruyor (yukarıdaki `ForceStopRunnable`); sonra durum uygulandı. Pil takılı değil (`AC powered: false`; Doze için ayrıca `dumpsys battery unplug`).
+- Zamanlar logcat'ten (`Start proc … for service SystemJobService`, `Worker result SUCCESS`) ve `dumpsys notification`'dan (`when`, `mInterruptionTimeMs`); bekleme nedeni `dumpsys jobscheduler`'dan.
+- **Sınır:** JobScheduler kotaları gerçek geçen süreyle sayılıyor, sahte günler ise gerçekte 5-45 dk arayla geçti. Kota sonuçları (özellikle `restricted`) gerçek bir günlük düzenden daha sıkışık bir geçmişle ölçüldü.
+
+### Görev 2 — bildirim ne zaman düştü
+
+**Android 13 (api33), saatler GMT:**
+
+| Durum | Hedef | Ne oldu | Bildirim | Bekleme nedeni (dumpsys) |
+|---|---|---|---|---|
+| Kontrol: arka planda, süreç canlı (01.10) | 09:00:00.0 | süreç içi zamanlayıcı 09:00:00.1'de başlattı | **09:00:00.4**, ses 09:00:00.7 | — |
+| Son uygulamalardan kaydırma (02.10) | 09:00:00.6 | `Killing … remove task`, `stopped=false`, iş JobScheduler'da kaldı; JobScheduler süreci 09:00:30.0'da başlattı | **09:00:32.4** | — |
+| `am force-stop` (03.10) — OEM temizlemesinin benzeri | 09:00:32.5 | `stopped=true`, iş JobScheduler'dan silindi; 09:05'e kadar hiçbir şey. Uygulama **09:05:21.95**'te açıldı | **09:05:25.8** (açılıştan 3,8 sn) | iş yok |
+| Doze (`force-idle`, ekran kapalı, süreç ölü) (05.10) | 09:05:27 | 09:13'e kadar koşmadı. Ekran 09:13:44.4'te açıldı (`unforce` + `WAKEUP`) → süreç 09:13:50.2 | **09:13:55.1** (ekrandan 11 sn) | `readyNotDozing: false`; `TIMING_DELAY` bile ~09:10'a kadar karşılanmadı (JobScheduler'ın zaman alarmı da Doze'da erteleniyor) |
+| Doze, süreç canlı (04.10, ilk deneme) | 09:05:26 | süreç içi zamanlayıcı Doze'a rağmen koştu | 09:05:26.6 | emülatörde CPU uyumuyor; gerçek cihaz için geçerli değil |
+| `rare` (40), süreç ölü, ekran açık (06.10) | 09:13:55 | 09:57'ye (**43 dk**) kadar koşmadı. Uygulama 09:57:16.8'de açıldı | **09:57:22.0** (açılıştan 5 sn) | kısıtların hepsi karşılanmış, `Ready: true`; Android 12+'nın aktif olmayan uygulamaları toplu başlatma kuralı: `min_ready_non_active_jobs_count=5`, `max_non_active_job_batch_delay_ms=1860000` (31 dk). 31 dk dolduktan sonra da kuyruk yeniden değerlendirilmediği için bekledi (sessiz emülatörde tetikleyecek başka iş yoktu) |
+| `restricted` (45), süreç ölü (07.10) | 09:57:22 | 10:01'e kadar koşmadı. Uygulama 10:01:40.9'da açıldı | **10:01:50.8** (açılışın kendisi 9,5 sn) | `Dynamic constraints: CHARGING BATTERY_NOT_LOW IDLE`, `readyDynamicSatisfied: false`; ayrıca `WITHIN_QUOTA` yok (`qc_max_session_count_restricted=1` / 24 sa) |
+| Yeniden başlatma, uygulama açılmadı (08.10) | 10:01:52 | `adb reboot` 09:56:46; sahte saat korundu; `BOOT_COMPLETED` 09:57:33, uygulamanın alıcısı 09:59:47, iş 09:59:57'de aynı hedefe kuruldu; süreç öldürüldü → JobScheduler 10:02:13'te başlattı | **10:02:21.0** | — |
+
+**Android 10 (api29), saatler EDT:**
+
+| Durum | Hedef | Ne oldu | Bildirim | Bekleme nedeni |
+|---|---|---|---|---|
+| Arka planda, süreç ölü (01.10) | 09:00:00 | JobScheduler süreci 09:01:58.5'te başlattı | **09:02:03.9**, ses 09:02:06 | — (bu imajda JobScheduler iki ölçümde de ~2 dk geç başlattı) |
+| Kaydırma (02.10) | 09:02:04 | `remove task`, `stopped=false`; süreç 09:04:02.8 | 09:04:05 (worker sonucu) | — |
+| `am force-stop` (03.10) | 09:04:05 | 09:09'a kadar hiçbir şey. Uygulama 09:09:16'da açıldı | **09:09:20.1** (4 sn) | iş yok |
+| Doze, süreç ölü (04.10) | 09:09:20 | 09:17'ye kadar koşmadı. Ekran 09:17:35.9 → süreç 09:17:39.0 | **09:17:42.1** (6 sn) | `readyNotDozing: false` |
+| `rare` (05.10) | 09:17:42 | süreç 09:17:42.0 | 09:17:44 (worker sonucu), **zamanında** | Android 10'da toplu başlatma kuralı yok (`min_ready_jobs_count=1`), kota var |
+| `restricted` | — | **Android 10'da yok:** `Unknown bucket: restricted` (grup Android 11'de geldi) | — | — |
+| Yerine: arka plan kısıtlaması (`appops RUN_ANY_IN_BACKGROUND ignore` — kullanıcının "Pil > Arka plan kısıtlaması") (06.10) | 09:17:44 | 09:22'ye kadar koşmadı. Uygulama 09:22:26'da açıldı | **09:22:29.2** (3 sn) | `readyNotRestrictedInBg: false` |
+| Yeniden başlatma, uygulama açılmadı (08.10) | 09:22:31 | `BOOT_COMPLETED` 09:17:42.6, alıcı 09:18:50, iş 09:18:54'te aynı hedefe kuruldu; **09:28'e kadar koşmadı**. Uygulama 09:28:32'de açıldı | **09:28:38.0** | yeniden başlatmadan sonra bekleme grubu **NEVER (50)** → `WITHIN_QUOTA` yok. İkinci yeniden başlatmada (09.10) tekrarlandı: grup önce 10, sonra 50; iş hedeften 2,5 dk sonra hâlâ bekliyordu. api33'te grup korunmuştu. **Nedeni belirlenemedi**; emülatörün ya da sahte saatin yan etkisi olabilir, gerçek bir Android 10 cihazda doğrulanmadı |
+
+**Özet.** İş planlanan saatte koşuyor: süreç canlıyken, stok kaydırmadan sonra, yeniden başlatmadan sonra (api33), Android 10'un `rare` grubunda. Beklediği durumlar: Doze (ekran açılınca 6-11 sn içinde koşuyor), Android 13 `rare` (Android 12+ toplu başlatma, ≥ 31 dk), `restricted` (şarj + boşta istiyor), arka plan kısıtlaması, zorla durdurma (hiç koşmuyor), api29'da yeniden başlatma sonrası NEVER. **Beklediği her durumda uygulama açılınca bildirim 3-10 sn içinde düştü** — testçinin tarifi bu.
+
+**Testçinin gözlemi için en olası açıklama** (kanıt değil): telefon uygulamayı arka planda durdurmuş ya da başlatılmasını engellemiş. dontkillmyapp.com'a göre MIUI'de "Otomatik başlatma", ColorOS'ta otomatik başlatma varsayılan kapalı ve son uygulamalardan temizlemek süreci öldürüyor; bu, emülatördeki force-stop satırının karşılığı. Android 13'te `rare`/`restricted` grupları da aynı sonucu veriyor. Stok Android'de uygulamayı kaydırıp kapatmak tek başına bunu yapmıyor.
+
+### Görev 3 — ses
+
+- Kanal `payment_reminders`, `IMPORTANCE_DEFAULT` (PaymentReminderNotifier.kt:64-69). dumpsys (api33 ve api29 aynı): `mImportance=3`, `mSound=content://settings/system/notification_sound` (sistemin varsayılan bildirim sesi), `mVibrationEnabled=false`, `usage=USAGE_NOTIFICATION`, `isNoisy=true`. DEFAULT = sesli, açılır pencere (heads-up) yok. **Varsayılan olarak sesli.**
+- Bildirimin kendisi `sound=null defaults=0x0 vibrate=null`; API 26+'da ses kanaldan geliyor.
+- Ses çaldı: api33'te 09:00:00.686'da `USAGE_NOTIFICATION` oynatıcı, `OpPlayAudio: … usage:5 not muted`, 82.980 çerçeve (~1,7 sn); api29'da 09:02:05-07 aynısı (`RingtonePlayer: Notification sound delayed by 1720msecs`). Titreşim kanalda kapalı.
+- **Android 7 (API 24-25) — sessiz.** Kanal yok; ses bildirimin kendi alanlarından geliyor. `NotificationCompat.Builder` bunları boş bırakıyor (core 1.17.0 kaynağı, `Builder(Context, String)` yalnız `when`, `audioStreamType` ve `PRIORITY_DEFAULT` kuruyor) ve notifier `setDefaults`/`setSound`/`setVibrate` çağırmıyor (PaymentReminderNotifier.kt:104-115). api24'te ölçüldü (iş 09:00:00'da koştu): kayıt `importance=2`, `requestedImportance=3 naturalImportance=2`, `isNoisy=false`, `defaults=0x00000000 sound=null vibrate=null`; ses servisinde o an hiçbir oynatma yok, zil modu normal. Android 7'de hatırlatma sessiz, titreşimsiz ve düşük önemde çıkıyor (minSdk 24).
+- **Testçinin sesi duymaması:** kanal sesli ve iki cihazda da çaldı; testçinin telefonu Android 8+ ise koddan bir sessizlik nedeni yok. Olası dış nedenler (doğrulanmadı): telefon sessizde/titreşimde ya da Rahatsız Etmeyin açık; üretici arayüzünde uygulamanın ya da kanalın sesi kapalı; bildirim uygulama açılırken geldiyse ses açılışla aynı anda çaldı. Testçiye sorulacaklar: marka ve Android sürümü; telefon o sırada sessizde miydi; Ayarlar > Uygulamalar > SubTrack > Bildirimler > "Ödeme hatırlatmaları"nda ses ne görünüyor.
+
+### Görev 4 — seçenekler (seçim yapılmadı)
+
+1. **`AlarmManager.setAndAllowWhileIdle`** (kesin olmayan, boştayken izinli); tetiklenince bildirimi hazırlayan alıcı/iş, yeniden başlatma ve saat değişimi için `BOOT_COMPLETED` (+ `TIME_SET`, `TIMEZONE_CHANGED`) alıcısı.
+   - İzin: özel izin yok, `SCHEDULE_EXACT_ALARM` gerekmez; `RECEIVE_BOOT_COMPLETED` birleşik manifestte zaten var (WorkManager'dan).
+   - Play: beyan gerektirmiyor. Javadoc bu kullanımı örnek veriyor: "a calendar notification that should make a sound" (AlarmManager.java, android-36.1).
+   - Davranış: Doze'da da tetikleniyor, ama kesin değil — Android 12+'da tetikleme zamanından itibaren 1 saat içinde (developer.android.com "Schedule alarms"); boştayken bu tür alarmlar uygulama başına seyrekleştiriliyor (belgede 9 dk, javadoc'ta "15 dakika gibi"), günde bir alarm için sorun değil. Android 12+ alarm kotası `rare` 1/saat, `restricted` 1/gün — günde bir sığıyor.
+   - Pil: günde bir uyanma, ihmal edilebilir.
+   - Sınır: zorla durdurmada alarm da siliniyor ve durdurulmuş uygulamaya `BOOT_COMPLETED` gelmiyor → OEM'in durdurmasına çare değil. Her gün 09:00'a yeniden kurulursa kayma biter.
+   - Mimari: §18 "Neden periyodik tarama, exact alarm değil" *kesin* alarmı reddetti; kesin olmayan, boşta izinli alarm ayrı bir karar olur.
+2. **Kesin alarm (`setExactAndAllowWhileIdle`) ya da `setAlarmClock`.**
+   - İzin: `SCHEDULE_EXACT_ALARM` (hedef 31+). Android 14'te hedef 33+ yeni kurulumda **varsayılan reddedilmiş**, kullanıcı "Alarmlar ve hatırlatıcılar" ekranından açmalı. `setAlarmClock` da aynı izni istiyor (`@RequiresPermission(SCHEDULE_EXACT_ALARM)`, AlarmManager.java). `USE_EXACT_ALARM` otomatik verilir ama Play yalnız çekirdek işlevi takvim ya da çalar saat olan uygulamalara izin veriyor → SubTrack için ret riski.
+   - Pil: cihazı Doze'dan tam zamanında uyandırıyor; günde bir için küçük. `setAlarmClock` durum çubuğunda alarm simgesi gösteriyor — hatırlatma için yanıltıcı.
+   - §18 bunu zaten reddetmişti; gerekçesi değişmedi.
+3. **WorkManager'da kalıp yalnız kaymayı düzeltmek.** (a) Her çalışmada `setNextScheduleTimeOverride` (WorkManager 2.9+) ile sonraki hedefi ertesi 09:00'a koymak, ya da (b) periyodik iş yerine her çalışmanın sonunda bir sonraki 09:00'a gecikmeli tek seferlik iş kurmak. İzin, politika ve pil etkisi yok. Doze, bekleme grubu ve OEM sorununa çare değil; yalnız 09:00'ın günler içinde kaymasını durdurur.
+4. **Pil optimizasyonu muafiyeti.** Ölçüldü (api29, 07.10): muafiyet listesindeki (`dumpsys deviceidle whitelist +…`) uygulamanın işi derin Doze'da **tam zamanında** koştu — hedef 09:22:29.3 → süreç 09:22:29.3 → bildirim 09:22:30.9, cihaz `IDLE`; `DEVICE_NOT_DOZING` muafiyetle karşılanmış sayılıyor. Bekleme gruplarına etkisi ölçülmedi.
+   - Doğrudan istek (`ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` + `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` izni): Play yalnız çekirdek işlevi Doze'dan olumsuz etkilenen türlere izin veriyor (kabul listesinde mesajlaşma, güvenlik, görev otomasyonu, çevre birimi…); hatırlatma/takip uygulaması listede yok → **ret riski yüksek.**
+   - Dolaylı yol: `ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS` (izin yok, politika sorunu yok) genel listeyi açıyor, kullanıcı SubTrack'i bulup seçiyor.
+   - Pil: uygulama Doze'da ağ ve wakelock kullanabilir hâle geliyor; SubTrack ağ kullanmıyor, iş günde bir.
+   - OEM kısıtlarını (otomatik başlatma) aşmıyor.
+5. **Üretici pil kısıtları (OPPO ColorOS, Xiaomi MIUI/HyperOS).** Genel API yok; dontkillmyapp.com iki marka için de geliştirici tarafında çözüm olmadığını yazıyor.
+   - (a) Ayarlar'da "Hatırlatmalar geç mi geliyor?" yardım satırı ve markaya göre adımlar (otomatik başlatmayı aç, pil kısıtlamasını kaldır, son uygulamalarda kilitle). İzin ve politika etkisi yok; iş kullanıcıda.
+   - (b) Üreticinin ayar ekranına doğrudan `Intent` (MIUI "Autostart", ColorOS başlangıç yöneticisi): bileşen adları belgesiz ve sürümden sürüme değişiyor; açılamazsa uygulama detay sayfasına düşülmeli (§18'deki açık fallback deseni). Bilinen politika sorunu yok, bakım yükü var.
+   - (c) FCM yüksek öncelikli push: sunucu ve `INTERNET` gerekir; v1.0'ın çevrimdışı kapsamıyla çelişiyor (PROJECT_SPEC §5). Yalnız eksiksizlik için.
+   - (d) Açılışta kaçanı söylemek: WorkManager açılışta zaten koşuyor (ölçüldü); §18'in "son N günde bir ödeme günü geçti mi" önerisi iki gün birden kaçsa bile açılışta geçmiş ödemeyi söyler. İzin ve pil etkisi yok; zamanında gelmeyi sağlamaz.
+   - Pil: (a)-(b) kullanıcının açtığı kadar; uygulama arka planda daha serbest kalır.
+
+**Android 7 sesi** (ayrı ve küçük): API < 26 için `setDefaults(DEFAULT_SOUND)` ya da `setSound(...)`; izin, politika ve pil etkisi yok.
+
+### Belgeler
+
+- PROJECT_SPEC §4 v1.2 ve ROADMAP Faz 19'a "Listeyi bir sonraki ödeme tarihine göre sıralama" eklendi (29.09 geri bildiriminin 4. maddesi). Faz 19'un "Bitti" satırında "Üç madde" → "Dört madde".
+
+### Doğrulama
+
+| Kontrol | Sonuç |
+|---|---|
+| `git diff --stat` | yalnız `docs/PROGRESS.md`, `docs/PROJECT_SPEC.md`, `docs/ROADMAP.md` |
+| Derleme, birim testleri | koşulmadı — kod değişmedi (`assembleDebug` yalnız ölçüm APK'sı için, `UP-TO-DATE`) |
+| Fiziksel cihaz | dokunulmadı; `adb devices` her seferinde yalnız emülatörü gösterdi |
+
+### Ortam (tur sonu)
+
+- api33: debug kaldırıldı; `auto_time 1` (saat gerçek zamana döndü, GMT), `dumpsys battery reset`, `deviceidle unforce`; bekleme grubu kaldırmayla gitti. Önceki 1.0.3 kurulumu (AAB'den) 16v'nin `subtrack-1.0.3.apks` setinden `install-apks` ile yeniden kuruldu (`versionCode 4`); **16v'nin fikstür verisi geri gelmedi**, grup `NEVER` (hiç açılmadı). `/data/local/tmp/subtrack.db` silindi.
+- api29: başta uygulama yoktu; debug kaldırıldı. `auto_time 1`, `auto_time_zone 1`, dilim `America/New_York` (30 sn sonra hâlâ NY), pil ve Doze sıfırlandı, muafiyet listesinden çıkarıldı, `RUN_ANY_IN_BACKGROUND` varsayılana döndü.
+- api24: başta 1.0 kuruluydu (`versionCode 1`, ilk kurulum 22.09 05:16, son güncelleme 11:23). Debug için kaldırıldı ve **yeniden kurulmadı**: hangi 16i setinden geldiği belli değil (birden çok `versionCode 1` seti var, bazıları deney derlemesi). `auto_time 1`, saat gerçek zamanda.
+- Üç emülatör de kapatıldı. Logcat, dumpsys dökümleri ve fikstür betiği oturumun geçici klasöründe: `%LOCALAPPDATA%\Temp\claude\C--Users-cane7-Documents-GitHub-SubTrack\b51abf47-3349-451a-bf83-5f0896aa13a9\scratchpad\` (`logcat33*.txt`, `logcat29*.txt`, `js*.txt`, `notif*.txt`, `make_db.py`). Kalıcı bir yer değil.
+
+**Değişen dosyalar**
+- `docs/PROGRESS.md` — bu kayıt
+- `docs/PROJECT_SPEC.md` — §4 v1.2'ye sıralama maddesi
+- `docs/ROADMAP.md` — Faz 19'a sıralama maddesi, "Bitti" satırı
+
+**Commit'ler**
+- (bu kayıt) docs: record the diagnosis of the reminder timing and sound feedback
+
+**Sonraki faz için not**
+- Karar sohbette: seçenek 1 (boşta izinli, kesin olmayan alarm), 3 (kayma), 4-5 (muafiyet/OEM yardımı) ve Android 7 sesi. Seçenek 1 ya da 3 seçilirse §18'in "Neden periyodik tarama" ve "`KEEP` zorunludur" başlıkları güncellenmeli.
+- Testçiye sorulacaklar: Görev 3'teki liste; ayrıca MIUI/ColorOS ise "Otomatik başlatma" ve pil ayarı.
+- api29'da yeniden başlatma sonrası NEVER grubu gerçek bir Android 10 cihazda doğrulanmadı.
+- TESTING güncellenebilir (bu turun kapsamı dışında bırakıldı): `cmd alarm set-time` API 29 ve 33'te çalışıyor, API 24'te çalışmıyor; api29'da saat değişince otomatik dilim cihazı GMT'ye çekiyor; süreç canlıyken WorkManager işi süreç içinde koşturuyor, JobScheduler davranışını görmek için süreç `am kill` ile öldürülmeli.
+
+---
+
 ## [Faz 16v] Sürüm 1.0.3 — Üçüncü Kapalı Test Güncellemesi — 2026-09-29
 
 **Durum:** Tamamlandı. Tek kod değişikliği sürüm satırları

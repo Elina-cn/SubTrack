@@ -836,8 +836,10 @@ Kapsam `PROJECT_SPEC.md` §4 "v1.2 — Kolaylıklar".
 - [ ] Aylık gelir ve gelirin aboneliklere giden yüzdesi. Gelir bize ya da
       başka bir şirkete gitmez; diğer ayarlar gibi kullanıcının kendi
       yedeğine girer (Auto Backup)
+- [ ] Listeyi bir sonraki ödeme tarihine göre sıralama (kapalı test önerisi,
+      PROGRESS 16w)
 
-**Bitti:** Üç madde çalışıyor; toplamlarda kuruş hatası yok.
+**Bitti:** Dört madde çalışıyor; toplamlarda kuruş hatası yok.
 
 **Sürüm:** v1.2 bu fazdan sonra, 1.0.1/1.0.2'deki gibi bir sürüm turuyla
 çıkar (PROGRESS 16n, 16r).

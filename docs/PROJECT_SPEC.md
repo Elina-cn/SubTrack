@@ -120,6 +120,8 @@ entegrasyonu isteyen kullanıcılar.
 - Aylık gelir ve gelirin aboneliklere giden yüzdesi. Gelir bize ya da başka
   bir şirkete gitmez; diğer ayarlar gibi kullanıcının kendi yedeğine girer
   (Auto Backup)
+- Listeyi bir sonraki ödeme tarihine göre sıralama (kapalı test önerisi,
+  29.09.2026)
 
 ### v1.3 — Veri taşınabilirliği
 
