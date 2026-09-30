@@ -110,6 +110,11 @@ class PaymentReminderNotifier @Inject constructor(
             // soon as there is more than one subscription in it.
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            // What the channel already says, for the Android 7 devices that have no channel: the
+            // default sound and no vibration. Without it Android 7 posted the reminder silent and
+            // ranked it low (measured on API 24 in phase 16w). From Android 8 the channel decides
+            // and this value is ignored, so no version check is needed.
+            .setDefaults(NotificationCompat.DEFAULT_SOUND)
             .setContentIntent(openTheApp())
             .setAutoCancel(true)
             .build()
