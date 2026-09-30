@@ -56,11 +56,14 @@ class PaymentReminderScheduler @Inject constructor(
             val queued = queuedReminder()
             if (!ReminderSchedule.needsReschedule(queued, now, target)) return
 
-            // Nothing queued: replace, which also clears any finished record under the name, so
-            // exactly one job is left. Something waiting: update it in place, which never cancels
-            // a run that has just begun.
+            // Nothing queued: KEEP, which with nothing waiting or running clears any finished
+            // record under the name and enqueues this one, so exactly one job is left. Something
+            // waiting: update it in place, which never cancels a run that has just begun.
+            // CANCEL_AND_REENQUEUE would read more naturally for the first case, but WorkManager
+            // refuses a pinned next run with it - it throws, and the first launch after install
+            // crashed on the emulator in phase 16x until this said KEEP.
             val policy = if (queued == QueuedReminder.None) {
-                ExistingPeriodicWorkPolicy.CANCEL_AND_REENQUEUE
+                ExistingPeriodicWorkPolicy.KEEP
             } else {
                 ExistingPeriodicWorkPolicy.UPDATE
             }
