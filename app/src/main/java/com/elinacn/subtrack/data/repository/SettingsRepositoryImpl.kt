@@ -5,16 +5,19 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.elinacn.subtrack.domain.model.Currency
 import com.elinacn.subtrack.domain.model.ExchangeRateTable
 import com.elinacn.subtrack.domain.model.ThemeMode
 import com.elinacn.subtrack.domain.repository.SettingsRepository
+import com.elinacn.subtrack.domain.usecase.ReminderSchedule
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
 import java.io.IOException
+import java.time.LocalTime
 import javax.inject.Inject
 
 /**
@@ -111,6 +114,19 @@ class SettingsRepositoryImpl @Inject constructor(
         dataStore.edit { preferences -> preferences[DYNAMIC_COLOR] = enabled }
     }
 
+    /**
+     * Stored as minutes after midnight rather than as text: one number, no format to parse. A value
+     * outside the day - a hand-edited file, or a later build's encoding - falls back to the default
+     * rather than giving the scheduler a time that does not exist.
+     */
+    override fun observeReminderTime(): Flow<LocalTime> = readPreferences()
+        .map { preferences ->
+            preferences[REMINDER_TIME_MINUTES]
+                ?.takeIf { it in 0 until MINUTES_PER_DAY }
+                ?.let { LocalTime.of(it / MINUTES_PER_HOUR, it % MINUTES_PER_HOUR) }
+                ?: ReminderSchedule.DEFAULT_TIME
+        }
+
     private fun readPreferences(): Flow<Preferences> = dataStore.data
         .catch { failure ->
             if (failure is IOException) emit(emptyPreferences()) else throw failure
@@ -124,6 +140,12 @@ class SettingsRepositoryImpl @Inject constructor(
         val THEME_MODE = stringPreferencesKey("theme_mode")
 
         val DYNAMIC_COLOR = booleanPreferencesKey("dynamic_color")
+
+        /** Minutes after local midnight; written by nothing until the v1.2 time picker. */
+        val REMINDER_TIME_MINUTES = intPreferencesKey("reminder_time_minutes")
+
+        const val MINUTES_PER_HOUR = 60
+        const val MINUTES_PER_DAY = 24 * MINUTES_PER_HOUR
 
         /** One key per currency, named by ISO code so the file stays readable. */
         fun rateKey(currency: Currency) = longPreferencesKey("rate_${currency.name}")

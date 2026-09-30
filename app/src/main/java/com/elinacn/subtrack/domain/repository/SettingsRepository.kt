@@ -4,6 +4,7 @@ import com.elinacn.subtrack.domain.model.Currency
 import com.elinacn.subtrack.domain.model.ExchangeRateTable
 import com.elinacn.subtrack.domain.model.ThemeMode
 import kotlinx.coroutines.flow.Flow
+import java.time.LocalTime
 
 /**
  * The only way the rest of the app reaches stored user preferences.
@@ -62,4 +63,13 @@ interface SettingsRepository {
 
     /** Stores whether the wallpaper supplies the colours. */
     suspend fun setDynamicColor(enabled: Boolean)
+
+    /**
+     * Emits the local time of day the payment reminder aims for, again whenever it changes.
+     *
+     * The one source of that time: the scheduler reads it and nothing else does. Absent means
+     * [com.elinacn.subtrack.domain.usecase.ReminderSchedule.DEFAULT_TIME]. There is no setter yet -
+     * choosing the time arrives with v1.2 (ROADMAP, phase 19).
+     */
+    fun observeReminderTime(): Flow<LocalTime>
 }

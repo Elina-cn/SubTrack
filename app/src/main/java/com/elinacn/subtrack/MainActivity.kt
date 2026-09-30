@@ -19,19 +19,27 @@ import androidx.core.graphics.drawable.toDrawable
 import androidx.core.splashscreen.SplashScreen
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.lifecycleScope
+import com.elinacn.subtrack.reminder.PaymentReminderScheduler
 import com.elinacn.subtrack.ui.navigation.SubTrackNavHost
 import com.elinacn.subtrack.ui.theme.SubTrackTheme
 import com.elinacn.subtrack.ui.theme.isDarkTheme
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.launch
+import javax.inject.Inject
 
 /**
- * The only activity. It sets up the theme and the navigation graph and nothing else; which screen
- * is showing, and which ViewModel belongs to it, is the graph's business.
+ * The only activity. It sets up the theme and the navigation graph, and checks the reminder job
+ * whenever the app comes to the front; which screen is showing, and which ViewModel belongs to it,
+ * is the graph's business.
  */
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
     private val viewModel: MainViewModel by viewModels()
+
+    @Inject
+    lateinit var reminderScheduler: PaymentReminderScheduler
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // Before super.onCreate, and that order is the library's requirement rather than a
@@ -85,6 +93,17 @@ class MainActivity : ComponentActivity() {
         // The library registers its own OnPreDrawListener on exactly that view, so it inherits
         // the constraint phase 14b measured - hence here rather than next to installSplashScreen.
         keepSplashScreenUntilThemeIsRead(splashScreen)
+    }
+
+    /**
+     * Checks the reminder job each time the app comes to the front, cold start and return from the
+     * background alike, so a changed time zone is caught on the next open (ARCHITECTURE §18).
+     *
+     * The check changes nothing unless it has to, which is what makes every start safe to use.
+     */
+    override fun onStart() {
+        super.onStart()
+        lifecycleScope.launch { reminderScheduler.ensureScheduled() }
     }
 
     /**

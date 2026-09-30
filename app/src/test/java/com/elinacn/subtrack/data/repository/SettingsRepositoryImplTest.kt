@@ -4,9 +4,11 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.elinacn.subtrack.domain.model.Currency
 import com.elinacn.subtrack.domain.model.ThemeMode
+import com.elinacn.subtrack.domain.usecase.ReminderSchedule
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -21,6 +23,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
+import java.time.LocalTime
 
 /**
  * Runs against a real store on a temporary file rather than a fake, because the parts worth
@@ -162,6 +165,34 @@ class SettingsRepositoryImplTest {
         assertEquals(Currency.USD, repository.observeMainCurrency().first())
         assertEquals(ThemeMode.DARK, repository.observeThemeMode().first())
         assertTrue(repository.observeDynamicColor().first())
+    }
+
+    @Test
+    fun observeReminderTime_nothingStored_isNineInTheMorning() = runTest {
+        val repository = SettingsRepositoryImpl(dataStore())
+
+        assertEquals(ReminderSchedule.DEFAULT_TIME, repository.observeReminderTime().first())
+        assertEquals(LocalTime.of(9, 0), repository.observeReminderTime().first())
+    }
+
+    /**
+     * Written straight into the file: nothing in the app writes the key until the v1.2 time
+     * picker, and this pins the format that picker will have to write - minutes after midnight.
+     */
+    @Test
+    fun observeReminderTime_storedMinutes_areReadAsTheTimeOfDay() = runTest {
+        val store = dataStore()
+        store.edit { it[intPreferencesKey("reminder_time_minutes")] = 7 * 60 + 30 }
+
+        assertEquals(LocalTime.of(7, 30), SettingsRepositoryImpl(store).observeReminderTime().first())
+    }
+
+    @Test
+    fun observeReminderTime_valueOutsideTheDay_fallsBackToTheDefault() = runTest {
+        val store = dataStore()
+        store.edit { it[intPreferencesKey("reminder_time_minutes")] = 24 * 60 }
+
+        assertEquals(ReminderSchedule.DEFAULT_TIME, SettingsRepositoryImpl(store).observeReminderTime().first())
     }
 
     private fun TestScope.dataStore(

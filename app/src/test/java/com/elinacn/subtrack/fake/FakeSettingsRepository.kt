@@ -4,11 +4,13 @@ import com.elinacn.subtrack.domain.model.Currency
 import com.elinacn.subtrack.domain.model.ExchangeRateTable
 import com.elinacn.subtrack.domain.model.ThemeMode
 import com.elinacn.subtrack.domain.repository.SettingsRepository
+import com.elinacn.subtrack.domain.usecase.ReminderSchedule
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
+import java.time.LocalTime
 
 /**
  * In-memory stand-in for the real settings store.
@@ -105,4 +107,9 @@ class FakeSettingsRepository(
         dynamicColorWrites += enabled
         storedDynamicColor.value = enabled
     }
+
+    /** Set directly: the real store has no writer for it until the v1.2 time picker. */
+    val reminderTime = MutableStateFlow(ReminderSchedule.DEFAULT_TIME)
+
+    override fun observeReminderTime(): Flow<LocalTime> = reminderTime.asStateFlow()
 }
