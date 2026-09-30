@@ -122,6 +122,12 @@
     <string name="reminder_notifications_on">On</string>
     <string name="reminder_notifications_can_request">Off — tap to turn on</string>
     <string name="reminder_notifications_settings_only">Off — turn on in system settings</string>
+    <!-- On, but background activity is restricted: reminders wait until the app is opened. -->
+    <string name="reminder_notifications_on_until_opened">On, but they won\'t arrive until you open the app — tap to fix</string>
+    <!-- On, but battery saver is on and may hold reminders back. -->
+    <string name="reminder_notifications_on_may_be_delayed">On, but they may be late while battery saver is on — tap to change</string>
+    <!-- Under the reminder row while reminders are on; opens the app's system page. -->
+    <string name="reminder_delivery_note">On some phones, battery and cleaner settings can delay reminders</string>
     <!-- Title and status read as a single focus stop. -->
     <string name="settings_row_description">%1$s, %2$s</string>
     <string name="reminder_rationale_title">Allow reminders</string>

@@ -4,6 +4,7 @@ import com.elinacn.subtrack.R
 import com.elinacn.subtrack.domain.model.Currency
 import com.elinacn.subtrack.domain.model.ThemeMode
 import com.elinacn.subtrack.fake.FakeDynamicColorSupport
+import com.elinacn.subtrack.fake.FakeReminderDeliveryStatus
 import com.elinacn.subtrack.fake.FakeReminderNotificationStatus
 import com.elinacn.subtrack.fake.FakeReminderStateRepository
 import com.elinacn.subtrack.fake.FakeSettingsRepository
@@ -284,7 +285,8 @@ class SettingsViewModelThemeTest {
         repository,
         FakeReminderStateRepository(),
         FakeReminderNotificationStatus(),
-        dynamicColorSupport
+        dynamicColorSupport,
+        FakeReminderDeliveryStatus()
     )
 
     private fun TestScope.collectState() {

@@ -1,6 +1,7 @@
 package com.elinacn.subtrack.ui.settings
 
 import com.elinacn.subtrack.fake.FakeDynamicColorSupport
+import com.elinacn.subtrack.fake.FakeReminderDeliveryStatus
 import com.elinacn.subtrack.fake.FakeReminderNotificationStatus
 import com.elinacn.subtrack.fake.FakeReminderStateRepository
 import com.elinacn.subtrack.fake.FakeSettingsRepository
@@ -306,7 +307,13 @@ class SettingsViewModelReminderTest {
             runtimePermissionRequired = runtimePermissionRequired,
             permissionGranted = permissionGranted
         )
-        return SettingsViewModel(repository, reminderState, notificationStatus, dynamicColorSupport)
+        return SettingsViewModel(
+            repository,
+            reminderState,
+            notificationStatus,
+            dynamicColorSupport,
+            FakeReminderDeliveryStatus()
+        )
     }
 
     /** WhileSubscribed keeps the state cold until something collects it. */

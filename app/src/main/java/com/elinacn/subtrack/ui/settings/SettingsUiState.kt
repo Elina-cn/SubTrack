@@ -22,6 +22,25 @@ enum class ReminderPermissionState {
     SETTINGS_ONLY
 }
 
+/**
+ * Whether reminders that are switched on will actually come on time.
+ *
+ * Only what the platform can answer. Phase 16w measured both of the held-back states stopping the
+ * reminder job until the app was opened. Manufacturer battery rules and cleaner apps cannot be
+ * seen, which is why the row always carries a general note underneath as well.
+ */
+enum class ReminderDelivery {
+
+    /** Nothing the app can see is holding reminders back. */
+    ON_TIME,
+
+    /** Background activity is restricted: reminders wait until the app is opened. */
+    UNTIL_OPENED,
+
+    /** Battery saver is on: reminders may come late. */
+    MAY_BE_DELAYED
+}
+
 /** Something only an Activity can do, decided here and carried out by the screen. */
 enum class ReminderPermissionAction {
 
@@ -29,7 +48,13 @@ enum class ReminderPermissionAction {
     REQUEST_PERMISSION,
 
     /** Open this app's notification settings. */
-    OPEN_SYSTEM_SETTINGS
+    OPEN_SYSTEM_SETTINGS,
+
+    /** Open this app's page in the system settings, where its battery settings live. */
+    OPEN_APP_DETAILS,
+
+    /** Open the system's battery saver settings. */
+    OPEN_BATTERY_SAVER_SETTINGS
 }
 
 /**
@@ -61,6 +86,11 @@ data class SettingsUiState(
      * answer). Every other case is settled from the platform before the first frame.
      */
     val reminderPermission: ReminderPermissionState? = null,
+    /**
+     * Whether reminders will come on time, read from the platform before the first frame and again
+     * each time the screen comes back. Only shown while [reminderPermission] is ENABLED.
+     */
+    val reminderDelivery: ReminderDelivery = ReminderDelivery.ON_TIME,
     /** Set while the short explanation before a repeat permission request is showing. */
     val isReminderRationaleVisible: Boolean = false,
     /** Set for one frame when the screen should carry out an Activity-only action. */
@@ -101,6 +131,9 @@ sealed interface SettingsEvent {
 
     /** The user tapped the reminder row. */
     data object ReminderRowTapped : SettingsEvent
+
+    /** The user tapped the note under the reminder row about phones that delay reminders. */
+    data object ReminderNoteTapped : SettingsEvent
 
     /** The user accepted the explanation and wants to be asked. */
     data object ReminderRationaleConfirmed : SettingsEvent

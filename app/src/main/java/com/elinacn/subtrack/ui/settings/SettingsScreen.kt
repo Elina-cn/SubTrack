@@ -113,6 +113,11 @@ fun SettingsScreen(
             ReminderPermissionAction.OPEN_SYSTEM_SETTINGS ->
                 activity?.openNotificationSettings()
 
+            ReminderPermissionAction.OPEN_APP_DETAILS -> activity?.openAppDetails()
+
+            ReminderPermissionAction.OPEN_BATTERY_SAVER_SETTINGS ->
+                activity?.openBatterySaverSettings()
+
             null -> return@LaunchedEffect
         }
         onEvent(SettingsEvent.ReminderActionHandled)
@@ -193,12 +198,11 @@ fun SettingsScreen(
 
             HorizontalDivider()
 
-            SettingsRow(
-                title = stringResource(id = R.string.reminder_notifications_title),
-                description = uiState.reminderPermission?.let {
-                    stringResource(id = it.statusTextId())
-                },
-                onClick = { onEvent(SettingsEvent.ReminderRowTapped) }
+            ReminderSettingsSection(
+                permission = uiState.reminderPermission,
+                delivery = uiState.reminderDelivery,
+                onRowTapped = { onEvent(SettingsEvent.ReminderRowTapped) },
+                onNoteTapped = { onEvent(SettingsEvent.ReminderNoteTapped) }
             )
 
             HorizontalDivider()

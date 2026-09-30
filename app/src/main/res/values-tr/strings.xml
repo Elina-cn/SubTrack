@@ -126,6 +126,12 @@
     <string name="reminder_notifications_on">Açık</string>
     <string name="reminder_notifications_can_request">Kapalı — açmak için dokunun</string>
     <string name="reminder_notifications_settings_only">Kapalı — sistem ayarlarından açılmalı</string>
+    <!-- On, but background activity is restricted: reminders wait until the app is opened. -->
+    <string name="reminder_notifications_on_until_opened">Açık, ama uygulamayı açana kadar gelmez — düzeltmek için dokunun</string>
+    <!-- On, but battery saver is on and may hold reminders back. -->
+    <string name="reminder_notifications_on_may_be_delayed">Açık, ama pil tasarrufu açıkken gecikebilir — değiştirmek için dokunun</string>
+    <!-- Under the reminder row while reminders are on; opens the app's system page. -->
+    <string name="reminder_delivery_note">Bazı telefonlarda pil ve temizleyici ayarları hatırlatmaları geciktirebilir</string>
     <!-- Başlık ve durum tek bir odak durağı olarak okunur. -->
     <string name="settings_row_description">%1$s, %2$s</string>
     <string name="reminder_rationale_title">Hatırlatmalara izin verin</string>

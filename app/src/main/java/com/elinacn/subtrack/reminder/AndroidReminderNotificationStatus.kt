@@ -27,7 +27,8 @@ class AndroidReminderNotificationStatus @Inject constructor(
     }
 
     /**
-     * The one version check that is written by hand.
+     * A version check written by hand - one of two in the reminder status classes, the other
+     * being [AndroidReminderDeliveryStatus.isBackgroundRestricted].
      *
      * No Compat class answers "does this build need a runtime permission to notify" - the whole
      * concept arrived with Android 13, and the settings screen has to know which of its two ways

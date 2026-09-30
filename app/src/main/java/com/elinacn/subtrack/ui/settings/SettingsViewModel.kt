@@ -7,6 +7,7 @@ import com.elinacn.subtrack.domain.model.Currency
 import com.elinacn.subtrack.domain.model.ThemeMode
 import com.elinacn.subtrack.domain.repository.ReminderStateRepository
 import com.elinacn.subtrack.domain.repository.SettingsRepository
+import com.elinacn.subtrack.reminder.ReminderDeliveryStatus
 import com.elinacn.subtrack.reminder.ReminderNotificationStatus
 import com.elinacn.subtrack.ui.common.UiText
 import com.elinacn.subtrack.ui.common.startingUnknown
@@ -28,7 +29,8 @@ class SettingsViewModel @Inject constructor(
     private val repository: SettingsRepository,
     private val reminderState: ReminderStateRepository,
     private val notificationStatus: ReminderNotificationStatus,
-    private val dynamicColorSupport: DynamicColorSupport
+    private val dynamicColorSupport: DynamicColorSupport,
+    private val deliveryStatus: ReminderDeliveryStatus
 ) : ViewModel() {
 
     /**
@@ -38,14 +40,16 @@ class SettingsViewModel @Inject constructor(
      * reminders are on shows "On" in the very first frame instead of a placeholder. Phase 16t
      * measured the old start: "off - turn on in system settings" for the whole 700 ms enter
      * transition, because the state was only worked out on ON_RESUME and the navigation graph holds
-     * a destination at STARTED until its transition ends.
+     * a destination at STARTED until its transition ends. Whether reminders come on time is a
+     * platform answer too, and is read here for the same reason (ARCHITECTURE section 29).
      */
     private val screenState = MutableStateFlow(
         ReminderScreenState(
             permission = notificationStatus.resolveReminderPermission(
                 wasRequested = null,
                 canShowRationale = null
-            )
+            ),
+            delivery = deliveryStatus.resolveReminderDelivery()
         )
     )
 
@@ -73,6 +77,7 @@ class SettingsViewModel @Inject constructor(
             // Not stored: it is a property of the device, so it is read rather than remembered.
             isDynamicColorSupported = dynamicColorSupport.isAvailable(),
             reminderPermission = reminder.permission,
+            reminderDelivery = reminder.delivery,
             isReminderRationaleVisible = reminder.isRationaleVisible,
             pendingReminderAction = reminder.pendingAction,
             errorMessage = reminder.errorMessage
@@ -80,12 +85,13 @@ class SettingsViewModel @Inject constructor(
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
-        // What the screen draws before anything has been collected. The two platform answers are
+        // What the screen draws before anything has been collected. The platform answers are
         // filled in here too - an initial value that left them out would be the one frame where
         // the screen still guessed.
         initialValue = SettingsUiState(
             isDynamicColorSupported = dynamicColorSupport.isAvailable(),
-            reminderPermission = screenState.value.permission
+            reminderPermission = screenState.value.permission,
+            reminderDelivery = screenState.value.delivery
         )
     )
 
@@ -120,6 +126,11 @@ class SettingsViewModel @Inject constructor(
 
             SettingsEvent.ReminderRowTapped -> onReminderRowTapped()
 
+            // The app's own page is where a phone keeps its battery rules for the app, standard
+            // or the manufacturer's - the one place worth sending the reader of the note.
+            SettingsEvent.ReminderNoteTapped ->
+                screenState.update { it.copy(pendingAction = ReminderPermissionAction.OPEN_APP_DETAILS) }
+
             SettingsEvent.ReminderRationaleConfirmed -> requestPermission()
 
             SettingsEvent.ReminderRationaleDismissed ->
@@ -138,12 +149,14 @@ class SettingsViewModel @Inject constructor(
      * [canShowRationale] is passed in because only an Activity can answer it. Everything else is
      * read here, so the screen never decides anything. The platform half is applied at once - on
      * the way back from the system settings that is the half that changed - and the stored flag
-     * follows when the read returns.
+     * follows when the read returns. Whether reminders will come on time is re-read with it: the
+     * user may have lifted a restriction or turned battery saver off while away.
      */
     private fun refreshReminders(canShowRationale: Boolean, requestAnswered: Boolean = false) {
         updateReminder {
             it.copy(
                 canShowRationale = canShowRationale,
+                delivery = deliveryStatus.resolveReminderDelivery(),
                 isRequestInFlight = it.isRequestInFlight && !requestAnswered
             )
         }
@@ -193,9 +206,12 @@ class SettingsViewModel @Inject constructor(
             // dialog; now the tap waits a few frames for the answer and then does the right thing.
             null -> screenState.update { it.copy(isRowTapPending = true) }
 
-            // Tapping an already-on row opens the same system screen, so turning reminders back
-            // off is where turning them on was.
-            ReminderPermissionState.ENABLED,
+            // An on row leads to whatever is holding reminders back; with nothing in the way it
+            // opens the same system screen as an off one, so turning reminders back off is where
+            // turning them on was.
+            ReminderPermissionState.ENABLED ->
+                screenState.update { it.copy(pendingAction = state.delivery.enabledRowAction()) }
+
             ReminderPermissionState.SETTINGS_ONLY ->
                 screenState.update {
                     it.copy(pendingAction = ReminderPermissionAction.OPEN_SYSTEM_SETTINGS)
@@ -272,25 +288,6 @@ class SettingsViewModel @Inject constructor(
             }
         }
     }
-
-    /** The part of the screen's state the settings file knows nothing about. */
-    private data class ReminderScreenState(
-        /** Derived from the inputs below by [updateReminder]; never set on its own. */
-        val permission: ReminderPermissionState? = null,
-        val isRationaleVisible: Boolean = false,
-        /** The theme chooser is screen state too: nothing about it is stored. */
-        val isThemeDialogVisible: Boolean = false,
-        val pendingAction: ReminderPermissionAction? = null,
-        /** Mirrors the stored flag so a tap does not have to wait on a read; null until read. */
-        val wasRequested: Boolean? = null,
-        /** The Activity's answer, from the last refresh; null until the screen has sent one. */
-        val canShowRationale: Boolean? = null,
-        /** A row tap that came in while [permission] was still unknown. */
-        val isRowTapPending: Boolean = false,
-        /** Between a permission request going out and its answer coming back. */
-        val isRequestInFlight: Boolean = false,
-        val errorMessage: UiText? = null
-    )
 
     private companion object {
         /** Outlives a configuration change, expires on a real departure. */

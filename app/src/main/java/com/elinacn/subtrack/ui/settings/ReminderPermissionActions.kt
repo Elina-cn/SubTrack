@@ -17,9 +17,18 @@ import com.elinacn.subtrack.R
  * outside the screen body because they are plain functions with nothing to compose.
  */
 
-/** The one line of the reminder row that changes with the state. */
-internal fun ReminderPermissionState.statusTextId(): Int = when (this) {
-    ReminderPermissionState.ENABLED -> R.string.reminder_notifications_on
+/**
+ * The one line of the reminder row that changes with the state.
+ *
+ * [delivery] only matters while reminders are on: a warning that they will come late means
+ * nothing to a user who has not switched them on yet.
+ */
+internal fun ReminderPermissionState.statusTextId(delivery: ReminderDelivery): Int = when (this) {
+    ReminderPermissionState.ENABLED -> when (delivery) {
+        ReminderDelivery.ON_TIME -> R.string.reminder_notifications_on
+        ReminderDelivery.UNTIL_OPENED -> R.string.reminder_notifications_on_until_opened
+        ReminderDelivery.MAY_BE_DELAYED -> R.string.reminder_notifications_on_may_be_delayed
+    }
     ReminderPermissionState.CAN_REQUEST -> R.string.reminder_notifications_can_request
     ReminderPermissionState.SETTINGS_ONLY -> R.string.reminder_notifications_settings_only
 }
@@ -48,7 +57,7 @@ internal fun Activity?.canShowNotificationRationale(): Boolean =
  */
 internal fun Activity.openNotificationSettings() {
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
-        startAppDetails()
+        openAppDetails()
         return
     }
     try {
@@ -60,18 +69,36 @@ internal fun Activity.openNotificationSettings() {
         // Spelled out rather than swallowed: a build that ships without the per-app screen still
         // has the app details page, which is where the older versions go anyway. A stated
         // fallback, not the silent catch section 9 forbids.
-        startAppDetails()
+        openAppDetails()
     }
 }
 
 /**
- * Where both branches end up: this app's page in Settings, with the notification section on it.
+ * Opens the system's battery saver screen, where the reminder row sends a user whose battery
+ * saver is holding reminders back.
  *
- * It is one step further from the reminder toggle than the per-app screen, and that is the price
- * of the versions that have no per-app screen. Leaving the row dead instead would take away the
- * only way in.
+ * The action exists on every supported version (API 22), but a manufacturer build may leave it
+ * unanswered; the app's own page, whose battery section leads to the same switch on most phones,
+ * is the stated fallback - the same shape as [openNotificationSettings].
  */
-private fun Activity.startAppDetails() {
+internal fun Activity.openBatterySaverSettings() {
+    try {
+        startActivity(Intent(Settings.ACTION_BATTERY_SAVER_SETTINGS))
+    } catch (notFound: ActivityNotFoundException) {
+        openAppDetails()
+    }
+}
+
+/**
+ * This app's page in Settings, with the notification and battery sections on it.
+ *
+ * Where both notification branches end up: one step further from the reminder toggle than the
+ * per-app screen, and that is the price of the versions that have no per-app screen. Leaving the
+ * row dead instead would take away the only way in. It is also where the background restriction
+ * and the manufacturer's battery rules for the app live, so the restricted reminder row and the
+ * note under it lead here too.
+ */
+internal fun Activity.openAppDetails() {
     startActivity(
         Intent(
             Settings.ACTION_APPLICATION_DETAILS_SETTINGS,

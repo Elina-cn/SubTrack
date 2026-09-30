@@ -1,6 +1,8 @@
 package com.elinacn.subtrack.di
 
+import com.elinacn.subtrack.reminder.AndroidReminderDeliveryStatus
 import com.elinacn.subtrack.reminder.AndroidReminderNotificationStatus
+import com.elinacn.subtrack.reminder.ReminderDeliveryStatus
 import com.elinacn.subtrack.reminder.ReminderNotificationStatus
 import dagger.Binds
 import dagger.Module
@@ -19,4 +21,10 @@ abstract class ReminderModule {
     abstract fun bindReminderNotificationStatus(
         impl: AndroidReminderNotificationStatus
     ): ReminderNotificationStatus
+
+    @Binds
+    @Singleton
+    abstract fun bindReminderDeliveryStatus(
+        impl: AndroidReminderDeliveryStatus
+    ): ReminderDeliveryStatus
 }
