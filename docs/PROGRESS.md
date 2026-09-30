@@ -176,6 +176,69 @@ Testçinin cihazı kayıtta yok. Kapalı testte bilinen iki cihaz OPPO A15s (Col
 - api29'da yeniden başlatma sonrası NEVER grubu gerçek bir Android 10 cihazda doğrulanmadı.
 - TESTING güncellenebilir (bu turun kapsamı dışında bırakıldı): `cmd alarm set-time` API 29 ve 33'te çalışıyor, API 24'te çalışmıyor; api29'da saat değişince otomatik dilim cihazı GMT'ye çekiyor; süreç canlıyken WorkManager işi süreç içinde koşturuyor, JobScheduler davranışını görmek için süreç `am kill` ile öldürülmeli.
 
+### EK — Arka plan kısıtlaması ve pil tasarrufu (2026-09-30)
+
+**30.09.2026 geri bildirimi**
+1. Kullanıcının telefonunda (OPPO A15s, Android 10) SubTrack'in "arka plan faaliyetleri" ayarı kurulumdan itibaren kendiliğinden kapalı.
+2. Arka plan faaliyetine izin verilse bile pil tüketimi ayarları bazı şeyleri engelliyor olabilir. Öneri: pil ya da bildirim ayarlarını üçüncü parti uygulamalarla yöneten kullanıcılar için ayarlarda genel bir uyarı; bunlar bildirimleri sessizce engelleyebilir.
+
+**Kapsam.** Yalnız ölçüm, üretim kodu değişmedi. 16w'de Android 10'da kısıtlamanın "uygulama kapalı" ve "açılınca" hâlleri ölçülmüştü (Görev 2, 06.10 satırı). Bu EK eksikleri tamamladı: Android 13'te kısıtlama, iki cihazda kısıtlama altında boşta hâli, pil tasarrufu ve üç değer. "Hiçbiri" durumunda işin koştuğu an 16w'nin tablolarından; tekrarlanmadı.
+
+**Yöntem.** 16w ile aynı: debug derleme, sahte gün, süreç `am kill` ile ölü, logcat + `dumpsys jobscheduler`.
+- Kısıtlama: `cmd appops set com.elinacn.subtrack RUN_ANY_IN_BACKGROUND ignore`.
+- Pil tasarrufu: `dumpsys battery unplug` + `cmd power set-mode 1` (iki imajda da var; `low_power 1`, "Battery Saver is currently: ON").
+- Boşta: ekran kapalı + `deviceidle force-idle` 3 dk; sonra `unforce` + `WAKEUP` ve 90 sn bekleme; en son uygulama açıldı.
+- Üç değer, geçici bir enstrümantasyon testiyle (`probe/PowerStateProbeTest`, `targetContext` üzerinden, `Log.i`) okundu. Test `assembleDebugAndroidTest` ile derlendi (yeni uyarı yok), APK'sı `adb install` ile kurulup `am instrument` ile koşturuldu, sonra kaynak silindi. `connectedDebugAndroidTest` kullanılmadı, çünkü uygulamayı sonunda kaldırıyor.
+- **Testin yan etkisi:** `am instrument` hedef uygulamayı zorla durduruyor. api33'te WorkManager süreç başında işleri silip yeniden kurarken test bitti ve süreç kapandı; iş JobScheduler'dan düşmüş kaldı. Bu yüzden her durumda değerler iş hedefinden önce okundu, ardından uygulama bir kez açılıp işi geri kurdu ve süreç öldürüldü.
+
+**Üç değer** (uygulamanın kendi süreci):
+
+| Durum | `isBackgroundRestricted()` api33 / api29 | `isPowerSaveMode()` api33 / api29 | `isIgnoringBatteryOptimizations()` api33 / api29 |
+|---|---|---|---|
+| Hiçbiri | false / false | false / false | false / false |
+| Arka plan kısıtlaması | **true / true** | false / false | false / false |
+| Pil tasarrufu | false / false | **true / true** | false / false |
+
+Pil tasarrufu `isBackgroundRestricted()`'ı değiştirmiyor, ama iş üzerindeki etkisi kısıtlamayla aynı (aşağıda). Pil optimizasyonu muafiyeti hiçbir durumda yok (varsayılan).
+
+**Android 13 (api33), saatler GMT:**
+
+| Durum | Hedef | Uygulama kapalı | Boşta | Boşluktan çıkış, ekran açık | Uygulama açılınca |
+|---|---|---|---|---|---|
+| Hiçbiri (16w) | — | JobScheduler hedeften ~30 sn sonra başlattı | koşmadı: `readyNotDozing: false` | ekrandan 11 sn sonra koştu | — |
+| Kısıtlama (01.10) | 09:00:01 | 09:03'e kadar koşmadı: `readyNotRestrictedInBg: false`; grup ACTIVE, diğer bütün kısıtlar karşılanmış | koşmadı: `readyNotDozing: false` + `readyNotRestrictedInBg: false` | 90 sn içinde koşmadı: `readyNotRestrictedInBg: false` | açılış 09:07:49.7 → bildirim **09:07:52.9** (3,3 sn), ses çaldı |
+| Pil tasarrufu (02.10) | 09:07:53 | 09:11'e kadar koşmadı: `readyNotRestrictedInBg: false`, ayrıca `TIMING_DELAY` bile karşılanmamış (zaman alarmı da ertelenmiş) | koşmadı: iki engel | 90 sn içinde koşmadı: `readyNotRestrictedInBg: false` | açılış 09:15:56.3 → bildirim **09:15:59.5** (3,2 sn), ses çaldı |
+
+**Android 10 (api29), saatler EDT:**
+
+| Durum | Hedef | Uygulama kapalı | Boşta | Boşluktan çıkış, ekran açık | Uygulama açılınca |
+|---|---|---|---|---|---|
+| Hiçbiri (16w) | — | JobScheduler hedeften ~2 dk sonra başlattı | koşmadı: `readyNotDozing: false` | ekrandan 6 sn sonra koştu | — |
+| Kısıtlama (01.10) | 09:00:00 | 09:05'e kadar koşmadı: `readyNotRestrictedInBg: false` (16w'nin 06.10 satırıyla aynı) | koşmadı: iki engel | 90 sn içinde koşmadı: `readyNotRestrictedInBg: false` | açılış 09:09:49.0 → bildirim **09:09:50.6** (1,6 sn), ses çaldı |
+| Pil tasarrufu (02.10) | 09:09:51 | 09:14'e kadar koşmadı: `readyNotRestrictedInBg: false`, `TIMING_DELAY` karşılanmamış | koşmadı: iki engel | 90 sn içinde koşmadı: `readyNotRestrictedInBg: false` | açılış 09:19:04.0 → bildirim **09:19:05.0** (1,0 sn), ses çaldı |
+
+Pil tasarrufu politikası (`dumpsys power`): api33 `force_all_apps_standby=true`, `force_background_check=true`, `enable_quick_doze=true`; api29 `force_all_apps_standby=true`, `force_background_check=true`. `force_all_apps_standby` bütün uygulamalara arka plan kısıtlaması uyguluyor; JobScheduler'daki engel bu yüzden aynı (`readyNotRestrictedInBg`).
+
+**Sonuç**
+- Arka plan kısıtlaması da pil tasarrufu da işi **uygulama açılana kadar** durduruyor. Boşluktan çıkmak ya da ekranı açmak yetmiyor. Açılışta bildirim 1-3,3 sn içinde düşüyor. Bu, "bildirim uygulamayı açınca geldi" tarifiyle uyuşuyor.
+- Pil tasarrufu kapanınca (ya da telefon şarja takılınca) işin kendiliğinden koşup koşmadığı ölçülmedi.
+- OPPO'daki "arka plan faaliyetleri" anahtarının Android'in `RUN_ANY_IN_BACKGROUND`'u mu, ColorOS'un kendi kısıtı mı olduğu bilinmiyor; emülatörde ColorOS yok. Stok Android'de yeni kurulumda kısıtlama yok (`No operations. Default mode: allow`, `isBackgroundRestricted=false`), yani "kurulumdan itibaren kapalı" stok Android'in varsayılanı değil.
+- `isBackgroundRestricted()` ve `isPowerSaveMode()` bu iki durumu uygulamanın içinden görüyor. Üretici kısıtları ve üçüncü parti pil/bildirim yöneticileri bu değerlere yansıyor mu, emülatörde ölçülemedi; bilinmiyor.
+- Testçinin önerisi (ayarlarda genel uyarı), 16w Görev 4'teki 5(a) seçeneğiyle (yardım satırı) aynı yönde; seçim yapılmadı.
+
+**Ortam (EK sonu)**
+- **16w düzeltmesi:** 16w sonunda api33'e geri kurulan 1.0.3 kalıcı olmamıştı. Bu turun başında paket kaydı vardı ama kodu yoktu (`pkg=null`, `pm list packages`'ta yok). Sebep, emülatörün 16w'de `adb emu kill` ile kapatılması; kurulum diske yazılmamıştı.
+- api33: debug ve test APK'sı kaldırıldı; `cmd power set-mode 0` (`low_power 0`), pil ve Doze sıfırlandı, `RUN_ANY_IN_BACKGROUND` varsayılana döndü, `auto_time 1`. 1.0.3 16v'nin `subtrack-1.0.3.apks` setinden yeniden kuruldu, `sync` + `reboot -p` ile kapatıldı. Yeniden açılınca 1.0.3 duruyordu (`versionName=1.0.3`, `pkg=Package{…}`); sonra yine `reboot -p`.
+- api29: başta uygulama yoktu; debug ve test APK'sı kaldırıldı. `low_power 0`, pil ve Doze sıfırlandı, `auto_time 1`, `auto_time_zone 1`, dilim `America/New_York` (otomatik dilim açılınca GMT'ye geçti, NY yeniden kuruldu, 30 sn sonra hâlâ NY). `sync` + `reboot -p`.
+- Fiziksel cihaza dokunulmadı; `adb devices` her seferinde yalnız emülatörü gösterdi. Geçici test silindi; çalışma ağacında yalnız bu kayıt var. Günlükler oturumun geçici klasöründe (`logcat33ek.txt`, `logcat29ek.txt`, `power*_bs.txt`).
+
+**Commit'ler**
+- (bu EK) docs: record the background restriction and battery saver measurements
+
+**Sonraki faz için not**
+- TESTING'e eklenebilir: `am instrument` hedef uygulamayı zorla durdurur ve WorkManager işini düşürebilir; emülatör `adb emu kill` yerine `adb shell reboot -p` ile kapatılmalı, yoksa son kurulumlar kaybolabiliyor.
+- Kullanıcıya sorulabilir: OPPO'da anahtarın tam adı ve yeri (Ayarlar > Uygulamalar > SubTrack > Pil kullanımı?), açılınca bildirimin zamanında gelip gelmediği.
+
 ---
 
 ## [Faz 16v] Sürüm 1.0.3 — Üçüncü Kapalı Test Güncellemesi — 2026-09-29
