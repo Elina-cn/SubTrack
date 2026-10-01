@@ -20,6 +20,11 @@ geçilmez. Tüm çalışma `Elina` branch'inde yapılır; branch açılmaz. Faz 
 > göre yeniden yazıldı (`PROJECT_SPEC.md` §4): v1.1 görünüm (Faz 17 ikonlar,
 > Faz 18 tema), v1.2 kolaylıklar (Faz 19), v1.3 dışa/içe aktarma (Faz 20),
 > v1.4 ödeme türü (Faz 21). Ağın sürüm numarası yok.
+>
+> **Not (2026-10-01):** v1.1'e sorun bildirme eklendi (Faz 18a), v1.2'ye
+> hatırlatma saatinin seçimi. Açık test kararı: ilk üretim sürümünden önce açık
+> test yok; v1.1'den itibaren her yeni sürüm önce açık teste, sonra üretime
+> çıkar (`PROJECT_SPEC.md` §5 "Açık test").
 
 ---
 
@@ -751,16 +756,22 @@ Aylık toplamın zaman içindeki anlık görüntüleri. `PROJECT_SPEC.md` §1'de
       parlama yok, tarih notu görünüyor; upload/Play imza farkı gerçek
       güncellemede sorun çıkarmadı. (Console'da, testçiyle ve telefonda oldu,
       repoda kanıt yok; etiket repoda.)
-- [ ] Sürüm 1.0.3 (`versionCode 4`) — üç testçi bildirimi (16t teşhis, 16u
+- [x] Sürüm 1.0.3 (`versionCode 4`) — üç testçi bildirimi (16t teşhis, 16u
       düzeltme): ayarlara girerken satırların bir an yanlış durumu göstermesi,
       kur ekranında kaydetmenin görünmemesi ("Varsayılana dön" artık hemen
       kaydediyor) ve ana ekrana dönüşte toplamın bir an eski değeri göstermesi.
       AAB 16v'de üretildi ve doğrulandı: şema `v1.0.2`'den beri değişmedi, izin
       listesi aynı, 1.0.2'nin üzerine güncelleme olarak kurulunca veri korundu
-      (`TESTING.md` "Yükseltme Testi"). Kaynak commit `e82f36a`. **Açık
-      kalan:** kapalı teste yükleme, aynı AAB'nin App Bundle kitaplığından
-      dahili teste eklenmesi (PROGRESS 16r, "Karar — sürüm yayınlama sırası")
-      ve etiket — kullanıcıda.
+      (`TESTING.md` "Yükseltme Testi"). Kaynak commit `e82f36a` (kullanıcının
+      `v1.0.3` etiketi, GitHub'a gönderildi). 29.09.2026'da kapalı teste
+      yüklendi, aynı AAB kitaplıktan dahili teste eklendi (PROGRESS 16r, "Karar
+      — sürüm yayınlama sırası"); kapalı test aynı gün onaylandı. Bir testçi
+      ayarlardaki anlık "kapalı" görünümünün düzeldiğini doğruladı
+      (29.09.2026). Kullanıcının telefonu (OPPO A15s, Android 10) 1.0.3'e
+      güncellendi, kontrollerin hepsi geçti (30.09.2026); aynı telefonda
+      SubTrack'in "arka plan faaliyetleri" ayarı kurulumdan beri kendiliğinden
+      kapalı (PROGRESS 16w EK). (Console'da, testçiyle ve telefonda oldu,
+      repoda kanıt yok; etiket repoda.)
 - [ ] Üretim erişimi ve yayın — 12 testçi 14 gün kesintisiz katılımda kalınca
       başvurulacak (Faz 16k).
 
@@ -822,8 +833,31 @@ Kapsam `PROJECT_SPEC.md` §4 "v1.1 — Görünüm".
 **Bitti:** Koyu tema gri/siyah yüzeyli; paletler API 24'ten itibaren
 çalışıyor; kontrast çiftleri WCAG AA'yı geçiyor (Faz 1c'deki gibi).
 
+**Sürüm:** v1.1, Faz 18a'dan sonra çıkar.
+
+---
+
+## ⬜ Faz 18a — Sorun Bildirme (v1.1)
+
+Kapsam `PROJECT_SPEC.md` §4 "v1.1 — Görünüm", "Sorun bildirme".
+
+- [ ] Ayarlar'da "Sorun bildir" satırı; kısa sorular: ne oldu, hangi ekran,
+      ne yapıyordun, her seferinde mi oluyor
+- [ ] Gönderince kullanıcının e-posta uygulaması açılır: alıcı
+      geliştiricinin Play Console e-postası, konu hazır; gövdede cevaplar,
+      uygulama sürümü, Android sürümü ve telefon modeli. E-postayı kullanıcı
+      kendisi gönderir
+- [ ] İnternet izni eklenmez; izin listesi değişmez
+- [ ] Gizlilik politikasına bir cümle eklenir; Play veri güvenliği formunun
+      etkilenip etkilenmediği uygulama sırasında kontrol edilir
+
+**Bitti:** Satırdan açılan e-posta cevapları ve üç cihaz bilgisini taşıyor;
+izin listesi aynı; gizlilik politikası cümlesi eklendi ve veri güvenliği
+formu kontrol edildi.
+
 **Sürüm:** v1.1 bu fazdan sonra, 1.0.1/1.0.2'deki gibi bir sürüm turuyla
-çıkar (PROGRESS 16n, 16r).
+çıkar (PROGRESS 16n, 16r) — önce açık test, sonra üretim (`PROJECT_SPEC.md` §5
+"Açık test").
 
 ---
 
@@ -838,11 +872,14 @@ Kapsam `PROJECT_SPEC.md` §4 "v1.2 — Kolaylıklar".
       yedeğine girer (Auto Backup)
 - [ ] Listeyi bir sonraki ödeme tarihine göre sıralama (kapalı test önerisi,
       PROGRESS 16w)
+- [ ] Hatırlatma saatini kullanıcı seçer; varsayılan 09:00. Depo anahtarı ve
+      zamanlama hazır (`ARCHITECTURE.md` §18 "Hedef saat tek kaynaktan
+      gelir", 16x); eksik olan seçici ve yazan
 
-**Bitti:** Dört madde çalışıyor; toplamlarda kuruş hatası yok.
+**Bitti:** Beş madde çalışıyor; toplamlarda kuruş hatası yok.
 
 **Sürüm:** v1.2 bu fazdan sonra, 1.0.1/1.0.2'deki gibi bir sürüm turuyla
-çıkar (PROGRESS 16n, 16r).
+çıkar (PROGRESS 16n, 16r) — önce açık test, sonra üretim.
 
 ---
 
@@ -879,7 +916,7 @@ kullanıcının seçtiği yere kaydediliyor; gizlilik politikasına dosya konumu
 cümlesi eklendi.
 
 **Sürüm:** v1.3 bu fazdan sonra, 1.0.1/1.0.2'deki gibi bir sürüm turuyla
-çıkar (PROGRESS 16n, 16r).
+çıkar (PROGRESS 16n, 16r) — önce açık test, sonra üretim.
 
 ---
 
@@ -896,4 +933,4 @@ Kapsam `PROJECT_SPEC.md` §4 "v1.4 — Ödeme türü".
 ödeme türünün hatırlatması doğru.
 
 **Sürüm:** v1.4 bu fazdan sonra, 1.0.1/1.0.2'deki gibi bir sürüm turuyla
-çıkar (PROGRESS 16n, 16r).
+çıkar (PROGRESS 16n, 16r) — önce açık test, sonra üretim.

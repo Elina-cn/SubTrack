@@ -113,6 +113,20 @@ entegrasyonu isteyen kullanıcılar.
   geçersiz kalır; sürüm sırası sohbette yeniden ele alınır.
 - v1.0'dan gelen aboneliklerin ikonları korunur.
 
+**Sorun bildirme** (ROADMAP Faz 18a)
+
+- Ayarlar'da "Sorun bildir"; kısa sorular: ne oldu, hangi ekran, ne
+  yapıyordun, her seferinde mi oluyor.
+- Gönderince kullanıcının e-posta uygulaması açılır: alıcı geliştiricinin
+  Play Console e-postası, konu hazır; gövdede cevaplar, uygulama sürümü,
+  Android sürümü ve telefon modeli. E-postayı kullanıcı kendisi gönderir.
+- İnternet izni eklenmez. Gizlilik politikasına bir cümle eklenir; veri
+  güvenliği formunun etkilenip etkilenmediği uygulama sırasında kontrol
+  edilir.
+
+**Yayın:** v1.1 ve sonrası önce açık teste, sonra üretime çıkar (§5 "Açık
+test").
+
 ### v1.2 — Kolaylıklar
 
 - Haftalık toplam görünümü (aylık/yıllık geçişine ek)
@@ -122,6 +136,7 @@ entegrasyonu isteyen kullanıcılar.
   (Auto Backup)
 - Listeyi bir sonraki ödeme tarihine göre sıralama (kapalı test önerisi,
   29.09.2026)
+- Hatırlatma saatini kullanıcı seçer; varsayılan 09:00
 
 ### v1.3 — Veri taşınabilirliği
 
@@ -231,6 +246,12 @@ istatistik ekranı. Karar gerçek kullanım görüldükten sonra verilecek.
 - Play'in otomatik koruması (dağıtılan sürüme eklenen yükleyici kontrolü)
   kapalı: kaynak kodu açık, internetsiz ve ücretsiz bir uygulamaya katkısı
   yok; Play'in dağıttığı sürüme test edilmemiş kod eklenmesini istemiyoruz
+
+### "Açık test"
+
+- İlk üretim sürümünden önce açık test yok.
+- v1.1'den itibaren her yeni sürüm önce açık teste, sonra üretime çıkar.
+- (Karar 2026-10-01, sohbette.)
 
 ### "iOS şimdilik yok"
 
