@@ -27,7 +27,89 @@ Her faz sonunda **en üste** yeni kayıt eklenir. Eski kayıtlar silinmez.
 
 ---
 
-## [Faz 16w] Teşhis: Hatırlatma Bildirimleri — 2026-09-29
+## [Faz 16x] Düzeltme: Hatırlatma Zamanlaması ve Uyarılar — 2026-10-01
+
+**Durum:** Tamamlandı. 16w ve EK'in bulgularından dört düzeltme; 1.0.4'e girecek, sürüm turu ayrı (`versionCode`/`versionName` değişmedi). Şema, bağımlılık ve izin listesi değişmedi. Karar (sohbette): WorkManager'da kalınıyor, alarm yoluna geçilmiyor — gerekçe ARCHITECTURE §18 "Alarm yolu neden seçilmedi".
+
+### Seçilen zamanlama yöntemi
+
+**Periyodik iş + `setNextScheduleTimeOverride`.** İş aynı adla (`payment_reminder`) 1 günlük periyodik iş olarak kalıyor; her çalışmanın sonunda bir sonraki çalışma hedef saatin bir sonraki oluşumuna sabitleniyor (`PaymentReminderScheduler.pinNextRun`, `UPDATE`). Uygulama her öne geldiğinde (`MainActivity.onStart`) `ensureScheduled` işi kontrol ediyor: yoksa kuruyor (`KEEP`), hedeften farklı bir gelecek anı bekliyorsa çekiyor (`UPDATE`), çalışıyorsa ya da zamanı geçmişse dokunmuyor.
+
+Gerekçe:
+- **Çalışma yarıda kalsa bile sonraki çalışma kuyrukta.** Periyodik iş hiç bitmiyor; sabitleme yapılamasa bile WorkManager bir sonraki çalışmayı (son çalışma + 24 sa) tutuyor. Tek seferlik iş zincirinde sıradaki halkayı kuracak adım atlanırsa zincir kopar, hatırlatmalar uygulama açılana kadar durur.
+- **WorkManager bunu doğrudan destekliyor:** `setNextScheduleTimeOverride` çalışma sürerken de verilebiliyor, çalışma bitince silinmiyor (kuşak sayacı; `work-runtime-2.11.2` kaynağı, `WorkerUpdater.kt`, `WorkerWrapper.kt:466`). Belgesi tam bu kullanımı anlatıyor ("before the user wakes up every morning without drift").
+- **1.0.3'ün işi silinmeden yerinde güncelleniyor:** aynı ad ve sınıf, iki iş hiçbir an birlikte durmuyor.
+- **§18'deki "`KEEP` zorunludur" kuralıyla çelişmiyor:** kuralın gerekçesi (her açılış işi ileri itmesin) korunuyor — aynı gün tekrar açmak aynı hedefi veriyor ve hedefi bekleyen işe dokunulmuyor. Başlık güncellendi.
+
+### Değişiklikler
+
+1. **Zamanlama** (`773ee8a`, düzeltme `844b4eb`): `ReminderSchedule` (hedef hesabı, yeniden kurma kararı; domain), `DailyReminder` (günde tek bildirim kuralı worker'dan çıktı; domain), `PaymentReminderScheduler` yeniden yazıldı, `PaymentReminderWorker` `finally`'de sabitliyor (sistemin yarıda durdurduğu çalışma hariç — WorkManager onu tekrar dener), `SettingsRepository.observeReminderTime()` (`reminder_time_minutes`, yoksa 09:00; yazan yok, v1.2), kuyruğa koyma `SubTrackApplication.onCreate`'ten `MainActivity.onStart`'a taşındı. Saat dilimi her hesapta sistemden okunuyor.
+2. **Android 7 sesi** (`820a3e7`): bildirim `setDefaults(DEFAULT_SOUND)` taşıyor; Android 8+'da kanal lehine yok sayılıyor.
+3. **Uyarılar** (`4191823`): `ReminderDeliveryStatus` + `AndroidReminderDeliveryStatus` (`isBackgroundRestricted()` API 28+, `isPowerSaveMode()`), `ReminderDelivery` (ON_TIME / UNTIL_OPENED / MAY_BE_DELAYED, kısıtlama öne geçer), `ReminderSettingsSection` (satır + not), iki yeni hedef ekran (`openAppDetails`, `openBatterySaverSettings`), tr/en metinler. Değerler ViewModel kurulurken ve ekran `ON_START`/`ON_RESUME`'da okunuyor. `SettingsViewModel` 300 satırı aşmasın diye `ReminderScreenState` ve karar fonksiyonları ayrı dosyalara çıktı.
+4. **Emülatörde bulunan hata** (`844b4eb`): temiz kurulumun ilk açılışı çöktü — WorkManager sabitlenmiş bir isteği `CANCEL_AND_REENQUEUE` ile reddediyor (`IllegalArgumentException: Next Schedule Time Override must be used with ExistingPeriodicWorkPolicy UPDATE (preferably) or KEEP`). İş yokken `KEEP` kullanılıyor (bekleyen/çalışan iş yoksa bitmiş kayıtları silip yenisini kuruyor). Birim testleri WorkManager'a ulaşmadığı için göremedi; `PaymentReminderSchedulerTest` (enstrümantasyon, 3 test) eklendi.
+
+### Görev 4 — emülatör doğrulaması
+
+`subtrack_tester_api33` (GMT) ve `subtrack_min_api24`. Saat `cmd alarm set-time` (api33) / Ayarlar arayüzü (api24); iş yeni saate force-stop + açılışla uydurulup süreç `am kill` ile öldürüldü (TESTING #123-127 notu). Fikstür: aylık abonelikler, çıpalar 06.10-12.10.
+
+| Ölçüm | Sonuç |
+|---|---|
+| **Normal** (06.10, süreç ölü) | hedef 09:00:00.000 → JobScheduler süreci 09:00:35.1'de başlattı → bildirim **09:00:36.4**. Sonraki çalışma: `next_schedule_time_override` **07.10 09:00:00.000**, `override_generation` 1 → 2 (çalışma içi sabitleme bitişte silinmedi), JobScheduler gecikmesi 23 sa 59 dk 23 sn |
+| **Zorla durdurma, öğleden sonra açılış** | 07.10 09:00'da hiçbir şey (paket durdurulmuş, JobScheduler'da iş 0). Saat 07.10 14:00; açılış 14:00:02.3 → bildirim **14:00:07.6** (açılışın kendisi 4,4 sn). Sonraki: **08.10 09:00:00.000**, JobScheduler gecikmesi 18 sa 59 dk 52 sn |
+| **Aynı gün ikinci bildirim yok** | 08.10 atlandı (telefon kapalı gibi); 09.10 08:00:01'de açılış → geç kalan iş **08:00:04.95**'te bildirim → sonraki aynı sabah 09:00:00.000. 09:00'da JobScheduler 09:00:48.4'te koşturdu, `Worker result SUCCESS`, **uygulamanın bildirim sayısı 0**; depoda `reminder_last_notified_day` = 20735 = 09.10. Sonraki: 10.10 09:00:00.000. (Bekleme kısalsın diye saat 08:58:30'a alınıp iş aynı hedefle yeniden kurdurulup süreç öldürüldü; zorla durdurma 08:00 bildirimini de sildiği için kanıt "0 bildirim") |
+| **Uyarılar** (tr-TR) | normal: "Açık" + not; kısıtlama (`appops … ignore`, ekrana dönüş, aynı süreç): "Açık, ama uygulamayı açana kadar gelmez — düzeltmek için dokunun", satır → `InstalledAppDetails`, not → `InstalledAppDetails`; pil tasarrufu: "Açık, ama pil tasarrufu açıkken gecikebilir — değiştirmek için dokunun", satır → `BatterySaverSettingsActivity`; kısıtlama kaldırılınca uyarı gitti (pil tasarrufu görüntüsünde yalnız kendi uyarısı), pil tasarrufu kapatılıp dönülünce satır yeniden **"Açık"** |
+| **Android 7 sesi** (api24) | 01.10 09:00:00.16 koştu; kayıt `importance=3`, `defaults=0x1` (`sound=default`), `isNoisy=true`, `vibrate=null`; 09:00:00.219'da sistem arayüzü ses odağı aldı, 09:00:02.37'de bıraktı (~2 sn ses). 16w'de: `importance=2`, `isNoisy=false`, ses olayı yok |
+| **1.0.3'ten güncelleme** (api33) | 1.0.3 (16v'nin AAB seti) 01.10 08:58'de açıldı, işi 09:00:35'te koştu, sonraki 02.10 09:00:35 (kayan tekrar). Üstüne `assembleRelease` (upload anahtarı, `versionCode 4` aynı) `install -r`: `firstInstallTime` korundu, açmadan önce JobScheduler'da tek iş. Açınca: tanı yayınında `payment_reminder` adıyla **tek iş, aynı kimlik** `65ec1330…`, sonraki çalışma **02.10 09:00:00.0**, JobScheduler'da uygulamanın tek işi |
+
+Not: güncelleme testindeki sürüm APK'sı `844b4eb`'deki düzeltmeden önce üretildi; güncelleme yolu (`UPDATE`, iş var) o düzeltmenin değiştirdiği dala girmiyor.
+
+**Ekran görüntüleri** (tr, api33, ~393 dp): normal, kısıtlama, pil tasarrufu — oturumun geçici klasöründe (`settings-normal-tr.png`, `settings-restricted-tr.png`, `settings-powersave-tr.png`); rapora eklendi, repoya konmadı.
+
+### Doğrulama
+
+| Kontrol | Sonuç |
+|---|---|
+| `./gradlew :app:testDebugUnitTest` | **390 test, 0 hata** (352 → 390: `ReminderScheduleTest` 20, `DailyReminderTest` 5, `SettingsRepositoryImplTest` +3, `SettingsViewModelDeliveryTest` 10) |
+| `./gradlew :app:lintDebug` | 0 hata, 22 uyarı — öncekiyle aynı türler (GradleDependency 13, InlinedApi 3, NewerVersionAvailable 2, PluralsCandidate 2, AndroidGradlePluginVersion 1, RedundantLabel 1); yeni uyarı yok |
+| `connectedDebugAndroidTest` (api33) | **22 test, 0 hata, 1 atlanan** (bilinen `reminderWorker_notificationsDisabled…`); yeni `PaymentReminderSchedulerTest` 3/3 |
+| `assembleDebug`, `assembleRelease` | geçti, yeni Kotlin uyarısı yok |
+| Dosya boyları | en büyükleri `SettingsViewModel.kt` 296, `SettingsScreen.kt` 295 satır |
+| `git diff` şema / gradle / sürüm | değişmedi |
+
+### Rapor edilen, dokunulmadı
+
+- Tekil `Clock` (`TimeModule`) saat dilimini süreç başlarken sabitliyor; worker'ın "bugün"ü `LocalDate.now(clock)`. Süreç yaşarken dilim değişirse "bugün" eski dilimde hesaplanabilir. Zamanlayıcı dilimi sistemden okuyor; worker'a dokunulmadı.
+- Genel not ~393 dp'de iki satıra kayıyor (cümle istenen içerikte; kısaltmak sohbette karar).
+- WorkManager sabitlenen anı önceki çalışmanın bitişinden en az 15 dk sonraya koyuyor: 08:50'de biten geç bir çalışmadan sonra o sabahki çalışma 09:05'te (o günün bildirimi zaten gitmiş). Açılış kontrolü bu durumda her açılışta bir `UPDATE` daha yapar; zararsız.
+- 16w'deki api29 "yeniden başlatmadan sonra NEVER" gözlemi hâlâ doğrulanmadı.
+- Önceki oturum kapanırken api33 emülatörü düzgün kapanmadı (saat sahte, pil tasarrufu açıktı); yeniden açılışta saat gerçek zamana, pil tasarrufu kapalıya dönmüştü, durum sonra ayrıca geri alındı.
+
+### Ortam (tur sonu)
+
+- api33: debug ve test APK'sı kaldırıldı (`connectedDebugAndroidTest` kaldırdı); 1.0.3 16v'nin setinden yeniden kuruldu; `auto_time 1` (gerçek saat), `low_power 0`, pil sıfır, uygulama dili boş, `RUN_ANY_IN_BACKGROUND` varsayılan; `sync` + `reboot -p`.
+- api24: başta uygulama yoktu, debug kaldırıldı; `auto_time 1`; `sync` + `reboot -p`.
+- api29 bu turda kullanılmadı. Fiziksel telefona dokunulmadı.
+
+**Değişen dosyalar**
+- `domain/usecase/ReminderSchedule.kt`, `domain/usecase/DailyReminder.kt` (yeni); `reminder/PaymentReminderScheduler.kt`, `reminder/PaymentReminderWorker.kt`, `reminder/PaymentReminderNotifier.kt`; `domain/repository/SettingsRepository.kt`, `data/repository/SettingsRepositoryImpl.kt`; `MainActivity.kt`, `SubTrackApplication.kt`
+- `reminder/ReminderDeliveryStatus.kt`, `reminder/AndroidReminderDeliveryStatus.kt` (yeni), `reminder/AndroidReminderNotificationStatus.kt` (yorum), `di/ReminderModule.kt`; `ui/settings/ReminderDeliveryResolution.kt`, `ReminderScreenState.kt`, `ReminderSettingsSection.kt` (yeni), `SettingsViewModel.kt`, `SettingsUiState.kt`, `SettingsScreen.kt`, `ReminderPermissionActions.kt`; `values/strings.xml`, `values-tr/strings.xml`
+- Testler: `ReminderScheduleTest`, `DailyReminderTest`, `SettingsViewModelDeliveryTest`, `FakeReminderDeliveryStatus` (yeni), `SettingsRepositoryImplTest`, `FakeSettingsRepository`, üç `SettingsViewModel*Test`; `androidTest/…/PaymentReminderSchedulerTest` (yeni)
+- `docs/ARCHITECTURE.md` (§18, §29), `docs/TESTING.md` (#123-127, ölçüm notları, yükseltme), `docs/PROGRESS.md` (bu kayıt, 16w tarihi)
+
+**Commit'ler**
+- `773ee8a` fix: keep the daily reminder at its local time instead of drifting
+- `820a3e7` fix: give the reminder a sound on Android 7, where there is no channel
+- `4191823` feat: warn on the reminder row when the phone holds reminders back
+- `844b4eb` fix: queue the first reminder job with KEEP, which WorkManager accepts
+- (bu kayıt) docs: record phase 16x and the new reminder schedule
+
+**Sonraki faz için not**
+- 1.0.4 sürüm turu ayrı: `versionCode 5`, AAB, yükseltme testi (1.0.3 → 1.0.4, AAB'den) — #127 dahil.
+- Saat seçici v1.2'de (ROADMAP Faz 19): depo anahtarı ve biçimi hazır (`reminder_time_minutes`, dakika); yazan eklenince zamanlayıcı yeni saati bir sonraki açılışta uygular.
+
+---
+
+## [Faz 16w] Teşhis: Hatırlatma Bildirimleri — 2026-09-30
 
 **Durum:** Tamamlandı (yalnız teşhis). Kod, şema, bağımlılık ve sürüm değişmedi. Testçinin "bildirim uygulamayı açarken düştü" tarifi emülatörde yeniden üretildi: uygulama zorla durdurulmuşken (force-stop) iş hiç koşmuyor, uygulama açılınca 3-5 sn içinde bildirim düşüyor. Aynı "açılışta düşme" Android 13'te `rare` (43 dk beklerken) ve `restricted` gruplarında, Android 10'da arka plan kısıtlamasında ve yeniden başlatmadan sonra da görüldü. Stok Android'de son uygulamalardan kaydırmak işi durdurmuyor. Kanal sesli, ses Android 10 ve 13'te çaldı; **Android 7'de hatırlatma sessiz** (yeni bulgu). Koddan ve ölçümden ikinci yeni bulgu: **09:00 hedefi kayıyor** — her geç çalışma sonraki bütün günleri o kadar geri itiyor.
 

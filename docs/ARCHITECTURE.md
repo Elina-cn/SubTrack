@@ -1170,12 +1170,19 @@ değil.
 **KABUL EDİLEN BEDEL — bir günü kaçıran döngü kaybolur.** Pencere, işi bir gün
 geç koşan bir worker için ikinci bir şans işlevi de görüyordu. Artık yok:
 ödeme günü geçtiği anda tarih bir sonraki periyoda atlar, dolayısıyla o
-döngünün bildirimi bir daha üretilemez. Doze altında kayan, cihazın kapalı
-olduğu ya da `KEEP` yüzünden atlanan bir gün, o ödeme için sessiz kalır.
+döngünün bildirimi bir daha üretilemez. Cihaz kapalıyken ya da iş uygulama
+açılana kadar bekletilirken (zorla durdurma, arka plan kısıtlaması, pil
+tasarrufu, `restricted` grubu; 16w) geçen bir gün, o ödeme için sessiz kalır.
 Bilerek kabul edildi: bugünkü kural iki günlük bir pencereye (bugün + yarın)
 bakıyor, yani bir günün kaçması ödemeyi tamamen kaçırmak değil — yarınki
 bildirim, bugün kaçırılan "yarın ödenecek" satırını "bugün ödenecek" olarak
 yakalar. Kaçan tek durum, o iki günün **ikisinin de** kaçırılması.
+
+**16x'te kalkan bedel — geç bir gün sonrakileri kaydırmaz.** 1.0.3'e kadar iş
+24 saatte bir, son çalışmasından sayılarak tekrarlanıyordu; geç bir çalışma
+sonraki bütün günleri o kadar geri itiyordu (16w: bir haftada 09:00 → 10:02).
+Artık her çalışma bir sonrakini hedef saatin bir sonraki oluşumuna sabitliyor
+(aşağıda "Sonraki çalışma hedef saate sabitlenir").
 
 İleride bu bedel ödenmek istenmezse doğru çözüm **"gecikmiş durumu" değil**:
 gecikmiş durumu ilerletmeyle birlikte anlamsız (tarih hiçbir zaman geçmişte
@@ -1216,15 +1223,97 @@ abonelik hatırlatması o eşiği hak etmiyor.
 yerel 09:00'dır, taahhüt değil — Doze altında saatlerce kayabilir. Hatırlatma
 için bu kabul edilebilir; ödeme anına bağlı bir iş olsaydı olmazdı.
 
-### `KEEP` zorunludur
+### Alarm yolu neden seçilmedi (16x, 16w ölçümüyle)
 
-İş uygulamanın **her açılışında** `enqueueUniquePeriodicWork` ile kuyruğa
-konuyor. `UPDATE` veya `REPLACE` ilk gecikmeyi her seferinde sıfırlar; yani
-uygulamayı her gün açan bir kullanıcıda iş **hiç çalışmaz**. `KEEP` bir tercih
-değil, tek doğru politika.
+16w izinsiz bir yolu da tarttı: `setAndAllowWhileIdle` (kesin olmayan, boştayken
+izinli alarm). Seçilmedi, çünkü alarmın yardım edeceği tek durum Doze, ve
+oradaki gecikme pratikte zararsız: 16w'de Doze'da bekleyen iş ekran açılınca
+6-11 sn içinde koştu. Asıl zarar verenler başka:
+
+| Durum (16w, 16w EK) | İş ne zaman koştu | Alarm yardım eder mi |
+|---|---|---|
+| Zorla durdurma (bazı üreticilerin kaydırması) | uygulama açılınca | hayır — zorla durdurma alarmları da siler |
+| Arka plan kısıtlaması | uygulama açılınca | büyük ihtimalle hayır (ölçülmedi) |
+| Pil tasarrufu (`force_all_apps_standby`) | uygulama açılınca | büyük ihtimalle hayır (ölçülmedi) |
+| `restricted` grubu (Android 12+) | şarj + boşta ya da açılış | alarm kotası günde 1; ölçülmedi |
+| Doze | ekran açılınca, saniyeler içinde | evet, ama kazanç küçük |
+
+Karar: WorkManager'da kalınır. Uygulamanın görebildiği iki durum (kısıtlama,
+pil tasarrufu) ayarlar satırında söylenir; göremedikleri için genel bir not
+durur (aşağıda "Teslim uyarıları").
+
+**KABUL EDİLEN BEDEL:** bu durumlarda hatırlatma uygulama açılana kadar gelmez;
+açılışta 1-10 sn içinde düşer (WorkManager açılışta geciken işi hemen koşturur).
+
+### Sonraki çalışma hedef saate sabitlenir (16x)
+
+1.0.3'e kadar başlık "`KEEP` zorunludur" idi. Gerekçesi korunuyor, kural
+değişti.
+
+**Yöntem: periyodik iş + `setNextScheduleTimeOverride`.** İş hâlâ 1 günlük
+periyodik bir WorkManager işi (`payment_reminder`, aynı benzersiz ad). Her
+çalışmanın sonunda (`PaymentReminderWorker`, `finally`) bir sonraki çalışma
+`PaymentReminderScheduler.pinNextRun()` ile hedef saatin bir sonraki oluşumuna
+sabitlenir (`ReminderSchedule.nextRunAfter`, yerel saat, yaz saati
+`ZonedDateTime.of` kurallarıyla). WorkManager bu sabitlemeyi çalışma sürerken de
+kabul ediyor ve çalışma bitince silmiyor (sabitlemenin kuşağı artıyor;
+`WorkerWrapper.resetPeriodic` yalnız kuşağı değişmemiş sabitlemeyi temizler).
+
+**Neden tek seferlik iş zinciri değil:** periyodik iş hiç bitmez. Bir çalışma
+sabitlemeden önce kesilse bile kuyrukta bir sonraki çalışma vardır (en kötü
+ihtimalle son çalışma + 24 sa); zincir ise sıradaki halkayı kuracak adıma
+ulaşılamazsa kopar ve uygulama açılana kadar hiç hatırlatma gelmez.
+
+**Sistemin yarıda durdurduğu çalışma sabitlemez.** WorkManager onu kısa süre
+sonra yeniden dener; sabitleme o anda yapılsaydı bugünün denemesi yarına
+kayardı. Yeniden deneme bittiğinde sabitler. Bir istisnayla biten çalışma
+sabitler.
+
+**Açılışta kontrol.** `MainActivity.onStart` her öne gelişte
+`ensureScheduled()` çağırır (soğuk açılış ve arka plandan dönüş). Kurallar
+(`ReminderSchedule.needsReschedule`):
+
+| İş | Ne yapılır |
+|---|---|
+| Yok (ya da yalnız bitmiş kayıt) | `KEEP` ile kurulur |
+| Çalışıyor | Dokunulmaz; çalışma kendisi sabitler |
+| Zamanı gelmiş/geçmiş | Dokunulmaz; hemen koşar, kendisi sabitler — yarına taşımak bugünün hatırlatmasını düşürürdü |
+| Hedeften farklı bir gelecek ana bekliyor (saat dilimi değişti, 1.0.3'ün 24 saatlik işi) | `UPDATE` ile hedefe çekilir |
+| Hedefi bekliyor | Dokunulmaz |
+
+**`KEEP`'in gerekçesi korunuyor:** aynı gün tekrar açmak aynı hedefi verir, yani
+uygulamayı her gün açan kullanıcıda iş hiçbir zaman ileri itilmez.
+
+**Politikalar:** iş yokken `KEEP` (bekleyen ya da çalışan iş yoksa bitmiş
+kayıtları silip yenisini kurar), iş varken `UPDATE` (yerinde günceller, çalışan
+işi iptal etmez). **`CANCEL_AND_REENQUEUE` / `REPLACE` kullanılmaz:** WorkManager
+sabitlenmiş bir isteği bu politikayla reddediyor (`IllegalArgumentException`);
+16x'te temiz kurulumun ilk açılışı emülatörde bu yüzden çöktü, düzeltildi ve
+`PaymentReminderSchedulerTest` (enstrümantasyon) bunu koruyor.
+
+**1.0.3'ten güncelleme:** aynı ad ve aynı worker sınıfı olduğu için eski
+periyodik iş silinip yenisi eklenmiyor, **yerinde** güncelleniyor (`UPDATE`);
+iki iş hiçbir an birlikte durmuyor. Ölçüldü (16x): 1.0.3'ün işi 09:00:35'e
+kaymıştı; güncelleme ve açılıştan sonra aynı iş kimliği, sonraki çalışma
+09:00:00.000, JobScheduler'da uygulamanın tek işi.
+
+**Saat dilimi** her hesapta sistemden okunur (`ZoneId.systemDefault()`), enjekte
+edilen `Clock`'tan değil: tekil `Clock` dilimi süreç başlarken sabitliyor.
+
+**WorkManager sınırı:** sabitlenen an önceki çalışmanın bitişinden en az 15 dk
+sonra olmalı (`MIN_PERIODIC_INTERVAL`). 08:50'de biten geç bir çalışmadan sonra
+o sabahki çalışma 09:00 değil 09:05'te olur; o günün bildirimi zaten
+gitmiştir.
 
 Constraint eklenmiyor: iş yerel veriyi okuyup bildirim gönderiyor, ağ da şarj
 da boşta cihaz da gerekmiyor. Herhangi birini istemek yalnızca geciktirirdi.
+
+### Hedef saat tek kaynaktan gelir (16x)
+
+`SettingsRepository.observeReminderTime()`: ayarlar deposunda
+`reminder_time_minutes` (gece yarısından sonraki dakika, `Int`); kayıt yoksa ya
+da gün dışındaysa `ReminderSchedule.DEFAULT_TIME` = 09:00. Zamanlayıcı başka
+yerden okumaz. Yazan yok: saat seçici v1.2'de gelecek (ROADMAP Faz 19).
 
 ### `InitializationProvider` paylaşılıyor
 
@@ -1245,7 +1334,12 @@ androidx.work 2.9'da fonksiyondan property'ye döndü.
 ### Gün yalnızca bildirim gerçekten gösterildiğinde işaretlenir
 
 `PaymentReminderNotifier.notify(...)` **`Boolean` döner**: bildirimin ekrana
-ulaşıp ulaşmadığı. Worker günü yalnızca `true` dönerse yazar.
+ulaşıp ulaşmadığı. Gün yalnızca `true` dönerse yazılır. Karar 16x'ten beri
+worker'da değil `DailyReminder`'da (domain/usecase): birim testiyle sabitli.
+
+**Günde en fazla bir bildirim, saat ne olursa olsun.** Kayıt bir takvim
+günüdür: dünkü çalışma bu sabah 08:00'de geç koştuysa günü o kullanmıştır ve
+09:00 çalışması sessiz kalır (16x'te emülatörde ölçüldü; `DailyReminderTest`).
 
 **Gerekçe:** bildirimler kapalıyken hiçbir şey gösterilmiyor. Günü yine de
 işaretlemek, o günün hatırlatmasını kalıcı olarak yutardı — kullanıcı bir saat
@@ -1346,9 +1440,11 @@ yüzden elle `Build.VERSION` dallanması yazılmadı.
 Emülatörde ölçüldü: kanal kapatıldığında `mImportance=0` oluyor, uygulama izni
 `granted=true` kalıyor ve satır doğru şekilde `SETTINGS_ONLY`'ye düşüyor.
 
-**Tek elle yazılan sürüm kontrolü**, "bu derlemede runtime izin gerekiyor mu"
-sorusudur. Hiçbir Compat sınıfı bunu cevaplamıyor ve ayarlar ekranının iki
-yolundan hangisinin mümkün olduğunu bilmesi gerekiyor.
+**Elle yazılan sürüm kontrolü** (durum sınıflarında), "bu derlemede runtime
+izin gerekiyor mu" sorusudur. Hiçbir Compat sınıfı bunu cevaplamıyor ve ayarlar
+ekranının iki yolundan hangisinin mümkün olduğunu bilmesi gerekiyor. 16x'ten
+beri ikincisi var: arka plan kısıtlaması API 28'de geldi (aşağıda "Teslim
+uyarıları").
 
 ### Notifier'daki ikinci izin kontrolü lint içindir
 
@@ -1496,6 +1592,43 @@ cevabı verip hatırlatmayı her eski cihazda susturur.
 Kanal her gönderimden önce yeniden oluşturulur. Var olan bir kanalı oluşturmak
 işlemsizdir; asıl kazanç, cihaz dili değişince kanal adının ve açıklamasının
 güncellenmesidir.
+
+### Android 7'de ses (16x)
+
+Kanal (`IMPORTANCE_DEFAULT`) Android 8+'da sesi verir: varsayılan bildirim sesi,
+titreşim yok. Android 7'de (API 24-25) kanal yok, ses bildirimin kendi
+alanlarından gelir ve `NotificationCompat.Builder` onları boş bırakır. 16w'de
+api24'te bildirim **sessiz** ve düşük önemde çıktı (`importance=2`,
+`isNoisy=false`, ses olayı yok).
+
+Bildirim artık `setDefaults(DEFAULT_SOUND)` taşıyor: kanalın söylediğinin
+aynısı, ses var, titreşim yok. Android 8+'da bu değer kanal lehine yok sayılır
+(NotificationCompat belgesi), o yüzden sürüm kontrolü yok. 16x'te api24'te
+ölçüldü: `importance=3`, `defaults=0x1`, `isNoisy=true`, sistem arayüzü ses
+odağı aldı ve ~2 sn ses çaldı.
+
+### Teslim uyarıları — ayarlardaki hatırlatma satırı (16x)
+
+Hatırlatmalar **açıkken** satır, uygulamanın görebildiği iki engeli söyler
+(`ReminderDeliveryStatus`, `ReminderDelivery`):
+
+| Durum | Satır | Dokununca |
+|---|---|---|
+| Engel yok | "Açık" | uygulamanın bildirim ayarları (eskisi gibi) |
+| Arka plan kısıtlaması (`ActivityManager.isBackgroundRestricted()`, API 28+; altında hep "yok") | "Açık, ama uygulamayı açana kadar gelmez — düzeltmek için dokunun" | uygulamanın sistem ayrıntı sayfası |
+| Pil tasarrufu (`PowerManager.isPowerSaveMode()`) | "Açık, ama pil tasarrufu açıkken gecikebilir — değiştirmek için dokunun" | pil tasarrufu ayarları (`ACTION_BATTERY_SAVER_SETTINGS`; karşılanmazsa uygulamanın sayfası) |
+
+İkisi birden açıksa kısıtlama öne geçer: o kalıcıdır, pil tasarrufu çoğu zaman
+şarjla kapanır. Hatırlatmalar açıkken satırın altında her durumda tek cümlelik
+genel bir not durur: "Bazı telefonlarda pil ve temizleyici ayarları
+hatırlatmaları geciktirebilir"; dokununca uygulamanın sistem ayrıntı sayfası
+açılır. Not, uygulamanın **göremediği** engeller içindir (üretici pil kuralları,
+temizleyici uygulamalar; 16w).
+
+İki değer platformdan anında okunur: ViewModel kurulurken (`initialValue`'ya
+yazılır, §29) ve ekran `ON_START`/`ON_RESUME`'da yenilenir — kullanıcı ayarı
+değiştirip dönünce uyarı gelir ya da gider (16x'te emülatörde ölçüldü). Kapalı
+satırlarda (`CAN_REQUEST`, `SETTINGS_ONLY`) uyarı da not da gösterilmez.
 
 ---
 
@@ -3227,9 +3360,9 @@ toplamı çizdi (aşağıda "Ana ekranın akışı durmaz").
 
 ### Bilinmeyen değer: yer tutar, çizilmez
 
-- **Eşzamanlı cevaplar ilk kareden doğrudur.** Bildirim durumu ve Android
-  sürümü ViewModel kurulurken okunur ve `initialValue`'ya yazılır; beklenecek
-  bir şey yok.
+- **Eşzamanlı cevaplar ilk kareden doğrudur.** Bildirim durumu, Android
+  sürümü ve (16x'ten beri) arka plan kısıtlaması ile pil tasarrufu ViewModel
+  kurulurken okunur ve `initialValue`'ya yazılır; beklenecek bir şey yok.
 - **Mağazadaki değerler `null` = "henüz okunmadı" ile başlar.** Her kaynak kendi
   başına gelir (`startingUnknown()`); `combine` hepsini beklemez, böylece
   mağazaya bağlı olmayan satır ilk yayından doğrudur.

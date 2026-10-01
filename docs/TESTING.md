@@ -175,6 +175,11 @@ etmeden bildirin; sonraki maddeler zaten bozuk bir durumun üstüne binebilir.
 | 120 | Koyu temada ana ↔ ayarlar, ayarlar ↔ kurlar, ana ↔ istatistik, ana ↔ düzenleme geçişleri; bir kez de uygulama teması sistemin **tersindeyken** (iki yönde) | Geçiş boyunca zemin **koyu kalıyor** — gri/beyaz parlama yok; tersine temada koyu çukur da yok. Ölçüm "Geçişlerde parlama gerileme testi" başlığında | 16q |
 | 121 | Ayarlara gir, kareleri izle: hatırlatma açıkken (API 29) ve Android 13'te izin hiç istenmemişken; bir kez de USD + Koyu kayıtlıyken. Geçiş sürerken hatırlatma satırına dokun | Her satır ilk karede ya **boş** (yeri tutulmuş, düzen kaymıyor) ya **doğru**; "Kapalı — sistem ayarlarından açılmalı", "Sistemi takip et", seçili TRY gibi **yanlış bir değer hiçbir karede yok**. Android 13'te izin hiç istenmemişse erken dokunuş **izin penceresini** açıyor, sistem ayarlarını değil | 16u |
 | 122 | Kur ekranı (en küçük ekranda da): **(a)** USD'yi virgülle değiştir, son kutuda klavyenin ✓'si; **(b)** USD'ye `0` yaz, klavye açıkken aşağı kaydırıp Kaydet; **(c)** Varsayılana dön → Sıfırla; **(d)** bir kutuyu değiştir, Kaydet'e hızlıca üç kez bas; **(e)** testçinin dizisi (28.09): ana para çipleri arasında gez (USD → EUR → GBP → USD), kur kutularında gez, ana ↔ istatistik; USD'yi elle değiştir → Kaydet → ana ekran → kurlar → Varsayılana dön → Kaydet → 5 sn'den uzun bekle → ana ekran. Her adımda ana ekran toplamı ve (debug derlemede) DataStore | **(a)** Klavye kapanıyor, odak bırakılıyor, "Kurlar kaydedildi"; kutu **noktayla** yazılıyor (`41.5`), Kaydet devre dışı, kutular **yerinden oynamıyor**. **(b)** Hiçbir şey yazılmıyor; ekran USD'ye kaydırılıyor, kutu odakta, hata görünür. **(c)** Hemen yazılıyor, "Varsayılan kurlar geri yüklendi", kutular varsayılan, Kaydet devre dışı. **(d)** Tek yazım; yazım sürerken düğmeler basılamıyor. **(e)** Toplam her adımda **kutudaki kurla** elle hesaplananla aynı; Varsayılana dön'den sonra Kaydet devre dışı ve DataStore'da kur anahtarı yok; ana ekrana dönüşte eski toplam **hiçbir karede yok** | 16u |
+| 123 | **Kayma.** Hatırlatma işi kuyruktayken uygulamayı zorla durdur, hedef saati geçir, öğleden sonra uygulamayı aç. Sonra `dumpsys jobscheduler` ve (debug) `WorkSpec` | Bildirim açılışta birkaç saniye içinde düşüyor; sonraki çalışma **ertesi gün tam hedef saatte** (`next_schedule_time_override` = ertesi 09:00:00.000), açılış saatinde değil. Normal bir çalışmadan sonra da sonraki hedef ertesi 09:00:00.000 | 16x |
+| 124 | **Günde tek bildirim.** Bir gün atla (iş bekliyorken saati ertesi sabah 08:00'e al), uygulamayı aç; ardından 09:00 çalışmasını bekle | 08:00'de bildirim düşüyor; 09:00 çalışması koşuyor (`Worker result SUCCESS`) ama **ikinci bildirim yok**; depodaki `reminder_last_notified_day` bugün | 16x |
+| 125 | **İki uyarı ve genel not** (hatırlatmalar açık, Türkçe ve İngilizce). Ayarlar; sonra arka plan kısıtlaması (`cmd appops set com.elinacn.subtrack RUN_ANY_IN_BACKGROUND ignore`) ve ekrana dönüş; sonra kısıtlamayı kaldırıp pil tasarrufu (`dumpsys battery unplug` + `cmd power set-mode 1`) ve dönüş; sonra pil tasarrufunu kapatıp dönüş. Her hâlde satıra ve nota dokun | Normal: "Açık" + altında not. Kısıtlama: "Açık, ama uygulamayı açana kadar gelmez…", satır uygulamanın sistem ayrıntı sayfasını açıyor. Pil tasarrufu: "Açık, ama pil tasarrufu açıkken gecikebilir…", satır pil tasarrufu ayarlarını açıyor. Not her hâlde uygulamanın sistem ayrıntı sayfasını açıyor. Ayar kapatılıp dönülünce uyarı **gidiyor**. Hatırlatmalar kapalıyken ne uyarı ne not var | 16x |
+| 126 | **(API 24) Android 7 sesi.** Hatırlatmayı koştur (saati 09:00'dan önceye al, uygulamayı aç, bekle); `dumpsys notification` ve logcat | Kayıt `importance=3`, `defaults=0x1`, `isNoisy=true`, `vibrate=null`; 09:00'da sistem arayüzü ses odağı alıyor (`MediaFocusControl … requestAudioFocus`), ses çalıyor; titreşim yok | 16x |
+| 127 | **Güncellemede tek iş.** Önceki sürüm kurulu ve işi kuyruktayken yeni sürümü kaldırmadan kur, aç. Tanı yayını ve `dumpsys jobscheduler` | `payment_reminder` adıyla **tek iş**, güncellemeden önceki **aynı iş kimliği**; sonraki çalışma bir sonraki 09:00:00.000; JobScheduler'da uygulamanın tek işi | 16x |
 
 **96-105 için not:** düzenleme maddeleri ekleme sheet'iyle **aynı** bileşenlerden
 kurulu bir formu sınıyor. #102 bilerek ikisini karşılaştırıyor: mesajlar
@@ -191,6 +196,18 @@ değişikliği ana ekrandan **5 sn'den uzun** süre sonra yapılınca anlamlıd�
 daha kısa sürede ana ekranın eski akışı zaten yeniden hesaplıyordu. DataStore
 debug derlemede `run-as com.elinacn.subtrack cat files/datastore/settings.preferences_pb`
 ile okunur.
+
+**123-127 için not:** saat `cmd alarm set-time` ile oynatılır (aşağıda "Duvar
+saatini root olmadan ileri almanın yolları"). JobScheduler gecikmesi saat
+değişikliğini görmez (gerçek geçen süreyle sayar); iş yeni saate ancak
+WorkManager onu yeniden kurunca uyar — en kolayı zorla durdurup uygulamayı
+açmak (`ForceStopRunnable` işleri yeniden kurar). Ölçümden önce süreç
+`am kill` ile öldürülür; süreç canlıyken WorkManager işi süreç içinde koşturur
+ve JobScheduler yolu görünmez (aşağıda "Periyodik WorkManager işi"). Zorla
+durdurma uygulamanın bildirimlerini de siler: #124'te 09:00'dan sonra
+"bildirim yok" kanıtı, uygulamaya ait bildirim sayısının 0 olmasıdır. #125 için
+uygulama dili API 33'te `cmd locale set-app-locales com.elinacn.subtrack
+--locales tr-TR` ile verilir (dil değişince uygulama yeniden başlatılır).
 
 ---
 
@@ -1062,9 +1079,14 @@ adb exec-out cat /sdcard/frame.raw > ekran.raw
 
 ### Otomatik testler
 
-Bugün **330 birim testi** ve **19 enstrümantasyon testi** var. Enstrümantasyon:
-8 abonelik DAO'su + **8 aylık anlık görüntü DAO'su (Faz 12a)** + 2 hatırlatma
-worker'ı + 1 düzenlenen tarih (Faz 15). Şablon testler Faz 16b'de silindi.
+Bugün **390 birim testi** ve **22 enstrümantasyon testi** var (16x).
+Enstrümantasyon: 8 abonelik DAO'su + **8 aylık anlık görüntü DAO'su (Faz 12a)**
++ 2 hatırlatma worker'ı + 1 düzenlenen tarih (Faz 15) + **3 hatırlatma
+zamanlayıcısı (16x, `PaymentReminderSchedulerTest`)**. Şablon testler Faz
+16b'de silindi. Zamanlayıcı testi uygulamanın gerçek WorkManager'ına tek işi
+kurdurup sonraki çalışmanın hedefe sabitlendiğini okur; WorkManager'ın bir
+politikayı reddetmesini birim testleri göremez (16x'te temiz kurulumun ilk
+açılışı bu yüzden çökmüştü).
 
 İkisi de iki yoldan koşar ve **iki yol da geçmek zorundadır**:
 
@@ -1183,9 +1205,21 @@ adb exec-out run-as com.elinacn.subtrack cat no_backup/androidx.work.workdb-wal 
 ```
 
 `WorkSpec` tablosunda `interval_duration`, `initial_delay`, `state`,
-`period_count` ve `requires_*` sütunları; `WorkName` tablosunda unique ad
-karşılığı vardır. **`-wal` dosyası da çekilmeli** — tablolar çoğu zaman ana
-dosyaya henüz yazılmamıştır ve yalnız `.db` "file is not a database" der.
+`period_count`, `last_enqueue_time`, `next_schedule_time_override` (16x'ten beri
+sabitlenen sonraki çalışma) ve `requires_*` sütunları; `WorkName` tablosunda
+unique ad karşılığı vardır. **`-wal` dosyası da çekilmeli** — tablolar çoğu
+zaman ana dosyaya henüz yazılmamıştır ve yalnız `.db` "file is not a database"
+der.
+
+**JobScheduler yolunu görmek için süreç ölü olmalı (16w).** Süreç canlıyken
+WorkManager işi kendi içinde de bekler (`GreedyScheduler` → `DelayedWorkTracker`
+→ `Handler.postDelayed`) ve zamanı gelince JobScheduler'ı beklemeden koşturur;
+emülatörde CPU uyumadığı için bu yol Doze'da bile koştu. Gece bekleyen bir
+telefonda süreç ölü ya da dondurulmuştur ve iş JobScheduler'dan gelir. Bu yüzden
+zamanlama ölçümünden önce süreç `adb shell am kill com.elinacn.subtrack` ile
+öldürülür (zorla durdurma değil — o işi de siler). Logcat'te ayırt edilir:
+`Start proc … for service …SystemJobService` JobScheduler yolu,
+`WM-GreedyScheduler: Starting work` süreç içi yol.
 
 JobScheduler tarafı:
 
@@ -1213,7 +1247,36 @@ ileri almak.
 yukarıdaki iki yol işin kuyruğa doğru girdiğini kanıtlar, **gövdesi ise
 aşağıdaki yolla gerçekten koşturulur.**
 
-### Duvar saatini root olmadan ileri almanın iki yolu
+### Duvar saatini root olmadan ileri almanın yolları
+
+**API 29 ve 33 — `cmd alarm set-time` (16w).** Otomatik saat kapatılınca kabuk
+komutu saati kuruyor; Ayarlar arayüzüne gerek yok:
+
+```bash
+adb shell settings put global auto_time 0
+adb shell cmd alarm set-time 1790844600000   # epoch ms
+```
+
+Bitince `settings put global auto_time 1`. API 24'te çalışmıyor (`No shell
+command implementation`; `service call alarm 2` izin hatası), orada aşağıdaki
+Ayarlar yolu kalıyor. 34 ve 36'da denenmedi; orada `time_detector` yolu da var.
+
+**api29 tuzağı — saat dilimi kayıyor.** Otomatik saat dilimi açıkken saat
+değiştirilince cihaz America/New_York'tan GMT'ye geçti (`TIMEZONE_CHANGED`) ve
+uygulama 09:00'ı GMT'ye göre kurdu. Ölçümden önce:
+
+```bash
+adb shell settings put global auto_time_zone 0
+adb shell cmd alarm set-timezone America/New_York
+```
+
+Geri alırken sıra önemli: önce `auto_time_zone 1`, **sonra** `cmd alarm
+set-timezone America/New_York` (tersi yapılınca otomatik dilim yine GMT'ye
+çekiyor).
+
+**Saat ileri alınınca JobScheduler gecikmesi değişmez.** Gecikme gerçek geçen
+süreyle sayılır; iş yeni saate ancak WorkManager onu yeniden kurunca uyar
+(zorla durdurma + uygulamayı açma, `ForceStopRunnable`).
 
 **API 31+ (34, 36) — tek komut.** `time_detector` servisinin test kancası
 `SET_TIME` izni istemiyor:
@@ -1230,7 +1293,7 @@ adb shell cmd time_detector set_time_state_for_tests --elapsed_realtime $(adb sh
 > android.permission.SUGGEST_MANUAL_TIME_AND_ZONE`. Çalışan çağrı
 > `set_time_state_for_tests`.
 
-**API 24 ve 29 — Ayarlar arayüzünden.** Bu sürümlerde `time_detector` ya hiç
+**API 24 (ve 29) — Ayarlar arayüzünden.** Bu sürümlerde `time_detector` ya hiç
 yok (API 24: *"Can't find service"*) ya da kabuk komutu yok (API 29: *"No
 shell command implementation"*). Ama Ayarlar'daki anahtar kapatılınca saat
 elle kurulabiliyor:
@@ -1897,14 +1960,19 @@ Uygulamayı açmadan önce `dumpsys jobscheduler`'da iş duruyor olmalı. Sonra:
 
 Açılışta `WM-ForceStopRunnable: Application was force-stopped, rescheduling`
 görülür — **normal**: güncelleme süreci öldürüp alarmları siliyor, WorkManager
-bunu zorla durdurma sayıp işleri yeniden kuruyor. İş kimliği aynı kalıyor
-(`ExistingPeriodicWorkPolicy.KEEP`), JobScheduler kaydı tazeleniyor, hedef saat
-(ertesi 09:00) değişmiyor.
+bunu zorla durdurma sayıp işleri yeniden kuruyor. İş kimliği aynı kalıyor,
+JobScheduler kaydı tazeleniyor, hedef saat (ertesi 09:00) değişmiyor.
+
+**1.0.3'ten sonraki sürümlerde (16x):** açılış kontrolü işi yerinde günceller
+(`UPDATE`) ve sonraki çalışmayı tam hedefe sabitler; tanı yayınında yine **tek
+iş, aynı kimlik**. 1.0.3'ün 24 saatlik tekrarıyla kaymış bir iş (örn. 09:00:35)
+açılışta 09:00:00.000'a çekilir. Madde #127.
 
 | Tur | Eski taraf | Sonuç |
 |---|---|---|
 | 16n (v1.0 → 1.0.1, api33) | universal APK (yedek yol) | beş dump aynı, görüntü durum çubuğu altında aynı, `firstInstallTime` 10:53:25 ve `userId` 10175 korundu, izin korundu, iş `3a84cfc8…` iki tarafta `ENQUEUED`, çökme yok |
 | 16r (1.0.1 → 1.0.2, api33) | 1.0.1 AAB'sinden bölünmüş APK (ana yol) | beş dump aynı, görüntü durum çubuğu altında aynı, `firstInstallTime` 13:18:40 ve `userId` 10176 korundu, izin korundu, iş `1739e29e…` iki tarafta `ENQUEUED`, çökme yok |
+| 16v (1.0.2 → 1.0.3, api33) | 1.0.2 AAB'sinden bölünmüş APK (16r kopyası, ana yol) | ana ekran, istatistik ve ayarlar dumpları aynı; kur ekranında metin ve kurlar aynı, kutular 42 px aşağıda (16u'nun bilinçli değişikliği); görüntü durum çubuğu altında aynı; `firstInstallTime` 07:39:03 ve `userId` 10180 korundu, izin korundu, iş `1b86e77e…` iki tarafta `ENQUEUED`, çökme yok (PROGRESS 16v) |
 
 **Bu turun ölçmediği:** iki taraf da upload anahtarıyla imzalı; testçilere
 giden APK'lar Play'in uygulama imzalama anahtarını taşıyor. Play imzalı → Play
