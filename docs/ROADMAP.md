@@ -772,6 +772,18 @@ Aylık toplamın zaman içindeki anlık görüntüleri. `PROJECT_SPEC.md` §1'de
       SubTrack'in "arka plan faaliyetleri" ayarı kurulumdan beri kendiliğinden
       kapalı (PROGRESS 16w EK). (Console'da, testçiyle ve telefonda oldu,
       repoda kanıt yok; etiket repoda.)
+- [ ] Sürüm 1.0.4 (`versionCode 5`) — hatırlatmalar (16w teşhis, 16x
+      düzeltme): her gün hedef saatte geliyor ve geç kalan bir gün sonrakileri
+      kaydırmıyor, ayarlardaki satır arka plan kısıtlamasını ve pil tasarrufunu
+      söylüyor, Android 7'de bildirim sesli. AAB 16y'de üretildi ve doğrulandı:
+      şema `v1.0.3`'ten beri değişmedi, izin listesi aynı, 1.0.3'ün üzerine
+      güncelleme olarak kurulunca veri korundu ve hatırlatma işi tek ve aynı
+      kimlikle hedef saate çekildi (`TESTING.md` "Yükseltme Testi"). Kaynak
+      commit `4f7fe73`. AAB'nin kalıcı kopyası
+      `C:\Users\cane7\Documents\SubTrack-releases\subtrack-1.0.4-vc5.aab`.
+      **Açık kalan:** kapalı teste yükleme, aynı AAB'nin App Bundle
+      kitaplığından dahili teste eklenmesi (PROGRESS 16r, "Karar — sürüm
+      yayınlama sırası") ve etiket — kullanıcıda.
 - [ ] Üretim erişimi ve yayın — 12 testçi 14 gün kesintisiz katılımda kalınca
       başvurulacak (Faz 16k).
 

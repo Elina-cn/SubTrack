@@ -1300,6 +1300,16 @@ kaymıştı; güncelleme ve açılıştan sonra aynı iş kimliği, sonraki çal
 **Saat dilimi** her hesapta sistemden okunur (`ZoneId.systemDefault()`), enjekte
 edilen `Clock`'tan değil: tekil `Clock` dilimi süreç başlarken sabitliyor.
 
+**Bilinen sınır — worker'ın "bugün"ü (16x raporu).** Yukarıdaki kural
+zamanlayıcı içindir; worker'ın "bugün"ü hâlâ enjekte edilen `Clock`'tan gelir
+(`PaymentReminderWorker`: `LocalDate.now(clock)`, `TimeModule`:
+`Clock.systemDefaultZone()`). Uygulama açıkken (süreç yaşarken) saat dilimi
+değişirse, o süreçte koşan çalışmanın "bugün" hesabı — hangi aboneliğin bugün
+ya da yarın ödeneceği ve günde tek bildirim kaydı — eski dilime göre yapılabilir.
+Süreç yeniden başlayınca düzelir; hedef saat zaten yeni dilime göre kurulur
+(16y'de api29'da ölçüldü: aynı süreçte dilim GMT'den New York'a geçince iş aynı
+kimlikle yerel 09:00'a çekildi). **Karar: üretimden sonra.**
+
 **WorkManager sınırı:** sabitlenen an önceki çalışmanın bitişinden en az 15 dk
 sonra olmalı (`MIN_PERIODIC_INTERVAL`). 08:50'de biten geç bir çalışmadan sonra
 o sabahki çalışma 09:00 değil 09:05'te olur; o günün bildirimi zaten
@@ -1623,7 +1633,9 @@ Hatırlatmalar **açıkken** satır, uygulamanın görebildiği iki engeli söyl
 genel bir not durur: "Bazı telefonlarda pil ve temizleyici ayarları
 hatırlatmaları geciktirebilir"; dokununca uygulamanın sistem ayrıntı sayfası
 açılır. Not, uygulamanın **göremediği** engeller içindir (üretici pil kuralları,
-temizleyici uygulamalar; 16w).
+temizleyici uygulamalar; 16w). Cümle tektir ama satır sayısı sabit değildir:
+dar ekranda ya da Türkçede iki satıra kayar (16y, api33 ~411 dp: İngilizce tek
+satır, Türkçe iki satır). Bu kabul edildi, metin kısaltılmadı.
 
 İki değer platformdan anında okunur: ViewModel kurulurken (`initialValue`'ya
 yazılır, §29) ve ekran `ON_START`/`ON_RESUME`'da yenilenir — kullanıcı ayarı

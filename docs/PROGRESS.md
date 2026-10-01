@@ -27,6 +27,279 @@ Her faz sonunda **en üste** yeni kayıt eklenir. Eski kayıtlar silinmez.
 
 ---
 
+## [Faz 16y] Sürüm 1.0.4 — Dördüncü Kapalı Test Güncellemesi — 2026-10-01
+
+**Durum:** Tamamlandı. Tek kod değişikliği sürüm satırları
+(`versionCode 4 → 5`, `versionName "1.0.3" → "1.0.4"`). AAB hazır; kapalı teste
+yükleme, aynı AAB'nin kitaplıktan dahili teste eklenmesi ve etiket kullanıcıda
+(16r, "Karar — sürüm yayınlama sırası"). İçerik 16x'in dört düzeltmesi.
+
+### Görev 1 — şema
+
+`git diff v1.0.3 -- app/schemas` → **boş** (0 bayt). `v1.0.3`'ten bu yana
+`gradle/`, kök ve `app/build.gradle.kts`, `proguard-rules.pro` ve
+`AndroidManifest.xml`'de de fark yok (sürüm commit'inden önce).
+
+### Görev 2-3 — sürüm ve AAB
+
+`./gradlew :app:assembleDebug :app:testDebugUnitTest :app:bundleRelease
+--rerun-tasks` → geçti (104 görev koştu); `compileDebugKotlin`,
+`compileReleaseKotlin` ve `signReleaseBundle` koştu. Yeni uyarı yok (yalnız
+bilinen `android.disallowKotlinSourceSets` ve 16q/16r derlemelerinde de olan
+"Unable to strip … libandroidx.graphics.path.so, libdatastore_shared_counter.so").
+
+| Alan | Değer |
+|---|---|
+| Kaynak commit | **`4f7fe73`** chore: bump version to 1.0.4 (versionCode 5) |
+| AAB | `app/build/outputs/bundle/release/app-release.aab`, **4.619.061 B**, 148 girdi (1.0.3: 4.592.256 B, 148 girdi) |
+| Kalıcı kopya | `C:\Users\cane7\Documents\SubTrack-releases\subtrack-1.0.4-vc5.aab`; 16v'nin 1.0.3 kopyası da aynı klasörde (`subtrack-1.0.3-vc4.aab`, SHA-256 16v kaydıyla aynı) |
+| AAB SHA-256 | `9666ec39a38258309e01576fede2aa118d000370176e9ed9e321aa65d2206784` |
+| `jarsigner -verify` | `jar verified.`, `CN=ElinaDorothea, OU=Development, O=SubTrack, L=Denizli, ST=Denizli, C=TR`; çıktının tamamı 1.0.3 AAB'sininkiyle **bayt bayt aynı** (`diff` boş) — aynı dört uyarı (geçersiz zincir, kendinden imzalı, zaman damgası yok / 2054-02-02, POSIX öznitelik notu) |
+| `bundletool dump manifest` | `versionCode="5"`, `versionName="1.0.4"`, `minSdkVersion="24"`, `targetSdkVersion="36"` |
+| Birim testleri | **390 test, 0 hata, 0 atlanan** |
+
+**İzin listesi — 1.0.3 ile birebir aynı.** `<permission>` ve `<uses-permission>`
+satırları sıralı karşılaştırıldı (`diff` boş): `POST_NOTIFICATIONS`,
+`WAKE_LOCK`, `ACCESS_NETWORK_STATE`, `RECEIVE_BOOT_COMPLETED`,
+`FOREGROUND_SERVICE`, `com.elinacn.subtrack.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION`
+(tanım + kullanım). İki manifestin tamamının tek farkı ilk satırdaki
+`versionCode`/`versionName`.
+
+### Görev 4 — temiz kurulum (AAB'den)
+
+| Cihaz | Sonuç |
+|---|---|
+| api33 (`subtrack_tester_api33`, GMT) | Başta 16x'ten kalan 1.0.3 vardı, kaldırıldı. `base.apk` + `split_config.x86_64.apk`, `versionCode 5`. İlk açılış çökmedi (2,8 sn), crash tamponu boş, boş durum görünüyor. Tanı yayını: `payment_reminder` `c3dccd4b…` `ENQUEUED`; JobScheduler'da uygulamanın tek işi, en erken **01.10 09:00:00** |
+| api29 (`subtrack_narrow_api29`) | Başta SubTrack yoktu. İki parça, `versionCode 5`; ilk açılış çökmedi, crash tamponu boş, tek iş. Hedef **09:00 GMT** çıktı: emülatör açılıştan ~20 sn sonra otomatik saat dilimiyle America/New_York'tan GMT'ye kendiliğinden geçmişti (aşağıda). `auto_time_zone 0` + New York verilip uygulama öne getirilince (aynı süreç, pid 4257): **aynı iş kimliği** `fa3e720a…`, hedef 12:59:59.999 UTC = **09:00 EDT**, tek iş |
+
+Okumalar `dumpsys jobscheduler`'ın göreli zamanı + cihaz saatiyle; ±15 ms okuma
+payı (release'te `WorkSpec` okunamıyor).
+
+### Görev 5 — yükseltme testi (api33)
+
+- **Eski taraf: gerçek 1.0.3.** 16v'nin AAB kopyası (SHA-256 `5b8b5e95…554ff`,
+  16v kaydıyla aynı) → `build-apks` (upload anahtarı) → `install-apks`. Yeniden
+  üretilen APK seti 16v'nin `subtrack-1.0.3.apks`'iyle bayt bayt aynı
+  (`2bd208fb…`); `aapt2`: `versionCode='4'`, `versionName='1.0.3'`. Yedek yola
+  gerek kalmadı.
+- **Yeni taraf:** 1.0.4 AAB'si → `build-apks` → `install-apks` (`69d58987…`,
+  `versionCode='5'`).
+
+**Fikstür (1.0.3 arayüzünden, en-US):** Gym €450 yıllık Sağlık; iCloud £2,49
+haftalık Diğer; Netflix ₺159,99 aylık Eğlence, sonraki ödeme 05.10.2026
+(kaydedince bağlamsal izin → Allow); Spotify $10,99 aylık Eğlence, 15.10.2026
+(ikinci tarihlide diyalog yok). Ana para USD, tema Dark, hatırlatmalar "On". Kur
+ekranında USD'ye `39,59` (virgülle) → `39.59`, "Last edited: Oct 1, 2026 2:05 AM".
+Toplam aylık **$73.48**, yıllık **$881.78**; istatistik Sağlık $43.76 %60, Eğlence
+$15.03 %20, Diğer $14.69 %20 (16v'deki elle hesapla aynı).
+
+| Kontrol | Güncellemeden önce (1.0.3) | Sonra (1.0.4) |
+|---|---|---|
+| Kurulum | `base.apk` + `split_config.x86_64.apk` | aynı iki parça — **kaldırılmadan** |
+| `versionCode` / `versionName` | 4 / 1.0.3 | **5 / 1.0.4** |
+| `firstInstallTime` | 01:59:04 | **01:59:04** (aynı) — güncelleme, temiz kurulum değil |
+| `lastUpdateTime` | 01:59:04 | 02:06:37 |
+| `userId` | 10191 | **10191** |
+| `POST_NOTIFICATIONS` | `granted=true` | **`granted=true`** |
+| Ana ekran aylık ve yıllık, istatistik, kurlar (4 döküm) | kaydedildi | **birebir aynı** (`diff` boş) |
+| Ayarlar dökümü | "Payment reminders, On", "Theme, Dark" | aynı değerler; tek fark 16x'in genel notu ("On some phones, battery and cleaner settings can delay reminders"), altındaki satırlar 126 px aşağıda |
+| Ana ekran görüntüsü | — | yalnız y 47-80 (durum çubuğu, saat) farklı, **altı piksel piksel aynı** |
+| `payment_reminder` (tanı yayını) | `6be6813a…` `ENQUEUED`, iş #0 | **aynı kimlik** `ENQUEUED`, iş #2 |
+| JobScheduler | tek iş, en erken 09:00:00.36 (1.0.3'ün gecikme hesabı) | açmadan önce aynı kayıt; açınca **tek iş, 09:00:00.000**'a çekildi (`UPDATE`, #127) |
+| Crash tamponu | — | **boş** |
+
+Açılışta `WM-ForceStopRunnable: Application was force-stopped, rescheduling`
+— beklenen (TESTING "Yükseltme Testi" adım 6).
+
+### Görev 6 — kısa tur (AAB'den kurulan 1.0.4, api33)
+
+Yükseltilmiş kurulum ve fikstürüyle. Saat `cmd alarm set-time`; iş yeni saate
+zorla durdurma + açılışla uydurulup süreç `am kill` ile öldürüldü (TESTING
+#123-127 notu). Saatler cihazın (GMT).
+
+**Hatırlatma (#123, #124):**
+
+| Adım | Sonuç |
+|---|---|
+| 03.10 14:00, açılış (geciken iş) | iş 14:00:03'te koştu, bildirim yok (Netflix 2 gün sonra — doğru); sonraki **04.10 09:00:00.0** |
+| **Normal** — 04.10 08:58:30, süreç ölü | JobScheduler süreci 09:00:20.98'de başlattı, bildirim **09:00:21.38** "Payment reminder: 1 subscription" / "Netflix — tomorrow", `Worker result SUCCESS`; sonraki **05.10 09:00:00.0** |
+| **Kayma** — zorla durdur, 05.10 14:00'te aç | zorla durdurunca JobScheduler'da uygulamanın işi 0, paket `stopped=true`; açılış 14:00:03.7 → bildirim **14:00:06.4** "Netflix — today"; sonraki **06.10 09:00:00.0** (açılış saatinde değil) |
+| **Günde tek bildirim** — 06-13.10 atlandı, 14.10 08:00'de aç | 08:00:01.8 "Spotify — tomorrow"; sonraki aynı sabah 09:00:00.0. 08:58:30'a alınıp süreç öldürüldü (zorla durdurma 08:00 bildirimini sildi) → JobScheduler 09:00:46.2, `Worker result SUCCESS`, **uygulamanın bildirimi 0**; sonraki **15.10 09:00:00.0** |
+
+**İki uyarı ve genel not (#125)**, en-US ve tr-TR (`cmd locale
+set-app-locales`), her hâlde satıra ve nota dokunuldu:
+
+| Hâl | Satır (en / tr) | Satıra dokununca | Nota dokununca |
+|---|---|---|---|
+| Normal | "On" / "Açık" + not | `AppNotificationSettingsActivity` | `InstalledAppDetails` |
+| `RUN_ANY_IN_BACKGROUND ignore`, ekrana dönüş | "On, but they won't arrive until you open the app — tap to fix" / "Açık, ama uygulamayı açana kadar gelmez — düzeltmek için dokunun" | `InstalledAppDetails` | `InstalledAppDetails` |
+| Kısıtlama kaldırıldı, `battery unplug` + `power set-mode 1` | "On, but they may be late while battery saver is on — tap to change" / "Açık, ama pil tasarrufu açıkken gecikebilir — değiştirmek için dokunun" | `BatterySaverSettingsActivity` | `InstalledAppDetails` |
+| Pil tasarrufu kapatıldı, dönüş | yine "On" / "Açık" — uyarı **gitti** | `AppNotificationSettingsActivity` | `InstalledAppDetails` |
+| İzin geri alındı (tr) | "Kapalı — açmak için dokunun"; **ne uyarı ne not** | — | — |
+
+Not ~411 dp'de (1080 px, 420 dpi) İngilizcede tek satır (42 px), Türkçede iki
+satır (84 px); kırpılma yok.
+
+**Android 7 sesi (#126, api24, AAB'den):** Spotify $10,99, sonraki ödeme
+02.10 (API 24'te izin diyaloğu çıkmadı). Saat `adb root` + `date` ile 02.10
+08:58:30 (aşağıda). İş 09:00:00'da koştu (`am kill` API 24'te süreci öldürmedi,
+çalışma süreç içinden geldi). Kayıt `importance=3`, `defaults=0x1`
+(`sound=default`), `isNoisy=true`, `vibrate=null`; sistem arayüzü (uid 10027,
+pid 1730) 09:00:00.130'da ses odağı aldı, 09:00:02.348'de bıraktı (~2,2 sn ses).
+Panelde "Payment reminder: 1 subscription" / "Spotify — today".
+
+**#121 — ayarlara giriş** (misafir `screenrecord`, kareler ffmpeg ile):
+
+| Durum | Kayıt | Hatırlatma | Tema | Ana para çipleri |
+|---|---|---|---|---|
+| Yükseltilmiş veri (USD + Dark, izin verilmiş) | 2 | ilk kareden "On" + not | 2 kare boş, sonra "Dark" | 2 kare çizilmiyor, ilk göründüğü karede USD |
+| Temiz kurulum (izin hiç istenmedi) | 1 | ilk karede değer boş (yeri tutulu), sonra "Off — tap to turn on"; not yok | 2 kare boş, sonra "Follow the system" (duvar kâğıdı da 2 kare boş, sonra "Off — the app's own palette") | çizilmiyor, sonra TRY |
+
+**Yanlış değer hiçbir karede yok.** Erken dokunuş (ayarlar ikonundan 250 ms
+sonra hatırlatma satırı): izin verilmişken `AppNotificationSettingsActivity`;
+izin hiç istenmemişken **izin penceresi** (`GrantPermissionsActivity`) → Allow →
+"On" + not. #121'in API 29 kısmı bu turda yok (kısa tur Android 13'te).
+
+**#122 — kur ekranı** (ekran klavyesi açık, metin yalnız klavyeye dokunarak):
+
+| Adım | Sonuç |
+|---|---|
+| (a) USD `40,25`; eylem tuşu USD ve EUR'da "sonraki", GBP'de ✓ | klavye kapandı (`mInputShown=false`), odakta düğüm yok, kutu `40.25`, "Last edited … 10:00 AM", Kaydet devre dışı, kutular yerinde (y 655 / 855 / 1055). Kayıtla tekrar (`40,5`): klavye ✓'den ~2,0 sn sonra kapandı, "Rates saved" ~3,9 sn |
+| (b) USD `0`, klavye açıkken aşağı kaydırıp Kaydet | hiçbir şey yazılmadı ("10:01" değişmedi); USD kutusu odakta, "The rate must be greater than zero" görünür (kutu zaten görünürdü; kaydırma kısmı 16v'deki gibi api33'te sınanamadı) |
+| (c) Reset to defaults → Reset | hemen "The rates have never been edited…", "Default rates restored" (~3,9 sn), 42.85 / 46.2 / 53.9, Kaydet devre dışı, kutular yerinde |
+| (d) USD `41`, tek shell satırında Kaydet × 3 | ilk basıştan sonraki ilk karede Kaydet devre dışı; **tek** "Rates saved"; klavye kapandı. Yazım sayısı release'te görülemiyor (`ExchangeRatesViewModelWriteTest`) |
+| (e) karışık fikstürle: ana ekrandan ayrılıp 7 sn sonra kur değişti, dönüş kaydedildi | 41 → 39,59: ilk görünür kareden **$73.48**, eski $71.33 27 karenin hiçbirinde yok; 39,59 → 41: ilk görünür kareden **$71.33** (elle 3,90 + 10,99 + 42,26 + 14,18), eski $73.48 31 karenin hiçbirinde yok. Ana para çipleri USD → EUR → GBP → USD ve ana ↔ istatistik: toplam her seferinde $71.33 |
+
+(e)'nin testçi fikstürü (yalnız TRY, ₺2.925,40) kurulmadı; karışık fikstürle
+dönüş ölçüldü.
+
+**Ekleme, düzenleme, silme** (api33, kur 41):
+
+| Adım | Sonuç |
+|---|---|
+| Ekleme — Disney ₺99,99 aylık | eklendi; toplam $71.33 → **$73.77** |
+| Düzenleme — ₺129,99, yıllık | kaydedildi; **$71.60**, satır yerinde |
+| Kaydırarak silme | "Subscription deleted" + Undo, $71.33, satır yok |
+| Geri alma (tek shell satırı, `942,2053`) | Disney geri geldi, **$71.60** |
+| Crash tamponu (api33 iki kez, api24) | boş |
+
+### Görev 7 — sürüm notları ("Bu sürümdeki yenilikler")
+
+```
+<tr-TR>
+Bu güncellemede hatırlatmalar daha güvenilir:
+• Hatırlatma her gün aynı saatte geliyor; bir gün geç kalırsa sonraki günler kaymıyor.
+• Telefonun pil ayarları hatırlatmaları engelliyorsa Ayarlar'daki hatırlatma satırı bunu söylüyor ve sizi ilgili ayara götürüyor.
+• Android 7'de hatırlatmalar artık sesli.
+Abonelikleriniz ve ayarlarınız olduğu gibi kalır. Teşekkürler!
+</tr-TR>
+<en-US>
+Reminders are more reliable in this update:
+• The reminder now arrives at the same time every day; a late day no longer shifts the days after it.
+• If your phone's battery settings hold reminders back, the reminder row in Settings tells you and takes you to the right setting.
+• On Android 7, reminders now make a sound.
+Your subscriptions and settings stay as they are. Thank you!
+</en-US>
+```
+
+tr-TR **367**, en-US **381** karakter, satır sonları dahil (satır sonsuz 363 /
+377; sınır 500). Metin sohbette verildiği gibi; yalnız istemdeki satır
+kaydırmaları birleştirildi, her madde tek satır.
+
+### Doğrulama
+
+| Koşu | Sonuç |
+|---|---|
+| `assembleDebug` + `testDebugUnitTest` + `bundleRelease`, `--rerun-tasks` | geçti; `compileDebugKotlin` ve `compileReleaseKotlin` koştu |
+| `./gradlew test --rerun-tasks` | geçti, **390 test, 0 hata, 0 atlanan** (`test` yalnız debug birim testlerini koşuyor) |
+| Derleme uyarısı | yeni yok (`disallowKotlinSourceSets`; `test` koşusunda "SDK XML version 4" — 16r/16v'de de var) |
+| `app/schemas` | `git diff v1.0.3` boş |
+| `lintDebug`, `connectedDebugAndroidTest` | koşulmadı — kod değişikliği yalnız sürüm satırları; 16x'te ikisi de bu kodla koştu |
+
+### Karşılaşılan sorunlar
+
+- Kısa turun ortasında (#122 başlarken, ~02:30) Claude Code oturumu kapandı;
+  arka planda çalışan api33 emülatörü de onunla **düzgün kapanmadan** gitti
+  (16v'deki gibi). 09:58'de soğuk açılışta 1.0.4, fikstür ve izin yerindeydi;
+  ancak açılıştan 20 sn sonra JobScheduler'da uygulamanın işi **yoktu**,
+  uygulama açılınca aynı iş kimliğiyle geri geldi (iş #56). Kapanış temiz
+  olmadığı için temiz bir yeniden başlatmada da böyle olup olmadığı bilinmiyor
+  (16w'deki açık "yeniden başlatmadan sonra" gözlemiyle ilgili olabilir).
+- Kısa turdan sonra saat 14.10'dan gerçek zamana (01.10) **geri** alınınca iş
+  14.10 09:15:46'yı bekledi: WorkManager sabitlenen anı son çalışmanın
+  bitişinden (14.10 09:00:46) en az 15 dk sonraya koyuyor ve saat geri gidince
+  bu an ileride kalıyor. Turun sonundaki temiz kurulum bunu sıfırladı.
+- api29 her açılışta America/New_York ile geliyor ve ~20 sn sonra otomatik saat
+  dilimiyle GMT'ye geçiyor (oturum başında da böyleydi). Geri alırken
+  `auto_time_zone 1` + `set-timezone America/New_York` hemen yine GMT'ye döndü;
+  emülatör yeniden açılıp başlangıç davranışının değişmediği doğrulandı.
+- api24'te saat Ayarlar arayüzü yerine **`adb root` + `date MMDDhhmmYYYY.ss`**
+  ile kuruldu: `google_apis` imajı (`ro.debuggable=1`) root kabul ediyor. Tur
+  sonunda `adb unroot`.
+- Ekleme sırasında ilk denemede fiyat ad alanına yazıldı ("Disney99.99"; klavye
+  açılırken fiyat alanına dokunuş kaydı) — Kaydet "Enter a price" ile reddetti,
+  sheet açık kaldı (#17 doğru). Düzeltilip kaydedildi; ölçüm hatası.
+
+### Ortam (tur sonu)
+
+- api33: 1.0.4 AAB'den **temiz** kurulu (#121'in "izin hiç istenmemiş" hâli
+  için), bildirim izni verildi (erken dokunuş testinde Allow); abonelik yok, ana
+  para TRY, tema "Sistemi takip et", iş 02.10 09:00. `auto_time 1`,
+  `auto_time_zone 1`, `low_power 0`, pil `reset`, `show_ime_with_hard_keyboard
+  0`, `cmd uimode night no`, `wm` 1080×2400 / 420, yazı 1.0, uygulama dili boş,
+  `RUN_ANY_IN_BACKGROUND` varsayılan; `/sdcard`'daki `ui.xml` ve kayıt silindi.
+  `sync` + `reboot -p`.
+- api29: başta ve sonda SubTrack yok; `auto_time_zone 1`; `sync` + `reboot -p`
+  (iki kez).
+- api24: başta ve sonda SubTrack yok; `auto_time 1` (saat host'la aynı), adbd
+  root değil; `/sdcard/ui.xml` silindi (dökümlerin dosyası; önceki turlardan da
+  kalmış olabilir). `sync` + `reboot -p`.
+- Fiziksel telefona dokunulmadı; `adb devices` her seferinde yalnız emülatörü
+  gösterdi.
+- AAB kopyaları kalıcı klasörde (yukarıda). APK setleri, dökümler, kayıtlar ve
+  ekran görüntüleri oturumun geçici klasöründe (`…\scratchpad\16y\`), kalıcı
+  değil.
+
+### Rapor edilen, dokunulmadı
+
+- **Saat geri gidince hatırlatma duruyor** (yukarıda): telefonun saati ileri
+  kaymışken bir çalışma olur, sonra saat düzeltilirse hatırlatmalar o ileri
+  tarihe kadar gelmez. 1.0.3'ün 24 saatlik tekrarında da aynıydı (son çalışma
+  + 24 sa); gerileme değil. Açılış kontrolü bunu çözemiyor (`UPDATE` aynı 15 dk
+  sınırına takılıyor).
+- TESTING "Yükseltme Testi"nin tur tablosu ve adım 2'deki SHA-256 listesi
+  1.0.2'de / 16v'de bitiyor; 1.0.3 (`5b8b5e95…`) ve 1.0.4 (`9666ec39…`) hash'leri
+  ve 16y satırı eklenmedi (istenmedi). Adım 6'nın "beş dump birebir aynı"
+  cümlesi bu turda ayarlar ekranında 16x'in bilinçli eklemesi (genel not)
+  yüzünden tutmadı.
+- TESTING "Duvar saatini root olmadan ileri almanın yolları" API 24 için yalnız
+  Ayarlar arayüzünü söylüyor; `adb root` + `date` yolu yazılmadı.
+- Belgelerde genel not için "tek satır" geçmiyordu (ARCHITECTURE §18 "tek
+  cümlelik" diyor); düzeltilecek yer yoktu, iki satıra kayabildiği §18'e not
+  olarak eklendi.
+
+**Değişen dosyalar**
+- `app/build.gradle.kts` — `versionCode 5`, `versionName "1.0.4"`
+- `docs/ROADMAP.md` — Faz 16'ya 1.0.4 satırı
+- `docs/ARCHITECTURE.md` — §18: worker'ın "bugün"ü için bilinen sınır (saat
+  dilimi, karar üretimden sonra); genel notun iki satıra kayabileceği
+- `docs/PROGRESS.md` — bu kayıt
+
+**Commit'ler**
+- `4f7fe73` chore: bump version to 1.0.4 (versionCode 5) — **etiket buna**
+- (bu kayıt) docs: record the 1.0.4 release build
+
+**Sonraki faz için not**
+- Kapalı teste yükleme, aynı AAB'nin kitaplıktan dahili teste eklenmesi ve
+  `v1.0.4` etiketi (`4f7fe73`) kullanıcıda. Güncelleme telefona gelince
+  abonelikler, toplam, ayarlar ve hatırlatma satırı (genel not) gözle kontrol
+  edilir; ertesi sabah hatırlatmanın 09:00'da geldiği görülür.
+- Bir sonraki yükseltme testinin eski tarafı 1.0.4: AAB'si artık kalıcı
+  klasörde (`SubTrack-releases`); api33'te 1.0.4'ün temiz kurulumu var, fikstür
+  yeniden girilmeli.
+
+---
+
 ## [Faz 16x] Düzeltme: Hatırlatma Zamanlaması ve Uyarılar — 2026-10-01
 
 **Durum:** Tamamlandı. 16w ve EK'in bulgularından dört düzeltme; 1.0.4'e girecek, sürüm turu ayrı (`versionCode`/`versionName` değişmedi). Şema, bağımlılık ve izin listesi değişmedi. Karar (sohbette): WorkManager'da kalınıyor, alarm yoluna geçilmiyor — gerekçe ARCHITECTURE §18 "Alarm yolu neden seçilmedi".
