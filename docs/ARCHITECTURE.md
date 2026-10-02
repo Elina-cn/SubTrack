@@ -19,6 +19,11 @@ güncellenir, sonra kod yazılır.
 - **Domain** hiçbir şeyi bilmez — içinde `android.*` veya `androidx.*`
   import'u olmaz. Saf Kotlin.
 
+> **Not (2026-10-02, Faz iOS-0):** "Saf Kotlin" burada "Android'e bağlı değil"
+> demek, "çok platformlu" değil. Domain `java.time`, `java.math.BigInteger` /
+> `BigDecimal` ve `javax.inject` kullanıyor; tutar biçimi `NumberFormat`'ta.
+> Bunlar iOS'ta yok. Envanter ve taşıma planı §30'da.
+
 **Neden:** Room'u yarın değiştirsek UI'a dokunmayız; UI'ı değiştirsek
 veritabanına dokunmayız. Test yazarken de her katman tek başına test edilebilir.
 
@@ -1092,6 +1097,8 @@ sheet'i **kapatmıyor** — dokunuş sistem çubuğunun penceresine gidiyor; 16m
   değil. 23:00 ile ertesi gün 01:00 arası iki saattir ama bir gündür.
   `Instant` üzerinden hesaplamak bu farkı kaybeder.
 - `java.time` saf Java'dır, domain saflığını bozmaz (§1).
+  **Not (2026-10-02):** ama iOS'ta yok; Kotlin Multiplatform'da
+  `kotlinx-datetime`'a geçer (§30).
 - `nextPaymentDate` NULLABLE. Tarih opsiyoneldir; boşsa arayüzde gösterge
   çıkmaz.
 - **Tarih ilerletme: okuma anında hesaplanır, veritabanına yazılmaz**
@@ -3448,3 +3455,305 @@ iki geçerli ölçümün birinde 3 kare (~140 ms) **$73,89**, 16u kur ekranıyla
   farkında olmadan akışın yeniden başlamasıydı. Artık ekran her `ON_START`'ta
   `ScreenStarted` gönderir, ViewModel tarihi yeniden okur; aynı günse durum
   değişmez.
+
+---
+
+## 30. Çok Platform Planı (taslak)
+
+> **Durum (2026-10-02, Faz iOS-0): taslak.** Kullanıcı iOS sürümüne başlama
+> kararı verdi; yol Kotlin Multiplatform (KMP). Domain ve veri ortak,
+> ekranların da Compose Multiplatform (CMP) ile ortak olması hedef. **Kod
+> değişikliği Android üretim onayından sonra başlar.** Bu bölüm o güne kadar
+> bağlayıcı değil: ilk kod fazından önce sohbette onaylanır, kesinleşen
+> kararlar ilgili bölümlere (§1, §6, §7, §12, §13, §17, §18, §25, §28) işlenir.
+> Sürümler 2026-10-02'de resmi belgelerden okundu; "doğrulanmadı" yazan satırlar
+> ilk ilgili fazda yeniden kontrol edilir.
+
+### "Saf Kotlin" çok platformlu demek değil
+
+§1'in kuralı domain'de `android.*` / `androidx.*` importunu yasaklıyor ve kural
+tutuyor. Ama domain JVM'e bağlı: `java.time` (12 dosya), `java.math` (2 dosya)
+ve `javax.inject` (2 dosya). Hiçbiri iOS'ta (Kotlin/Native) yok. ViewModel'ler
+ayrıca Hilt'e ve Android kaynaklarına (`R.string`) bağlı; ekranlar
+`LocalConfiguration`, `Manifest`, `Activity` ve `java.text` kullanıyor. Yani
+bugünkü Android kodu iOS'ta olduğu gibi derlenmez. Compose Multiplatform'un
+kendisi iOS'ta **kararlı** (kotlinlang "Supported platforms" sayfası); engel
+kütüphane değil, bizim JVM ve Android kullanımlarımız.
+
+### Envanter — ortak koda girecek katmanlarda JVM/Android'e bağlı kullanımlar
+
+Kapsam: `app/src/main` altında domain, data, ViewModel'ler ve ekranlar
+(`Elina` @ `0009f3f`). Sayılar import satırıdır. `MainActivity`,
+`SubTrackApplication`, `di/` ve `reminder/` zaten Android'de kalacak; tabloda
+yalnız ortak koda giren dosyalardaki kullanımlar var.
+
+| # | Kullanım | Nerede (dosya:satır) | Kaç yerde | Çok platformlu karşılık | Risk |
+|---|---|---|---|---|---|
+| 1 | `java.math.BigInteger` | `domain/usecase/CurrencyConverter.kt:9, 105-118, 136, 162` | 1 dosya | Yalnız `Long` ile tam çarp-böl ("Para" başlığı) | **Yüksek** — her toplam buradan geçer |
+| 2 | `java.math.BigDecimal`, `RoundingMode` | `domain/usecase/SubscriptionInput.kt:4-5, 66, 88, 99`; `ui/settings/rates/RateText.kt:6, 34-40, 56`; `ui/common/SubscriptionFormState.kt:17, 132` | 3 dosya | Ortak ondalık metin ayrıştırıcı → `Long` alt birim, ve geri yazım | **Yüksek** — kabul edilen girdi kümesi kayabilir |
+| 3 | `java.time.LocalDate`, `ChronoUnit` | domain: `NextPaymentDate.kt:4-5`, `PaymentCountdown.kt:3-4`, `Subscription.kt:3`, `DailyReminder.kt:6`, `PaymentReminderSelection.kt:4`, `SubscriptionInput.kt:6`; data: `SubscriptionMapper.kt:9-11, 61-66`; ViewModel: `HomeViewModel.kt:32, 46, 157, 176`, `EditSubscriptionViewModel.kt:24`; UiState ve form: `HomeUiState.kt:10`, `HomeScreenState.kt:7`, `EditSubscriptionUiState.kt:8`, `SubscriptionFormState.kt:18` | `java.time` toplamı: 31 dosya, 50 import (domain 12, data 4, UI ve ViewModel 12, di 1, reminder 2) | `kotlinx-datetime`: `LocalDate`, `DateTimeUnit`, `plus`, `until` | **Yüksek** — ay sonu ve gün sayımı (§17) |
+| 4 | `java.time.YearMonth` | `MonthlySnapshot.kt:3`, `MonthlySnapshotRepository.kt:5`, `MonthlyTrend.kt:6`, `MonthlySnapshotRecorder.kt:14`, `MonthlySnapshotMapper.kt:7`, `MonthlySnapshotRepositoryImpl.kt:12`, `StatisticsViewModel.kt:17`, `MonthlyTrendChart.kt:32`, `MonthFormatter.kt:6` | 9 dosya | `kotlinx-datetime` `YearMonth` (0.7.0'dan beri) | Orta |
+| 5 | `java.time.Clock`, `Instant`, `ZoneId`, `ZonedDateTime`, `LocalTime` | `ReminderSchedule.kt:3-6`; `MonthlySnapshotRecorder.kt:13, 79`; `SettingsRepository.kt:7`; `SettingsRepositoryImpl.kt:20`; `HomeViewModel.kt:31`; `EditSubscriptionViewModel.kt:23`; `StatisticsViewModel.kt:16`; `di/TimeModule.kt:7, 23` | 8 dosya | `kotlin.time.Clock` / `Instant` + `kotlinx.datetime.TimeZone`, `LocalTime` | Orta — saat dilimi geçişleri (`ReminderSchedule`, §18) |
+| 6 | `System.currentTimeMillis()` | `SettingsRepositoryImpl.kt:73`, `HomeViewModel.kt:203` | 2 | Enjekte edilen saat | Düşük |
+| 7 | `java.io.IOException` | `SettingsRepositoryImpl.kt:19, 132`; `ReminderStateRepositoryImpl.kt:12, 48` | 2 dosya | `okio.IOException` (DataStore çekirdeği okio kullanıyor) — doğrulanmadı | Düşük |
+| 8 | `java.text.NumberFormat`, `DecimalFormat`, `java.util.Locale`, `java.util.Currency` | `ui/common/MoneyFormatter.kt:8-12, 32-57` | 1 dosya; ekrandaki her tutar | `expect`/`actual`: Android'de bugünkü kod, iOS'ta `NSNumberFormatter` | Orta — iOS çıktısı Android'le harfi harfine aynı olmayabilir |
+| 9 | Tarih ve ay adı: `DateTimeFormatter.ofLocalizedDate`, `java.text.DateFormat`, `Month.getDisplayName` | `SubscriptionFormFields.kt:39-43, 251-254`; `RateFields.kt:25-26, 43-47`; `MonthFormatter.kt:7-8, 21-34` | 3 dosya | `expect`/`actual`: iOS'ta `NSDateFormatter`. `kotlinx-datetime` yerelleştirme yapmıyor (README: "out of the scope") | Orta |
+| 10 | `LocalConfiguration.current.locales[0]` | `MoneyFormatter.kt:73`, `MonthFormatter.kt:40`, `SubscriptionFormFields.kt:252`, `RateFields.kt:43` | 4 | CMP `Locale.current` ya da `expect`/`actual`; metnin çözüldüğü dille aynı kaynaktan (§28) | Orta |
+| 11 | `R.string` / `R.plurals` | 35 dosya, 159 satır, 131 metin (`values/` ve `values-tr/`); ViewModel'lerde 8 satır: `HomeViewModel.kt:212, 227, 245`, `EditSubscriptionViewModel.kt:115, 174`, `SettingsViewModel.kt:248, 287`, `ExchangeRatesViewModel.kt:177`; ayrıca `RateText.kt`, `FormErrors.kt`, `UiText.kt:3, 10` (`@StringRes Int`) | 35 dosya | CMP kaynakları (`Res.string`, `Res.plurals`; `%1$s` / `%1$d` destekli; dışarıda `suspend getString`) | Orta — dil seçimi (§28) yeniden test |
+| 12 | Hilt, `javax.inject` | `@HiltViewModel` 6 sınıf: `MainViewModel.kt:20`, `HomeViewModel.kt:36`, `EditSubscriptionViewModel.kt:39`, `SettingsViewModel.kt:27`, `ExchangeRatesViewModel.kt:38`, `StatisticsViewModel.kt:33`; domain: `DailyReminder.kt:7, 17`, `MonthlySnapshotRecorder.kt:15-16, 42-43`; data: 4 repository'de `@Inject constructor`; `SubTrackNavHost.kt` 5 `hiltViewModel()` | 27 dosya, 73 satır (7'si `di/`) | Ortak kodda anotasyonsuz kurucu; DI seçenekleri aşağıda | Orta |
+| 13 | `SavedStateHandle` | `EditSubscriptionViewModel.kt:3, 43, 55` | 1 | savedstate KMP (Tier 1); ya da abonelik kimliği kurucuya parametre. Ortak kodda kullanımı doğrulanmadı | Düşük |
+| 14 | Navigation Compose (androidx), string rotalar | `SubTrackNavHost.kt:6-14`, `Destination.kt` | 2 dosya | JetBrains `navigation-compose` çatalı ya da Navigation 3 (bağımlılık tablosu) | Orta |
+| 15 | Bildirim izni ve Activity: `Manifest.permission.POST_NOTIFICATIONS`, `rememberLauncherForActivityResult`, `LocalActivity`, `Intent`, `Settings`, `Build` | `HomeScreen.kt:3-5, 131, 142`; `SettingsScreen.kt:3-6, 70, 75, 111`; `ReminderPermissionActions.kt:3-10` | 3 dosya | Ekran bir arayüzü çağırır; izin ve ayar bağlantısı platformda ("Platforma özel kalanlar") | Orta |
+| 16 | Dynamic color: `dynamicLight/DarkColorScheme(context)`, `LocalContext`, `Build.VERSION` | `Theme.kt:6-7, 11, 170-177`; `DynamicColorSupport.kt:3-4, 30-31` | 2 dosya | `expect`/`actual`; iOS'ta yok | Düşük |
+| 17 | `material-icons-extended` 1.7.8 | 12 ikon: `Add`, `BarChart`, `Settings`, `ArrowBack`, `List`, `Star`, `PlayArrow`, `Delete`, `DateRange`, `Cloud`, `ArrowUpward`, `ArrowDownward` | 12 | Vektör kaynağı olarak projeye kopyalamak | Düşük |
+| 18 | `@Preview` (`androidx.compose.ui.tooling.preview`) | 21 dosya | 34 önizleme | Ortak kodda önizleme desteği doğrulanmadı; gerekirse önizlemeler `androidMain`'de | Düşük |
+| 19 | Room ve DataStore kurulumu: `Room.databaseBuilder(context, SubTrackDatabase::class.java, …)`, `preferencesDataStoreFile("settings")` | `di/DatabaseModule.kt:30-32`, `di/DataStoreModule.kt:31` | 2 | Kurulum platformda kalır; dosya yolları korunur ("Veri" başlığı) | **Yüksek** — kullanıcı verisi |
+
+Sorun olmayanlar: `@JvmInline value class Money` (`Money.kt:9`) ortak kodda
+kullanılabilir (bu turda belgeyle doğrulanmadı); `kotlinx.coroutines`, `Flow`,
+`Mutex`, `kotlin.math` zaten çok platformlu.
+
+**Testler.** 390 birim testinin 32 dosyası JUnit 4 (`org.junit.*`), 23'ü
+`java.time`, `PeriodNormalisationTest.kt:14, 247` `BigInteger`'ı kâhin olarak
+kullanıyor, 2 dosya `java.util.Locale`, 2 dosya `TemporaryFolder` (gerçek
+DataStore dosyası), 7 dosya `R.string`. Ortak teste geçerken: `kotlin.test`;
+Turbine ve `kotlinx-coroutines-test` çok platformlu.
+
+### Bağımlılıklar
+
+"Projede" sütunu `:app:dependencies --configuration releaseRuntimeClasspath`
+çıktısından (çözümlenen sürüm). Diğer sütunlar developer.android.com,
+kotlinlang.org ve kütüphanelerin GitHub sayfalarından, 2026-10-02.
+
+| Bileşen | Projede | Çok platformlu sürüm | Android'de sürüm değişir mi | Kotlin / AGP uyumu | Doğrulama |
+|---|---|---|---|---|---|
+| Kotlin (KGP, derleyici) | 2.2.10 (AGP 9.0.1'in yerleşik Kotlin'i); `kotlin-stdlib` 2.3.21'e çözümleniyor | KMP eklentisi aynı KGP ile | Muhtemelen: CMP, iOS için Kotlin 2.2.20'ye yükseltmeyi öneriyor | AGP 9.0'ın KGP 2.2.10'a çalışma zamanı bağımlılığı var; daha yüksek KGP/KSP kök `buildscript` classpath'ine eklenerek kullanılabilir | Doğrulandı (AGP 9.0 sürüm notları, CMP uyumluluk sayfası) |
+| AGP | 9.0.1, compileSdk 36.1, Gradle ≥ 9.1.0 | KMP modülü için `com.android.kotlin.multiplatform.library` (AGP ≥ 8.10, KGP ≥ 2.0) | Hayır; ortak modüle yeni eklenti | AGP 9'da KMP eklentisi `com.android.application` ya da `com.android.library` ile **aynı modülde kullanılamaz** → uygulama ayrı modülde kalır | Doğrulandı |
+| KSP | 2.2.10-2.0.2 | Hedef başına KSP (`kspAndroid`, `kspIosArm64`, …) | KGP değişirse evet | KGP ile birlikte yükselir | Kısmen (Room KMP sayfası) |
+| Room | 2.8.4 | Aynı artefakt KMP: 2.7.0'dan (09.04.2025) beri kararlı; son 2.8.5 (09.09.2026). Room 3.0 (`androidx.room3`, son 3.0.3) ayrı paket | 2.8.4 → 2.8.5 yama, isteğe bağlı | Room 2.8: minSdk 23, Room Gradle eklentisi AGP ≥ 8.4, Kotlin 2.0. Room 2.x Room 3 duyurusundan beri bakım modunda (yama sürümleri sürüyor) | Doğrulandı |
+| SQLite | `sqlite-framework` 2.6.2 (Android'in kendi SQLite'ı) | iOS'ta `sqlite-bundled` (`BundledSQLiteDriver`, Room belgesinin önerdiği) | Android'de motor değişmemeli ("Veri") | — | Öneri doğrulandı; Room 2.8'in Android'de sürücüsüz kurulumu doğrulanmadı |
+| DataStore | 1.1.7 (`datastore-preferences`) | `datastore-preferences-core`, 1.1.0'dan beri KMP; son 1.2.1. KMP'de yalnız Preferences | Hayır (1.1.7 yeterli) | — | Doğrulandı |
+| Lifecycle / ViewModel | 2.10.0 | androidx lifecycle Tier 1 KMP (son 2.11.0); CMP tarafında `org.jetbrains.androidx.lifecycle` (CMP 1.12.1 → 2.11.0) | Seçilen CMP sürümüne göre 2.10 → 2.11 olabilir | Ortak kodda `viewModel()` initializer ister (yansıma yok) | Doğrulandı |
+| SavedState | 1.4.0 | Tier 1 KMP (son 1.5.0) | Muhtemelen | — | `SavedStateHandle`'ın ortak kodda kullanımı doğrulanmadı |
+| Navigation | `navigation-compose` 2.9.5, string rotalar | androidx Navigation'ın Android dışı hedefleri yalnız saplama (2.9.0-rc01 notu). Çok platformlu: JetBrains `org.jetbrains.androidx.navigation:navigation-compose` (CMP 1.12.1 notları: 2.10.0-beta01) ya da Navigation 3 (runtime Google'dan KMP, son 1.2.0; UI'nin çok platformlu hâli JetBrains'te, CMP 1.12.1: 1.1.2) | Evet, kütüphane değişir | Navigation 3 1.2.0 compileSdk 37 istiyor (§12'deki AGP eşiği) | Kısmen: JetBrains Navigation'ın kararlı sürümü ve string rota desteği doğrulanmadı |
+| Compose | BOM 2025.11.01 → UI/foundation/runtime 1.9.5, material3 1.4.0 | Compose Multiplatform; iOS kararlı. Son 1.12.1 (↔ Jetpack 1.12.1); 1.9.3 ↔ 1.9.4. CMP 1.8+ en az Kotlin 2.1.0 | CMP 1.9 hattı ≈ bugünkü Android Compose; 1.10+ büyük sıçrama | Yeni Compose hatlarının compileSdk / AGP isteği doğrulanmadı (Navigation 3 notu "Compose'un compileSdk'sı" 37 diyor) | Kısmen |
+| Material ikonları | `material-icons-extended` 1.7.8 | JetBrains karşılığının 1.7.3'te durduğu söyleniyor — doğrulanmadı | Evet, 12 ikon projeye vektör olarak | — | Doğrulanmadı |
+| Kaynaklar | Android `R` (131 metin) | `org.jetbrains.compose.components:components-resources`: plural, `%1$s`/`%1$d`, `suspend getString`; Android'de assets olarak paketlenir (CMP 1.7.0'dan beri) | Evet, ekran metinleri taşınır | Android'de dil `Configuration`'dan, iOS'ta `NSLocale.preferredLanguages`'tan | Kısmen: uygulama başına dil (`set-app-locales`) davranışı doğrulanmadı |
+| Hilt | 2.60.1, `androidx.hilt` 1.3.0 | Yok (Android'e özel) | DI kararına göre | — | Doğrulandı (KMP listesinde yok; kotlinlang ViewModel sayfası Koin ve Metro'yu anıyor) |
+| WorkManager | 2.11.2 | Yok | Hayır, Android'de kalır | — | Doğrulandı (KMP listesinde yok) |
+| Coroutines | 1.9.0 | Çok platformlu | Hayır | — | Bu turda kaynak açılmadı |
+| `desugar_jdk_libs` | 2.1.5 | — | Muhtemelen kalır: Android biçimlendiricileri `java.time`/`java.text` kullanmaya devam eder; `kotlinx-datetime`'ın JVM'de `java.time`'a dayandığı doğrulanmadı | — | Doğrulanmadı |
+| `kotlinx-datetime` | Yok | Son 0.8.0; README "experimental" (alfa). `Instant`/`Clock` 0.7.0'da `kotlin.time`'a taşındı; `YearMonth` 0.7.0'da geldi | Yeni bağımlılık | En düşük Kotlin sürümü doğrulanmadı | Kısmen |
+| Koin (DI seçeneği) | Yok | 4.2.x (GitHub: 4.2.2); `koin-compose-viewmodel` | Seçilirse yeni | 4.2.0 notunda Kotlin 2.3.20 geçiyor; en düşük sürüm doğrulanmadı | Kısmen |
+
+### Para — sonuçlar birebir aynı kalır
+
+Korunacak olan §6'nın zinciri: fiyat `Long` kuruş girer, cevap `Long` kuruş
+çıkar, önce çarp, en sonda bir kez böl, HALF_UP; ve `PeriodNormalisationTest`'te
+sabitlenen sayılar (243,33 · 2.920,00 · 14 kuruşluk fark · 21.284.704 /
+1.773.725 satır).
+
+**Öneri: `BigInteger` yerine yalnız `Long` ile tam çarp-böl.** Yeni bağımlılık
+yok, iki platformda aynı kod. `Long`'u aşan tek ara değer `weighted ×
+kaynakKuru`; bölüm-kalan ayrıştırmasıyla o çarpım hiç kurulmadan aynı tamsayı
+çıkar:
+
+```
+W = Σ(fiyat × paymentsPerYear)      satır başına ≤ 1e8 × 52 → Long'da 1,77 milyar satır
+D = hedefKuru × parça               ≤ 1e7 × 12 = 1,2e8
+q = W / D,  r = W % D
+sonuç = q × kaynakKuru + (r × kaynakKuru ± D/2) / D
+```
+
+`q × D × kaynakKuru` D'ye tam bölündüğü için sonuç `(W × kaynakKuru ± D/2) / D`
+ile aynıdır. `r × kaynakKuru` 1,2e15'in altında kalır, her zaman sığar.
+`q × kaynakKuru` ancak cevabın kendisi `Long`'a sığmadığında taşar — o sınır
+bugün de var (§6 "Geriye kalan sınır"). Negatif dal aynı: iki tip de sıfıra
+doğru kırpıyor. Ortak kodda `Math.multiplyExact` yok; taşma sessizce sarmak
+yerine açıkça kontrol edilmeli. Ön deneme (Faz iOS-0, repoya girmedi): JVM'de
+`BigInteger`'a karşı 1.934.463 rastgele ve tavan girdide fark **0**; cevabın
+`Long`'a sığmadığı 65.537 girdi karşılaştırma dışı.
+
+Önerilmeyen iki yol: `expect`/`actual` (JVM'de `BigInteger`, iOS'ta
+`NSDecimalNumber`) iki ayrı aritmetik demek, iOS'un ondalık yuvarlaması ayrıca
+kanıtlanmalı; üçüncü taraf KMP büyük sayı kütüphanesi yeni bağımlılık ve sürümü
+doğrulanmadı.
+
+**Ayrıştırma (`BigDecimal`).** `SubscriptionInput.parsePrice` ve
+`RateText.parse` Kotlin'in `toBigDecimalOrNull()`'ını kullanıyor. Faz iOS-0'da
+JVM'de denendi: arayüzde görünmeyen biçimler de kabul ediliyor — `1e3` ve
+`1E+3` → 100000 kuruş (1.000), `+5` → 500, `.5` → 50, `5.` → 500; `1.2.3`,
+`0x10`, `5d`, `NaN` → reddediliyor. Ortak ayrıştırıcı bu kümeyi **birebir**
+korumalı. Daraltmak (ör. üssü reddetmek) ayrı bir ürün kararıdır, taşımayla
+birlikte yapılmaz. Geri yazım (`toPlainString`, `stripTrailingZeros`) da aynı
+metni üretmeli (`RateTextTest`'in gidiş-dönüş testi).
+
+**Para testlerinin iki platformda koşması:**
+
+1. **Önce JVM'de, `:app` içinde (iOS-1).** Uygulama değişir, testler
+   **hiç değişmeden** geçer: `CurrencyConverterTest` (17),
+   `PeriodNormalisationTest` (16), `SubscriptionInputTest` (13), `RateTextTest`
+   (7) — 53 test. Yanına farklılık testi: eski yol (`BigInteger` /
+   `toBigDecimalOrNull`) kâhin; rastgele ve sınır girdilerde (tavan fiyat ve
+   kur, haftalık, karışık para birimi; ayrıştırıcıda yukarıdaki derlem) iki yol
+   aynı sonucu verir. Kâhin JVM'e bağlı olduğu için bu test JVM test kaynağında
+   kalır.
+2. **Sonra ortak teste (iOS-3 ve iOS-7).** 53 test `commonTest`'e taşınır:
+   `org.junit` → `kotlin.test`, beklenen değerler aynı. `PeriodNormalisationTest
+   .kt:247`'deki `BigInteger` kâhinli test JVM'de kalır. Windows'ta `:shared`'in
+   Android host testi, Mac'te `iosSimulatorArm64Test`. Aynı beklentiler iki
+   platformda yeşil olmadan iOS sürümü çıkmaz.
+3. `MoneyFormatterTest` (7) ortak değil: biçim platforma özel. Android'deki
+   kalır; iOS için `iosTest`'te kendi beklentileriyle yazılır.
+
+### Veri — Android kullanıcısının verisi korunur
+
+**Room — şema değişmeden geçiş beklenen yol.** Room 2.8 aynı artefaktla KMP;
+taşıma için Room 3'e geçmek gerekmiyor (Room 3 paket adını değiştiriyor ve
+sürücüyü zorunlu kılıyor; ayrı karar, taşımayla birlikte yapılmaz). Kimlik
+hash'i entity şemasından üretilir; `SubscriptionEntity`, `MonthlySnapshotEntity`
+ve iki DAO değişmeden ortak koda girer. Engel yok: DAO'nun 8 fonksiyonunun hepsi
+`suspend` ya da `Flow` (Android dışı hedeflerin şartı); `SupportSQLite`,
+migration, callback, `RawQuery` ve `TypeConverter` kullanımı yok. Eklenecek tek
+şey `@ConstructedBy(SubTrackDatabaseConstructor::class)` ve onun `expect
+object`'i.
+
+- **Kapı:** yeniden üretilen şema JSON'u bugünkü `1.json` ile **bayt bayt
+  aynı** (`identityHash` `ef18d874586948288a87736e03c2b556`). Değilse dur
+  (CLAUDE.md §6 madde 5).
+- **Dosya:** Android'de aynı yer ve ad, `databases/subtrack.db` (`-wal`,
+  `-shm` ile; §25).
+- **Sürücü:** Android'de SQLite motoru taşımayla aynı anda değişmez — bugünkü
+  çerçeve SQLite'ı (sürücü vermemek ya da `AndroidSQLiteDriver`).
+  `BundledSQLiteDriver` yalnız iOS'ta. Gerekçe: kullanıcının dosyasını açan
+  motoru ve kodu aynı sürümde değiştirmemek.
+- **Şema konumu:** KMP'de KSP her hedef için çalışıyor; Room belgesi Room
+  Gradle eklentisini (`room { schemaDirectory(...) }`) gösteriyor. §12 "şema
+  dışa aktarılır" bu eklentiyi bilerek kullanmıyordu; KSP argümanının KMP'de
+  yetip yetmediği doğrulanmadı, yetmezse o karar yeniden açılır. Dosya
+  `app/schemas/…` → `shared/schemas/…` (`git mv`); CLAUDE.md §6'daki yol o
+  fazda güncellenir.
+
+**DataStore — yol tuzağı.** `datastore-preferences-core` KMP; anahtar adları ve
+türleri değişmez. Ama resmi KMP örneği Android dosyasını `filesDir/<ad>.preferences_pb`'ye
+koyuyor; bugünkü dosya `files/datastore/settings.preferences_pb`
+(`preferencesDataStoreFile("settings")`). Örnek kopyalanırsa ana para birimi,
+kurlar, tema ve hatırlatma bayrakları sessizce sıfırlanır, yeni dosya da §25'in
+beyaz listesi (`file/datastore`) dışında kalıp yedeğe girmez. Android `actual`'ı
+bugünkü yolu birebir kullanır. iOS'ta dosyalar `Application Support`'ta
+(`Caches` değil).
+
+**Yükseltme testi:**
+
+1. **Otomatik (cihaz testi):** bugünkü sürümün yazdığı `subtrack.db` ve
+   `settings.preferences_pb` fikstürü; yeni kod açar, bütün satırları ve
+   tercihleri okur; `room_master_table`'daki hash ve `PRAGMA user_version` (1)
+   değişmez. Android-KMP kütüphane eklentisinde cihaz testleri varsayılan kapalı
+   (`withDeviceTest`); test ya `:app`'te durur ya da açılır.
+2. **Elle:** TESTING "Yükseltme Testi" — `SubTrack-releases`'teki son yayınlanan
+   AAB fikstürle kurulur, KMP derlemesi **kaldırmadan** üstüne kurulur; 16y'deki
+   dökümler (ana ekran aylık ve yıllık, istatistik, kurlar) ve ayarlar `diff` ile
+   birebir aynı.
+3. **Yedek:** bir kez Auto Backup geri yükleme turu (16f yöntemi). Yollar
+   değişmediyse yedek aynı dosyaları taşır.
+4. Fiziksel telefona dokunulmaz (CLAUDE.md §6); gerçek cihaz kontrolü Play'den
+   gelen güncellemeyle kullanıcıda.
+
+### Platforma özel kalanlar
+
+| Konu | Android (bugün, değişmez) | iOS karşılığı | Not |
+|---|---|---|---|
+| Hatırlatma | WorkManager işi, hedef saate sabit (§18); `PaymentReminderWorker`, `PaymentReminderNotifier` | `UNUserNotificationCenter` ile önceden planlanmış yerel bildirimler (`UNCalendarNotificationTrigger`, hedef saatte). İçerik ortak seçim mantığıyla (`PaymentReminderSelection`) önümüzdeki günler için hesaplanır; her veri değişikliğinde ve açılışta yeniden planlanır. `BGTaskScheduler` zamanı garanti etmez | iOS bekleyen yerel bildirimi 64 ile sınırlıyor (Apple belgesi; bu turda doğrulanmadı). §18'in "gün yalnız bildirim gösterildiğinde işaretlenir" kuralı iOS'ta aynı kurulamaz — bildirimi sistem, uygulama çalışmadan gösterir. Ürün kararı gerekir |
+| Bildirim izni | `POST_NOTIFICATIONS` (API 33+); üç hâl ve "hiç sorulmadı" bayrağı (§18) | `requestAuthorization`; durum `authorizationStatus`: `notDetermined` → sorulabilir, `denied` → yalnız ayarlar, `authorized`/`provisional` → açık | iOS tek kez sorar ve durumu kendisi söyler; bizim bayrağa gerek kalmaz |
+| Sistem ayarlarına bağlantı | Sürüme göre uygulama bildirim ayarı, uygulama bilgisi, pil tasarrufu (§18) | `UIApplication.openSettingsURLString` (uygulamanın ayar sayfası); iOS 16+ `openNotificationSettingsURLString` | 16x'in arka plan / pil tasarrufu uyarılarının iOS karşılığı yok; iOS tarafı "zamanında" döner — doğrulanmadı |
+| Yedekleme | Auto Backup ve cihazdan cihaza aktarım, beyaz liste (§25) | Cihaz yedeği (iCloud ya da bilgisayar) uygulama kabını alır, `Caches` ve `tmp` hariç | Kod gerekmez, dosya konumu kararı. İzinlerin iOS'ta geri yüklenip yüklenmediği doğrulanmadı |
+| Tutar biçimi | `NumberFormat` + her yerde sembol (§23) | `NSNumberFormatter` (`currency` stili, `locale`, `currencyCode`; `currencySymbol` = `Currency.symbol`) | Aynı dilde Android'le harfi harfine aynı çıktı garanti değil; testler platform başına |
+| Tarih ve ay adı | `DateTimeFormatter.ofLocalizedDate(MEDIUM)`, `DateFormat`, `getDisplayName` | `NSDateFormatter` (`dateStyle`, `timeStyle`), `standaloneShortMonthSymbols`, `standaloneMonthSymbols` | — |
+| Dil | `values`, `values-tr`; varsayılan İngilizce; `localeFilters` (§28) | Aynı klasörler CMP kaynağı olarak; iOS'ta dil `NSLocale.preferredLanguages` ve Info.plist'teki yerelleştirme listesi | Biçimin dili metnin diliyle aynı kaynaktan (§28) |
+| Tema | Dynamic color, Android 12+ | Yok, sabit palet | iOS'ta ayar satırı gizlenir mi: ürün kararı |
+| Açılış ve sistem çubukları | Splash, edge-to-edge, durum çubuğu ikonları (`MainActivity`, §23) | Launch screen, durum çubuğu stili | — |
+
+### DI seçenekleri (seçim yapılmadı)
+
+Ortak koddaki sınıflar `javax.inject` anotasyonu taşıyamaz; her seçenekte ortak
+ViewModel ve use case'ler düz kuruculu olur. Testler bugün ViewModel'leri
+fake'lerle elle kuruyor; hiçbir seçenek testleri değiştirmez.
+
+| Seçenek | Ne değişir | Büyüklük | Risk |
+|---|---|---|---|
+| **A. Koin, iki platformda** (Hilt kalkar) | 7 Hilt modülü Koin modülü olur; 6 `@HiltViewModel` → `koinViewModel()`; `@HiltWorker` → Koin'in WorkManager entegrasyonu; `@HiltAndroidApp`, `@AndroidEntryPoint` kalkar | Büyük (Android'de ~27 dosya) | Eksik bağımlılık derlemede değil çalışma anında çıkar (Koin'in modül doğrulama testiyle kapatılır); Koin 4.2'nin istediği Kotlin sürümü doğrulanmadı; tek grafik iki platformda |
+| **B. Hilt Android'de kalır, iOS'ta elle** (ya da iOS'ta Koin) | Ortak sınıflardaki anotasyonlar kalkar, Android'de `@Provides` ile bağlanır; ViewModel'ler `hiltViewModel()` yerine Hilt'in verdiği bağımlılıklarla `viewModel { }` initializer'ıyla ya da `androidMain`'de ince `@HiltViewModel` sarmalayıcılarla kurulur; iOS'ta ayrı bir kurulum | Orta | İki ayrı grafik: biri güncellenip diğeri unutulabilir; derleme zamanı güvenliği yalnız Android'de. Android'deki Worker ve Application yapısı değişmez |
+| **C. Elle bağlama, iki platformda** (ortak `AppContainer`) | `commonMain`'de tek bir container; platform yalnız kökleri verir (veritabanı kurucusu, DataStore, saat, bildirim). Hilt kalkar; WorkManager için elle `WorkerFactory` | Orta-büyük | Kütüphane yok, derleme zamanında güvenli; tekil ömürler (tek DataStore örneği, `DataStoreModule`) elle korunur; kod daha uzun |
+| **D. Derleme zamanı KMP DI** (Metro, kotlin-inject) | Hilt'e benzer anotasyonlar iki platformda; kotlinlang ViewModel sayfası Metro'yu (`metroViewModel()`) anıyor | Büyük | Metro bir Kotlin derleyici eklentisi: Kotlin sürümüne sıkı bağlı (AGP 9'un KGP'siyle hizalama); genç ekosistem; sürümler doğrulanmadı |
+
+### Modül yapısı önerisi
+
+```
+SubTrack/
+├── shared/    KMP (org.jetbrains.kotlin.multiplatform + com.android.kotlin.multiplatform.library)
+│              commonMain   domain, data (Room entity/DAO, repository), ViewModel'ler,
+│                           ekranlar, tema, Res kaynakları (strings, plurals, ikonlar)
+│              androidMain  Room ve DataStore kurulumu (bugünkü yollar), biçimlendiriciler,
+│                           izin ve ayar köprüsü, dynamic color
+│              iosMain      aynılarının iOS karşılıkları, BundledSQLiteDriver
+│              commonTest / androidHostTest / iosTest
+├── app/       Android uygulaması (bugünkü modül): MainActivity, Application, WorkManager
+│              hatırlatma, bildirim (Android res'te kalan metinler), Auto Backup kuralları,
+│              imzalama, sürüm
+└── iosApp/    Xcode projesi (Gradle modülü değil): uygulama kabuğu,
+               ComposeUIViewController, yerel bildirim, Info.plist
+```
+
+- **Tek `shared` modülü:** iOS'a tek framework çıkar. İleride gerekirse
+  `shared/data` ve `shared/ui` diye bölünür.
+- **`:app` adı korunur.** `androidApp`'e çevirmek `app/schemas`, CLAUDE.md,
+  TESTING, imzalama ve yayın yollarını değiştirir; kazancı yalnız isim.
+  Karar sohbette.
+- AGP 9 KMP eklentisini `com.android.application` ile aynı modülde kabul
+  etmiyor; uygulama modülünün ayrı durması zorunlu.
+- Windows'ta Apple hedefleri derlenmez, ama `commonMain`'in metadata derlemesi
+  Windows'ta da koşar: ortak koda sızan JVM API'sini Mac'e gitmeden yakalar.
+
+### Faz listesi
+
+Her faz tek başına test edilir; her fazın sonunda Android yayınlanabilir
+durumdadır (tam regresyon + yükseltme testi). İsimler çalışma adı; ROADMAP'teki
+yerleri sonraki belge turunda belirlenir.
+
+| Faz | İçerik | Büyüklük | Mac | Kapı |
+|---|---|---|---|---|
+| **iOS-1** Para ve ayrıştırma | `:app` içinde: `CurrencyConverter` yalnız `Long`; ortak ondalık ayrıştırıcı (`SubscriptionInput`, `RateText`, `SubscriptionFormState`) | Küçük-orta | Hayır | 53 para testi değişmeden; farklılık testi; Android'de görünür değişiklik yok |
+| **iOS-2** Tarih ve saat | `:app` içinde: domain, data ve ViewModel'lerde `java.time` → `kotlinx-datetime` + `kotlin.time`; `System.currentTimeMillis` → saat. Biçimlendirme şimdilik Android'de `java.time`/`java.text` | Orta | Hayır | Tarih testleri değişmeden (`NextPaymentDate` 13, `PaymentCountdown` 7, `ReminderSchedule` 20, `MonthlyTrend` 20, mapper'lar); §17'nin 31 Ocak → 28 Şubat → 31 Mart örneği; `lintDebug` (API 24) |
+| **iOS-3** `:shared` ve veri | KMP modülü; domain ve veri taşınır (Room 2.8 KMP, DataStore core); `javax.inject` ortak koddan çıkar, Android'de Hilt `@Provides` ile bağlar (DI kararından bağımsız ara adım); Kotlin, KSP ve CMP sürüm kararı; iOS hedefleri tanımlanır, Windows'ta derlenmez | Büyük | Hayır | `1.json` bayt bayt aynı; yükseltme testi (otomatik, elle, yedek); R8'li release çalışıyor; AAB boyutu ölçüldü; para testleri `commonTest`'te |
+| **iOS-4** Kaynaklar | Ekran metinleri CMP kaynaklarına; bildirim metinleri Android `res`'te kalır (`days_until_payment` iki yerde); `UiText` CMP kaynağı taşır | Orta | Hayır | Dil matrisi (§28): en, tr, üçüncü dil → İngilizce, `set-app-locales`; `localeFilters` hâlâ etkili |
+| **iOS-5** ViewModel ve DI | 6 ViewModel `commonMain`'e; seçilen DI; `SavedStateHandle`; ViewModel testleri `commonTest`'e | Orta-büyük (DI'a göre) | Hayır | ViewModel testleri; Android regresyon |
+| **iOS-6** Ekranlar | Tema, ortak bileşenler, beş ekran CMP'ye; navigasyon kütüphanesi; 12 ikon vektör kaynağına; biçimlendiriciler `expect`/`actual` (Android'de aynı kod); izin ve ayar bağlantısı arayüz arkasına; önizlemeler | Büyük | Hayır | TESTING'in sabit regresyon listesi; insets ölçümleri (§16); TalkBack; Android'de ekran görüntüleri önceki sürümle aynı |
+| **iOS-7** iOS iskeleti | `iosApp`, iOS hedefleri, `BundledSQLiteDriver`, DataStore yolu; uygulama simülatörde açılır; `commonTest` iOS'ta koşar | Orta | **Evet** | Para ve tarih testleri iki platformda yeşil |
+| **iOS-8** iOS platform özellikleri | Yerel bildirim ve izin, ayar bağlantıları, `NSNumberFormatter`/`NSDateFormatter` + `iosTest`, dosya konumları ve yedek, açılış ekranı, ikon, durum çubuğu, dil listesi | Büyük | **Evet** | iOS'a uyarlanmış regresyon listesi; hatırlatma ürün kuralı kararı önceden |
+| **iOS-9** iOS yayın | Apple Developer Program, imzalama, App Store Connect, TestFlight, gizlilik bildirimi ve App Store gizlilik etiketleri, mağaza metni, gizlilik politikası | Orta | **Evet** (+ hesap ve yıllık ücret) | TestFlight dahili test |
+
+**Mac gerektirenler:** iOS-7, iOS-8, iOS-9'un tamamı; ayrıca ortak para ve tarih
+testlerinin iOS'ta koşması (`iosSimulatorArm64Test`), Xcode, simülatör ve cihaz
+denemesi, `NSNumberFormatter` çıktılarının ölçülmesi, imzalama ve App Store
+yüklemesi. Testleri koşmak için macOS'lu bir CI koşucusu değerlendirilebilir
+(karar yok); simülatörde elle deneme ve yükleme yine Mac ister.
+
+### En riskli beş kalem
+
+1. **Veri kaybı.** DataStore'un KMP örneğindeki yol bugünkü dosyayla aynı değil
+   (ayarlar ve kurlar sessizce sıfırlanır, yedek dışına düşer); Room'da şema JSON'u
+   bayt bayt aynı kalmalı, Android'de SQLite motoru değişmemeli.
+2. **Para sonuçlarının kayması.** `BigInteger` ve `BigDecimal`'in yerine geçen
+   kod: HALF_UP, tek bölme ve `toBigDecimalOrNull`'ın kabul ettiği biçimler
+   (`1e3`, `+5`, `.5`, `5.`) birebir korunmalı.
+3. **Tarih semantiği.** `java.time` → `kotlinx-datetime`: ay sonu kırpması
+   (§17), `ChronoUnit.*.between` sayımı, saat dilimi geçişleri. Kütüphane hâlâ
+   "experimental" ve yerelleştirilmiş biçim vermiyor.
+4. **Araç zinciri eşiği.** AGP 9.0.1 KGP 2.2.10'a bağlı; KMP ayrı modül ve
+   yeni Android-KMP eklentisi istiyor; CMP iOS için Kotlin 2.2.20 öneriyor;
+   yeni CMP / Navigation 3 hatları compileSdk 37 ve AGP 9.1 eşiğini (§12)
+   getirebilir — Android'de Compose 1.9.5'ten sıçrama.
+5. **Hatırlatma iOS'ta aynı ürün kuralını taşıyamaz.** WorkManager yok; iOS
+   bildirimleri önceden planlanır, bekleyen bildirim sınırı var, "gösterildiyse
+   işaretle" kuralı ve teslim uyarılarının karşılığı yok. Kod yazılmadan önce
+   ürün kararı gerekir.

@@ -253,12 +253,23 @@ istatistik ekranı. Karar gerçek kullanım görüldükten sonra verilecek.
 - v1.1'den itibaren her yeni sürüm önce açık teste, sonra üretime çıkar.
 - (Karar 2026-10-01, sohbette.)
 
-### "iOS şimdilik yok"
+### "iOS başladı (02.10.2026)"
 
-iOS sürümü baştan yazılmayı gerektiriyor (Kotlin/Compose iOS'ta çalışmıyor);
-Mac, Xcode ve yıllık Apple geliştirici ücreti gerekiyor. Android'de talep
-görülünce değerlendirilecek. Domain katmanı saf Kotlin olduğu için Kotlin
-Multiplatform'a geçiş kapısı açık.
+iOS başladı (02.10.2026). Kullanıcı kararı, iOS'ta talep var. Yol Kotlin
+Multiplatform; kod değişikliği üretim onayından sonra.
+
+- Domain ve veri ortak; ekranların da Compose Multiplatform ile ortak olması
+  hedef. İki platform birlikte yürür.
+- Mevcut Android kodu iOS'ta olduğu gibi çalışmıyor: `java.time`,
+  `BigInteger`, `NumberFormat`, Hilt, WorkManager ve Android kaynakları iOS'ta
+  yok. Compose Multiplatform iOS'ta kararlı.
+- Mac, Xcode ve yıllık Apple geliştirici ücreti gerekiyor. Geliştirme makinesi
+  bugün Windows; Mac gerektiren adımlar planda ayrıca işaretli.
+- Hatırlatma, yedekleme, bildirim izni, sistem ayarlarına giden bağlantılar ve
+  tutar/tarih biçimi platforma özel kalır.
+- Envanter, bağımlılıklar, para ve veri koruma planı, faz listesi:
+  `ARCHITECTURE.md` §30 (taslak). iOS fazlarının ROADMAP'teki yeri sonraki
+  belge turunda belirlenir.
 
 ---
 
@@ -287,7 +298,7 @@ Bu maddeler bilinçli olarak **yapılmayacak**:
 | Para birimi kodu ISO 4217 (`TRY`, `USD`) | Standart, formatlama kütüphaneleriyle uyumlu |
 | Tarih = epoch millis `Long` | Room'da basit saklanır, `Instant`'a dönüştürülür |
 | Tek Activity, Compose Navigation | Modern Android standardı |
-| Domain katmanı saf Kotlin (Android importu yok) | Test edilebilirlik; ileride Kotlin Multiplatform kapısı |
+| Domain katmanı saf Kotlin (Android importu yok) | Test edilebilirlik; ileride Kotlin Multiplatform kapısı. **Not (2026-10-02):** `java.time`, `BigInteger` ve `NumberFormat` iOS'ta yok; ayrıntı `ARCHITECTURE.md` §30 |
 | Hatırlatma WorkManager ile, kesin alarm yok | Günlük hatırlatma için kesin alarm gerekmiyor; kesin alarm izni Play'de gerekçe ister |
 | Varsayılan dil İngilizce | Android eşleşen dil bulamayınca varsayılan kaynaklara düşer; varsayılan Türkçe olsaydı dünyanın geri kalanı uygulamayı Türkçe görürdü |
 

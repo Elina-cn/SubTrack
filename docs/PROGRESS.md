@@ -27,6 +27,104 @@ Her faz sonunda **en üste** yeni kayıt eklenir. Eski kayıtlar silinmez.
 
 ---
 
+## [Faz iOS-0] iOS — Ortak Kod Envanteri ve Plan — 2026-10-02
+
+**Durum:** Tamamlandı. Yalnızca belge; kod, Gradle dosyaları ve `app/schemas/`
+değişmedi, bağımlılık ya da modül eklenmedi. Sürümleri okumak için tek Gradle
+komutu koştu (`:app:dependencies --configuration releaseRuntimeClasspath
+--offline`); derleme yapılmadı. İki ön deneme repo dışında, JVM'de koştu
+(aşağıda).
+
+**Kullanıcı kararı (02.10.2026, sohbette)**
+- iOS sürümüne başlanıyor: iOS'ta talep var, iki platform birlikte yürüyecek.
+- Yol Kotlin Multiplatform: domain ve veri ortak, ekranların da Compose
+  Multiplatform ile ortak olması hedef.
+- Android kapalı testte ve üretim başvurusu yaklaşıyor: bu tur yalnız envanter
+  ve plan; kod değişikliği üretim onayından sonra başlar.
+- Geliştirme makinesi Windows; bu turda iOS derlemesi yok.
+
+**Envanter özeti** (ayrıntı, dosya:satır ve karşılıklar ARCHITECTURE §30)
+- `java.time`: 31 dosya, 50 import (domain 12, data 4, UI ve ViewModel 12, di 1,
+  reminder 2) → `kotlinx-datetime` + `kotlin.time`.
+- `java.math`: `BigInteger` 1 dosya (`CurrencyConverter`), `BigDecimal` 3 dosya
+  (`SubscriptionInput`, `RateText`, `SubscriptionFormState`) → yalnız `Long` ile
+  tam çarp-böl ve ortak ondalık ayrıştırıcı.
+- Biçimlendirme: `NumberFormat`/`DecimalFormat`/`Locale` 1 dosya, tarih ve ay
+  adı 3 dosya, `LocalConfiguration` 4 yer → `expect`/`actual`.
+- Android kaynakları: 35 dosya, 159 satır, 131 metin; ViewModel'lerde 8 satır →
+  Compose Multiplatform kaynakları.
+- Hilt / `javax.inject`: 27 dosya, 73 satır; 6 `@HiltViewModel`; domain'de 2
+  sınıf (`DailyReminder`, `MonthlySnapshotRecorder`).
+- Ekranlarda Android API'si: izin ve Activity 3 dosya, dynamic color 2,
+  navigation 1, `SavedStateHandle` 1; 12 ikon; 34 önizleme.
+- Testler: 390 birim testinin 32 dosyası JUnit 4, 23'ü `java.time`;
+  `PeriodNormalisationTest` `BigInteger`'ı kâhin olarak kullanıyor.
+
+**Ön denemeler (scratchpad, repoya girmedi)**
+- `toBigDecimalOrNull()` JVM'de: `1e3` ve `1E+3` → 100000 kuruş, `+5` → 500,
+  `.5` → 50, `5.` → 500 kabul ediliyor; `1.2.3`, `0x10`, `5d`, `NaN` reddediliyor.
+  Ortak ayrıştırıcı bu kümeyi korumalı.
+- Önerilen `Long` çarp-böl, `BigInteger`'a karşı 1.934.463 rastgele ve tavan
+  girdide **0 fark**; cevabın `Long`'a sığmadığı 65.537 girdi karşılaştırma
+  dışı (§6'daki sınır).
+
+**En riskli beş kalem**
+1. Veri kaybı: DataStore'un KMP örneğindeki dosya yolu bugünkü
+   `files/datastore/settings.preferences_pb` değil; Room şema JSON'u bayt bayt
+   aynı kalmalı, Android'de SQLite motoru değişmemeli.
+2. Para sonuçlarının kayması: HALF_UP, tek bölme ve ayrıştırıcının kabul
+   kümesi birebir korunmalı.
+3. Tarih semantiği: ay sonu kırpması (§17), gün/ay sayımı, saat dilimi;
+   `kotlinx-datetime` hâlâ "experimental".
+4. Araç zinciri: AGP 9.0.1 KGP 2.2.10'a bağlı; KMP ayrı modül ve
+   `com.android.kotlin.multiplatform.library` istiyor; CMP iOS için Kotlin
+   2.2.20 öneriyor; yeni hatlar compileSdk 37 / AGP 9.1 eşiğini getirebilir.
+5. Hatırlatma: iOS'ta WorkManager yok; önceden planlanan yerel bildirimler
+   §18'in "gösterildiyse işaretle" kuralını ve teslim uyarılarını taşıyamaz.
+
+**Bağımlılıklar — özet** (tablo ARCHITECTURE §30)
+- Room 2.8 aynı artefaktla KMP (2.7.0'dan beri), Android'de 2.8.4 yeterli;
+  Room 3 ayrı paket, taşımayla birlikte yapılmaz.
+- DataStore 1.1.7: `datastore-preferences-core` KMP. Lifecycle/ViewModel ve
+  SavedState KMP.
+- Navigation 2.9.5 Android'e özel; JetBrains çatalı (CMP 1.12.1 notlarında
+  2.10.0-beta01) ya da Navigation 3.
+- Compose BOM 2025.11.01 → 1.9.5; CMP son 1.12.1, iOS kararlı.
+- Hilt ve WorkManager'ın KMP sürümü yok.
+- Doğrulanamayanlar tabloda "doğrulanmadı" diye işaretli.
+
+**Değişen dosyalar**
+- `docs/ARCHITECTURE.md` — yeni §30 "Çok Platform Planı (taslak)": envanter,
+  bağımlılık tablosu, para ve veri koruma planı, platforma özel kalanlar, DI
+  seçenekleri (seçim yok), modül yapısı, faz listesi (iOS-1 … iOS-9), en riskli
+  beş kalem; §1 ve §17'ye "saf Kotlin ≠ çok platformlu" notu
+- `docs/PROJECT_SPEC.md` — §5 "iOS şimdilik yok" → "iOS başladı (02.10.2026)";
+  §7 tablosunda domain satırına not
+- `docs/PROGRESS.md` — bu kayıt
+
+**Commit'ler**
+- (bu kayıt) docs: plan the iOS port and inventory platform-bound code
+
+**Rapor edilen, dokunulmadı**
+- CLAUDE.md §1 ("Platform: Android") ve §6 madde 5 (`app/schemas/1.json`
+  yolu), PROJECT_SPEC §1 ("Android uygulamasıdır") iOS ile birlikte
+  güncellenmeli; bu turun dosyaları dışında.
+- ROADMAP'e iOS fazları eklenmedi (sonraki belge turu).
+- `kotlin-stdlib` 2.3.21'e çözümleniyor, derleyici 2.2.10. Android'de bugün
+  sorun değil; Kotlin/Native'de daha yeni Kotlin'le derlenmiş kütüphanelerin
+  okunup okunmadığı doğrulanmadı → iOS-3'teki Kotlin sürüm kararına girdi.
+- Fiyat alanına `1e3` yazan 1.000 kaydediyor (yukarıdaki deneme). Hata
+  sayılırsa düzeltmesi taşımadan ayrı yapılmalı.
+
+**Sonraki faz için not**
+- Sohbette karar bekleyenler: DI seçeneği; Navigation (JetBrains çatalı ya da
+  Navigation 3); CMP sürüm hattı ve Kotlin sürümü; `:app` adının korunması;
+  iOS hatırlatma ürün kuralı; iOS'ta dynamic color satırı.
+- İlk kod fazı (iOS-1) üretim onayından sonra; ROADMAP'teki yeri sonraki belge
+  turunda.
+
+---
+
 ## [Faz 16y] Sürüm 1.0.4 — Dördüncü Kapalı Test Güncellemesi — 2026-10-01
 
 **Durum:** Tamamlandı. Tek kod değişikliği sürüm satırları
