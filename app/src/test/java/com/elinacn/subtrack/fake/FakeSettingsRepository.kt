@@ -108,8 +108,16 @@ class FakeSettingsRepository(
         storedDynamicColor.value = enabled
     }
 
-    /** Set directly: the real store has no writer for it until the v1.2 time picker. */
+    /** Settable directly too, for a test that starts from a time chosen earlier. */
     val reminderTime = MutableStateFlow(ReminderSchedule.DEFAULT_TIME)
 
+    val reminderTimeWrites = mutableListOf<LocalTime>()
+
     override fun observeReminderTime(): Flow<LocalTime> = reminderTime.asStateFlow()
+
+    override suspend fun setReminderTime(time: LocalTime) {
+        failOnWrite?.let { throw it }
+        reminderTimeWrites += time
+        reminderTime.value = time
+    }
 }

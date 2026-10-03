@@ -67,9 +67,16 @@ interface SettingsRepository {
     /**
      * Emits the local time of day the payment reminder aims for, again whenever it changes.
      *
-     * The one source of that time: the scheduler reads it and nothing else does. Absent means
-     * [com.elinacn.subtrack.domain.usecase.ReminderSchedule.DEFAULT_TIME]. There is no setter yet -
-     * choosing the time arrives with v1.2 (ROADMAP, phase 19).
+     * The one source of that time: the scheduler aims the job by it and the settings screen shows
+     * it. Absent means [com.elinacn.subtrack.domain.usecase.ReminderSchedule.DEFAULT_TIME].
      */
     fun observeReminderTime(): Flow<LocalTime>
+
+    /**
+     * Stores the time of day the payment reminder aims for, to the minute.
+     *
+     * Only the value: moving the queued job to it is the scheduler's part, which is why the
+     * settings screen goes through the scheduler rather than calling this itself.
+     */
+    suspend fun setReminderTime(time: LocalTime)
 }

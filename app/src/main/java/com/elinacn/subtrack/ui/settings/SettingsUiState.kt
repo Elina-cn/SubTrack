@@ -3,6 +3,7 @@ package com.elinacn.subtrack.ui.settings
 import com.elinacn.subtrack.domain.model.Currency
 import com.elinacn.subtrack.domain.model.ThemeMode
 import com.elinacn.subtrack.ui.common.UiText
+import java.time.LocalTime
 
 /**
  * How reminders stand, and what the user can do about it from here.
@@ -91,6 +92,18 @@ data class SettingsUiState(
      * each time the screen comes back. Only shown while [reminderPermission] is ENABLED.
      */
     val reminderDelivery: ReminderDelivery = ReminderDelivery.ON_TIME,
+    /** The time of day the reminder aims for; null until the store has answered. */
+    val reminderTime: LocalTime? = null,
+    /**
+     * Whether the time row can be tapped: only while [reminderPermission] is ENABLED. False while
+     * that is still null too, which is never wrong - null is only left over when reminders are
+     * already known to be off and the open question is which way to turn them on.
+     */
+    val isReminderTimeEnabled: Boolean = false,
+    /** The phone's clock setting, read before the first frame and again when the screen returns. */
+    val is24HourFormat: Boolean = false,
+    /** Set while the time picker is showing. */
+    val isReminderTimePickerVisible: Boolean = false,
     /** Set while the short explanation before a repeat permission request is showing. */
     val isReminderRationaleVisible: Boolean = false,
     /** Set for one frame when the screen should carry out an Activity-only action. */
@@ -134,6 +147,15 @@ sealed interface SettingsEvent {
 
     /** The user tapped the note under the reminder row about phones that delay reminders. */
     data object ReminderNoteTapped : SettingsEvent
+
+    /** The user tapped the reminder time row and wants the picker. */
+    data object ReminderTimeRowTapped : SettingsEvent
+
+    /** The user saved a time in the picker. */
+    data class SelectReminderTime(val hour: Int, val minute: Int) : SettingsEvent
+
+    /** The user closed the picker without saving. */
+    data object ReminderTimeDialogDismissed : SettingsEvent
 
     /** The user accepted the explanation and wants to be asked. */
     data object ReminderRationaleConfirmed : SettingsEvent

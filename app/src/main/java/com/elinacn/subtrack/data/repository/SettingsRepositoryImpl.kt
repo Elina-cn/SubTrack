@@ -127,6 +127,13 @@ class SettingsRepositoryImpl @Inject constructor(
                 ?: ReminderSchedule.DEFAULT_TIME
         }
 
+    /** One key in one edit; seconds are dropped, the picker does not offer them. */
+    override suspend fun setReminderTime(time: LocalTime) {
+        dataStore.edit { preferences ->
+            preferences[REMINDER_TIME_MINUTES] = time.hour * MINUTES_PER_HOUR + time.minute
+        }
+    }
+
     private fun readPreferences(): Flow<Preferences> = dataStore.data
         .catch { failure ->
             if (failure is IOException) emit(emptyPreferences()) else throw failure
@@ -141,7 +148,7 @@ class SettingsRepositoryImpl @Inject constructor(
 
         val DYNAMIC_COLOR = booleanPreferencesKey("dynamic_color")
 
-        /** Minutes after local midnight; written by nothing until the v1.2 time picker. */
+        /** Minutes after local midnight; written by the settings screen's time picker. */
         val REMINDER_TIME_MINUTES = intPreferencesKey("reminder_time_minutes")
 
         const val MINUTES_PER_HOUR = 60

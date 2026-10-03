@@ -128,6 +128,8 @@
     <string name="reminder_notifications_on_may_be_delayed">On, but they may be late while battery saver is on — tap to change</string>
     <!-- Under the reminder row while reminders are on; opens the app's system page. -->
     <string name="reminder_delivery_note">On some phones, battery and cleaner settings can delay reminders</string>
+    <!-- Under the reminder row; the line below it is the stored time, in the phone's clock format. -->
+    <string name="reminder_time_title">Reminder time</string>
     <!-- Title and status read as a single focus stop. -->
     <string name="settings_row_description">%1$s, %2$s</string>
     <string name="reminder_rationale_title">Allow reminders</string>

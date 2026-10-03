@@ -4,7 +4,9 @@ import com.elinacn.subtrack.fake.FakeDynamicColorSupport
 import com.elinacn.subtrack.fake.FakeReminderDeliveryStatus
 import com.elinacn.subtrack.fake.FakeReminderNotificationStatus
 import com.elinacn.subtrack.fake.FakeReminderStateRepository
+import com.elinacn.subtrack.fake.FakeReminderTimeChanger
 import com.elinacn.subtrack.fake.FakeSettingsRepository
+import com.elinacn.subtrack.fake.FakeTimeFormatSupport
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.collect
@@ -165,12 +167,15 @@ class SettingsViewModelDeliveryTest {
         powerSaveMode: Boolean = false
     ): SettingsViewModel {
         delivery = FakeReminderDeliveryStatus(backgroundRestricted, powerSaveMode)
+        val settings = FakeSettingsRepository()
         return SettingsViewModel(
-            FakeSettingsRepository(),
+            settings,
             FakeReminderStateRepository(permissionRequested = true),
             FakeReminderNotificationStatus(remindersVisible = true, permissionGranted = true),
             FakeDynamicColorSupport(),
-            delivery
+            delivery,
+            FakeTimeFormatSupport(),
+            FakeReminderTimeChanger(settings)
         )
     }
 

@@ -9,6 +9,8 @@ import com.elinacn.subtrack.domain.repository.ReminderStateRepository
 import com.elinacn.subtrack.domain.repository.SettingsRepository
 import com.elinacn.subtrack.reminder.ReminderDeliveryStatus
 import com.elinacn.subtrack.reminder.ReminderNotificationStatus
+import com.elinacn.subtrack.reminder.ReminderTimeChanger
+import com.elinacn.subtrack.ui.common.TimeFormatSupport
 import com.elinacn.subtrack.ui.common.UiText
 import com.elinacn.subtrack.ui.common.startingUnknown
 import com.elinacn.subtrack.ui.theme.DynamicColorSupport
@@ -21,6 +23,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.time.LocalTime
 import javax.inject.Inject
 
 /** Holds the settings screen's state and turns its events into preference writes. */
@@ -30,27 +33,14 @@ class SettingsViewModel @Inject constructor(
     private val reminderState: ReminderStateRepository,
     private val notificationStatus: ReminderNotificationStatus,
     private val dynamicColorSupport: DynamicColorSupport,
-    private val deliveryStatus: ReminderDeliveryStatus
+    private val deliveryStatus: ReminderDeliveryStatus,
+    private val timeFormat: TimeFormatSupport,
+    private val reminderTime: ReminderTimeChanger
 ) : ViewModel() {
 
-    /**
-     * Everything that is not stored in the settings file.
-     *
-     * The reminder row starts from what the platform can answer on the spot, so a device where
-     * reminders are on shows "On" in the very first frame instead of a placeholder. Phase 16t
-     * measured the old start: "off - turn on in system settings" for the whole 700 ms enter
-     * transition, because the state was only worked out on ON_RESUME and the navigation graph holds
-     * a destination at STARTED until its transition ends. Whether reminders come on time is a
-     * platform answer too, and is read here for the same reason (ARCHITECTURE section 29).
-     */
+    /** Everything that is not stored in the settings file; see [ReminderScreenState.initial]. */
     private val screenState = MutableStateFlow(
-        ReminderScreenState(
-            permission = notificationStatus.resolveReminderPermission(
-                wasRequested = null,
-                canShowRationale = null
-            ),
-            delivery = deliveryStatus.resolveReminderDelivery()
-        )
+        ReminderScreenState.initial(notificationStatus, deliveryStatus, timeFormat)
     )
 
     /**
@@ -67,32 +57,17 @@ class SettingsViewModel @Inject constructor(
         repository.observeMainCurrency().startingUnknown(),
         repository.observeThemeMode().startingUnknown(),
         repository.observeDynamicColor().startingUnknown(),
+        repository.observeReminderTime().startingUnknown(),
         screenState
-    ) { currency, themeMode, dynamicColor, reminder ->
-        SettingsUiState(
-            mainCurrency = currency,
-            themeMode = themeMode,
-            isThemeDialogVisible = reminder.isThemeDialogVisible,
-            isDynamicColorEnabled = dynamicColor,
-            // Not stored: it is a property of the device, so it is read rather than remembered.
-            isDynamicColorSupported = dynamicColorSupport.isAvailable(),
-            reminderPermission = reminder.permission,
-            reminderDelivery = reminder.delivery,
-            isReminderRationaleVisible = reminder.isRationaleVisible,
-            pendingReminderAction = reminder.pendingAction,
-            errorMessage = reminder.errorMessage
-        )
+    ) { currency, themeMode, dynamicColor, time, screen ->
+        // Wallpaper support is not stored: it is a property of the device, so it is read.
+        screen.toUiState(dynamicColorSupport.isAvailable(), currency, themeMode, dynamicColor, time)
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
-        // What the screen draws before anything has been collected. The platform answers are
-        // filled in here too - an initial value that left them out would be the one frame where
-        // the screen still guessed.
-        initialValue = SettingsUiState(
-            isDynamicColorSupported = dynamicColorSupport.isAvailable(),
-            reminderPermission = screenState.value.permission,
-            reminderDelivery = screenState.value.delivery
-        )
+        // What the screen draws before anything has been collected: nothing stored is known yet,
+        // every platform answer already is.
+        initialValue = screenState.value.toUiState(dynamicColorSupport.isAvailable())
     )
 
     init {
@@ -131,6 +106,18 @@ class SettingsViewModel @Inject constructor(
             SettingsEvent.ReminderNoteTapped ->
                 screenState.update { it.copy(pendingAction = ReminderPermissionAction.OPEN_APP_DETAILS) }
 
+            // The faded row cannot be tapped; this also holds for a tap that slipped in just as
+            // reminders turned off.
+            SettingsEvent.ReminderTimeRowTapped ->
+                if (screenState.value.permission == ReminderPermissionState.ENABLED) {
+                    screenState.update { it.copy(isTimePickerVisible = true) }
+                }
+
+            is SettingsEvent.SelectReminderTime -> setReminderTime(LocalTime.of(event.hour, event.minute))
+
+            SettingsEvent.ReminderTimeDialogDismissed ->
+                screenState.update { it.copy(isTimePickerVisible = false) }
+
             SettingsEvent.ReminderRationaleConfirmed -> requestPermission()
 
             SettingsEvent.ReminderRationaleDismissed ->
@@ -150,13 +137,15 @@ class SettingsViewModel @Inject constructor(
      * read here, so the screen never decides anything. The platform half is applied at once - on
      * the way back from the system settings that is the half that changed - and the stored flag
      * follows when the read returns. Whether reminders will come on time is re-read with it: the
-     * user may have lifted a restriction or turned battery saver off while away.
+     * user may have lifted a restriction or turned battery saver off while away. So is the clock
+     * setting, which the user may have switched between 24 and 12 hours.
      */
     private fun refreshReminders(canShowRationale: Boolean, requestAnswered: Boolean = false) {
         updateReminder {
             it.copy(
                 canShowRationale = canShowRationale,
                 delivery = deliveryStatus.resolveReminderDelivery(),
+                is24HourFormat = timeFormat.is24HourFormat(),
                 isRequestInFlight = it.isRequestInFlight && !requestAnswered
             )
         }
@@ -268,6 +257,17 @@ class SettingsViewModel @Inject constructor(
 
     private fun setDynamicColor(enabled: Boolean) {
         write { repository.setDynamicColor(enabled) }
+    }
+
+    /**
+     * Closes the picker on the tap, like the theme chooser, and hands the time to the scheduler,
+     * which stores it and moves the job. The time already stored is not written again, so a
+     * default that was never chosen stays unwritten, as reset rates do (ARCHITECTURE section 15).
+     */
+    private fun setReminderTime(time: LocalTime) {
+        screenState.update { it.copy(isTimePickerVisible = false) }
+        if (time == uiState.value.reminderTime) return
+        write { reminderTime.change(time) }
     }
 
     /**

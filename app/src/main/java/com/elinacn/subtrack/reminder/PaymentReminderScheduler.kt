@@ -16,6 +16,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.time.Clock
 import java.time.Instant
+import java.time.LocalTime
 import java.time.ZoneId
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
@@ -35,10 +36,17 @@ class PaymentReminderScheduler @Inject constructor(
     @param:ApplicationContext private val context: Context,
     private val settings: SettingsRepository,
     private val clock: Clock
-) {
+) : ReminderTimeChanger {
 
     /** One check at a time, so two starts close together cannot both enqueue. */
     private val mutex = Mutex()
+
+    /** Stores the new time; under the same lock as every other change to the job. */
+    override suspend fun change(time: LocalTime) {
+        mutex.withLock {
+            settings.setReminderTime(time)
+        }
+    }
 
     /**
      * Makes sure a job is queued for the next reminder time, and changes it only when it has to.

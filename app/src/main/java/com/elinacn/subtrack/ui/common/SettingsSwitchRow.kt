@@ -114,7 +114,7 @@ fun SettingsSwitchRow(
  * Still the theme's colour, only at Material's disabled opacity - the role decides the hue, this
  * decides whether the row reads as usable.
  */
-private fun Color.atContentAlpha(enabled: Boolean): Color =
+internal fun Color.atContentAlpha(enabled: Boolean): Color =
     if (enabled) this else copy(alpha = DISABLED_CONTENT_ALPHA)
 
 /** Material's opacity for disabled content. */

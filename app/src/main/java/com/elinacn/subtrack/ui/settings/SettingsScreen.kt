@@ -13,7 +13,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -24,7 +23,6 @@ import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -201,7 +199,11 @@ fun SettingsScreen(
             ReminderSettingsSection(
                 permission = uiState.reminderPermission,
                 delivery = uiState.reminderDelivery,
+                reminderTime = uiState.reminderTime,
+                is24HourFormat = uiState.is24HourFormat,
+                isTimeEnabled = uiState.isReminderTimeEnabled,
                 onRowTapped = { onEvent(SettingsEvent.ReminderRowTapped) },
+                onTimeRowTapped = { onEvent(SettingsEvent.ReminderTimeRowTapped) },
                 onNoteTapped = { onEvent(SettingsEvent.ReminderNoteTapped) }
             )
 
@@ -230,35 +232,7 @@ fun SettingsScreen(
         }
     }
 
-    // Only once the stored mode is known: the chooser marks the current choice, and a tap on the
-    // row in the first few frames would otherwise open it with a guess marked. The tap is not lost
-    // - the dialog appears as soon as the mode arrives.
-    val themeMode = uiState.themeMode
-    if (uiState.isThemeDialogVisible && themeMode != null) {
-        ThemeModeDialog(
-            selected = themeMode,
-            onSelect = { onEvent(SettingsEvent.SelectThemeMode(it)) },
-            onDismiss = { onEvent(SettingsEvent.ThemeDialogDismissed) }
-        )
-    }
-
-    if (uiState.isReminderRationaleVisible) {
-        AlertDialog(
-            onDismissRequest = { onEvent(SettingsEvent.ReminderRationaleDismissed) },
-            title = { Text(stringResource(id = R.string.reminder_rationale_title)) },
-            text = { Text(stringResource(id = R.string.reminder_rationale_message)) },
-            confirmButton = {
-                TextButton(onClick = { onEvent(SettingsEvent.ReminderRationaleConfirmed) }) {
-                    Text(stringResource(id = R.string.reminder_rationale_confirm))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { onEvent(SettingsEvent.ReminderRationaleDismissed) }) {
-                    Text(stringResource(id = R.string.cancel))
-                }
-            }
-        )
-    }
+    SettingsDialogs(uiState = uiState, onEvent = onEvent)
 }
 
 /**

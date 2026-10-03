@@ -28,13 +28,17 @@ import com.elinacn.subtrack.ui.theme.Dimens
  *
  * A null [description] is a value still being read: the line keeps its height and stays empty,
  * and the row reads out its title alone (ARCHITECTURE section 29).
+ *
+ * A row that is [enabled] = false is drawn at the disabled opacity, ignores taps and is announced
+ * as unavailable, the way [SettingsSwitchRow] does it.
  */
 @Composable
 fun SettingsRow(
     title: String,
     description: String?,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true
 ) {
     val rowDescription = description
         ?.let { stringResource(id = R.string.settings_row_description, title, it) }
@@ -47,7 +51,7 @@ fun SettingsRow(
             // the shape that puts the description directly under the focusable node. Reversing
             // the two, or adding a role, only splits the row into more nodes - see the note in
             // TESTING.md.
-            .clickable(onClick = onClick)
+            .clickable(enabled = enabled, onClick = onClick)
             .semantics(mergeDescendants = true) { contentDescription = rowDescription }
             .defaultMinSize(minHeight = Dimens.MinTouchTarget)
             .padding(vertical = Dimens.SpacerMedium),
@@ -56,14 +60,14 @@ fun SettingsRow(
         Text(
             text = title,
             style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onBackground
+            color = MaterialTheme.colorScheme.onBackground.atContentAlpha(enabled)
         )
         // Empty rather than left out: an empty line is still one line tall, so the rows below do
         // not move when the value arrives.
         Text(
             text = description.orEmpty(),
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = MaterialTheme.colorScheme.onSurfaceVariant.atContentAlpha(enabled)
         )
     }
 }

@@ -7,7 +7,9 @@ import com.elinacn.subtrack.fake.FakeDynamicColorSupport
 import com.elinacn.subtrack.fake.FakeReminderDeliveryStatus
 import com.elinacn.subtrack.fake.FakeReminderNotificationStatus
 import com.elinacn.subtrack.fake.FakeReminderStateRepository
+import com.elinacn.subtrack.fake.FakeReminderTimeChanger
 import com.elinacn.subtrack.fake.FakeSettingsRepository
+import com.elinacn.subtrack.fake.FakeTimeFormatSupport
 import com.elinacn.subtrack.ui.common.UiText
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -286,7 +288,9 @@ class SettingsViewModelThemeTest {
         FakeReminderStateRepository(),
         FakeReminderNotificationStatus(),
         dynamicColorSupport,
-        FakeReminderDeliveryStatus()
+        FakeReminderDeliveryStatus(),
+        FakeTimeFormatSupport(),
+        FakeReminderTimeChanger(repository)
     )
 
     private fun TestScope.collectState() {
