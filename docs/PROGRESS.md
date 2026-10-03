@@ -27,6 +27,95 @@ Her faz sonunda **en üste** yeni kayıt eklenir. Eski kayıtlar silinmez.
 
 ---
 
+## [Faz 16aa] Hatırlatma Saati: Ayarlar — 2026-10-02
+
+**Durum:** Tamamlandı. Kullanıcı kararı (02.10.2026): hatırlatma saatini kullanıcı seçer ve bu 1.0.5'te, üretimden önce çıkar. Bu faz Ayarlar'daki varsayılan saat; aboneliğe ayrı saat ve ödeme başına bildirim 16ab, sürüm turu 16ac. Bildirim içeriği ve "aynı gün ikinci bildirim çıkmaz" kuralı değişmedi. Şema, bağımlılık, izin listesi, `versionCode`/`versionName` değişmedi.
+
+**Yapılanlar**
+
+1. **Ayarlar satırı ve seçici** (`f61b7d4`). "Ödeme hatırlatmaları"nın hemen altında "Hatırlatma saati" / "Reminder time"; kayıtlı saati telefonun 24/12 ayarıyla yazar (`TimeFormatSupport` platform cevabı, ViewModel kurulurken ve `ON_START`/`ON_RESUME`'da okunur; metin `TimeOfDayFormatter`). Kayıtlı saat okunmadan değer satırı boş (§29). Dokununca Material 3 `TimePickerDialog`; Kaydet yazar, Vazgeç/Geri/dışarı dokunma hiçbir şey yazmaz, kayıtlı saatin aynısı yazılmaz. Hatırlatmalar `ENABLED` değilken satır soluk, dokunulamaz, saati yine gösterir. `SettingsRow`'a `enabled` eklendi. 300 satır sınırı için ekran durumunun eşlemesi ve başlangıcı `ReminderScreenState.kt`'ye, üç diyalog `SettingsDialogs.kt`'ye taşındı (içerik aynı).
+2. **Kayıt ve yeniden kurma** (`4a91080`). Ekran `ReminderTimeChanger`'ı çağırır (gerçeklemesi `PaymentReminderScheduler`): aynı kilit altında tek `edit` ile `reminder_time_minutes` yazılır, saat depodan geri okunur, iş yeniden kurulur. Hedef `ReminderSchedule.runAfterTimeChange`: yeni saat bugün geçti ve bugün bildirim yoksa **şimdi**; bugün bildirim varsa yarın yeni saatte; aksi hâlde bugün yeni saatte. Sonra açılıştaki `needsReschedule` (çalışan/zamanı gelmiş iş dokunulmaz). `ensureScheduled` değişmedi; ortak taşıma adımı `moveIfNeeded`'e çıktı. Ayrıntı: ARCHITECTURE §18 "Saat seçici ve kayıttan sonra yeniden kurma".
+
+**Prompt'taki ifadeyle ilgili not.** "1.0.4'teki açılış kuralı aynen uygulanır" denmişti. 1.0.4'ün açılış kuralı (`ensureScheduled`) bugün için geçmiş bir yeni saati doğrudan yarına taşır ve bugünün hatırlatmasını düşürür; promptta tarif edilen davranış (geçtiyse ve bugün yapılmadıysa hemen) ondan farklı. Tarif edilen davranış ayrı bir karar fonksiyonu olarak uygulandı, açılış kuralına dokunulmadı.
+
+### Görev 3 — emülatör doğrulaması
+
+16w yöntemi: süreç ölüyken JobScheduler yolu (api29 `am kill`; api24'te `am kill` süreci öldürmediği için root ile `kill -9`, zorla durdurma değil). Saat api29'da `cmd alarm set-time` (dilim GMT'ye kendiliğinden geçti, `auto_time_zone 0` ile sabit), api24'te `adb root` + `date`. Debug APK `4a91080`. Fikstür: api29 Netflix ₺199,99 aylık (arayüzden), api24 Spotify ₺59,99 aylık (`run-as … sqlite3`, süreç ölüyken); ikisinin de sonraki ödemesi 06.10. Kanıt: logcat (`Start proc … SystemJobService`, `Worker result SUCCESS`), olay tamponu (`notification_enqueue`), `dumpsys jobscheduler`, `dumpsys notification`, debug depo dosyası.
+
+**api29 (`subtrack_narrow_api29`, 720×1280):**
+
+| Ölçüm | Sonuç |
+|---|---|
+| Kurulum, 05.10 17:40 | iş 06.10 09:00 (+15 sa 17 dk 55 sn) |
+| **Saat birkaç dakika sonrasına** — 17:42:53'te 17:50 kaydedildi | satır "5:50 PM"; depoda `reminder_time_minutes` = 1070; **aynı iş kimliği** `ca1f3ead…`, JobScheduler'da tek iş, en erken ≈ 17:50:00. Süreç öldürüldü → JobScheduler süreci 17:51:26.47'de başlattı, bildirim **17:51:27.36** "Payment reminder: 1 subscription" / "Netflix — tomorrow"; sonraki **06.10 17:50:00** |
+| **Bugün gösterildikten sonra saat ileri** — 17:52:24'te 17:55 | iş **18:06:27**'ye kuruldu (son çalışma 17:51:27'de bitti, WorkManager 15 dk sınırı). Süreç ölüyken 18:06:28'de koştu, `SUCCESS`, **yeni `notification_enqueue` yok** (tek kayıt 17:51:27); sonraki **06.10 17:55:00** |
+| **Bugün gösterilmemişken geçmiş saat** — saat 06.10 12:00'ye alındı (açılış işi taşımadı), 11:00 kaydedildi | Kaydet ≈12:00:29.9 → worker 12:00:29.95 → bildirim **12:00:29.986** "Netflix — today"; sonraki **07.10 11:00:00**; `last_notified_day` = 20732 (06.10) |
+| Ek: bugün gösterildikten sonra geçmiş saat (10:00) | hemen koşmadı, bildirim yok; iş **07.10 10:00:00** |
+| 12 / 24 saat | 12 saatte "10:00 AM", seçicide AM/PM; `time_12_24 24` yapılıp uygulamaya dönülünce satır "10:00", seçici 24 saatlik kadran (AM/PM yok) |
+| Kapalıyken | uygulama bildirimleri sistemden kapatılınca: "Off — turn on in system settings", saat satırı soluk, `enabled=false`, "10:00" görünüyor, dokunuş seçici açmadı, not gizlendi |
+| İptal / Geri | saat ve iş değişmedi |
+
+**api24 (`subtrack_min_api24`, 720×1280):**
+
+| Ölçüm | Sonuç |
+|---|---|
+| Kurulum, 05.10 13:50 | iş 06.10 09:00 |
+| **Bugün gösterilmemişken geçmiş saat** — 13:51:35'te kaydedilen saat **01:55** oldu | Seçici diyaloğu api24'te 48 px yukarıda; PM'e dokunuş kutunun dışına düştü, AM kaldı. Sonuç kuralın kendisi: 01:55 bugün geçmişti, bugün bildirim yoktu → iş hemen koştu (13:51:35.787), bildirim **13:51:35.814** "Spotify — tomorrow" (`sound=default`, `defaults=0x1`); sonraki 06.10 01:55 |
+| **Saat birkaç dakika sonrasına** — saat 06.10 01:00 (açılış işi taşımadı), 01:00:25.95'te 01:05 | aynı kimlik `099b3cad…`, gecikme 4 dk 34,05 sn = 01:05:00.0; süreç öldürüldü → JobScheduler süreci **01:05:00.028**'de başlattı, bildirim **01:05:00.266** "Spotify — today"; sonraki **07.10 01:05:00** |
+| **Bugün gösterildikten sonra saat ileri** — saat 01:21'e alındı (15 dk sınırı beklenmesin diye), 01:21:23.52'de 01:25 | iş 01:25:00.0; süreç ölüyken 01:25:00.05'te koştu, `SUCCESS`, **yeni `notification_enqueue` yok** (06.10'da tek kayıt 01:05); sonraki **07.10 01:25:00** |
+| 12 / 24 saat | "1:25 AM" → `time_12_24 24` + dönüş → "01:25", seçicide AM/PM yok |
+| Türkçe (cihaz dili tr-TR) | "Hatırlatma saati, 01:25" (24 saat), "ÖÖ 1:25" (12 saat); seçici "Saat Seçin", "Vazgeç", "Kaydet" |
+
+**Ekran görüntüleri** (repoya konmadı; oturumun geçici klasöründe `C:\Users\cane7\AppData\Local\Temp\claude\C--Users-cane7-Documents-GitHub-SubTrack\8fd1ddb8-a37a-42ab-b429-2c10f6627da6\scratchpad\shots\`):
+- api29 açık tema: `api29-light-12h-settings.png`, `api29-light-12h-picker.png`, `api29-light-24h-settings.png`, `api29-light-24h-picker.png`
+- api29 koyu tema (uygulamanın tema seçicisiyle; `cmd uimode night yes` bu imajda uygulanmadı): `api29-dark-12h-settings.png`, `api29-dark-12h-picker.png`, `api29-dark-24h-settings.png`, `api29-dark-24h-picker.png`, kapalı satır `api29-dark-off-settings.png`
+- api24: `api24-light-12h-settings.png`, `api24-light-24h-settings.png`, `api24-light-24h-picker.png`, `api24-tr-24h-settings.png`, `api24-tr-12h-settings.png`, `api24-tr-12h-picker.png`
+
+### Doğrulama
+
+| Kontrol | Sonuç |
+|---|---|
+| `assembleDebug`, `testDebugUnitTest`, `lintDebug` (`--rerun-tasks`, birlikte) | geçti; yeni Kotlin uyarısı yok |
+| Birim testleri | **427 test, 0 hata** (390 → 427: `SettingsViewModelReminderTimeTest` 15, `ReminderTimeChangeTest` 18, `SettingsRepositoryImplTest` +4) |
+| `lintDebug` | 0 hata, 22 uyarı — öncekiyle aynı türler; yeni uyarı yok |
+| `compileDebugAndroidTestKotlin` | geçti (`PaymentReminderSchedulerTest` yeni kurucuya uyarlandı; bu turda koşturulmadı) |
+| Dosya boyları | `SettingsViewModel.kt` 296, `SettingsScreen.kt` 269 satır |
+| `git diff` şema / gradle / sürüm | değişmedi |
+
+### Rapor edilen, dokunulmadı
+
+- **15 dk sınırı.** Bir çalışmadan sonraki 15 dk içinde saat değiştirilirse iş o sınırda koşar (api29: 17:55 seçildi, 18:06:27'de koştu). "Şimdi" hedefi de bu sınıra tabi; son 15 dk içinde bildirimsiz biten bir çalışma varken geçmiş saat seçilip uygulama o ana kadar yeniden öne gelirse açılış kontrolü işi bir sonraki oluşuma taşır (ARCHITECTURE §18, kabul edilen bedel).
+- **JobScheduler gecikmesi.** api29'da 17:50 hedefli iş 86 sn geç başladı (`TIMING_DELAY` 17:51:26'ya kadar sağlanmadı; kesin olmayan zaman alarmı). 16x/16y'de 20-48 sn idi. §18'deki "dakika garantisi yok" kapsamında.
+- `PROJECT_SPEC.md` §4 "v1.2 — Kolaylıklar" listesinde "Hatırlatma saatini kullanıcı seçer; varsayılan 09:00" satırı duruyor (prompt yalnız hatırlatma satırını istedi); ROADMAP Faz 19'dan çıkarıldı. Silinip silinmeyeceği sohbette.
+- 16ab için: ROADMAP Faz 21 "ilk migration"ı v1.4'e, kullanıcının elinde kendi yedek dosyası (Faz 20) olduktan sonraya koyuyor; 16ab'nin migration'ı bu gerekçenin önüne geçiyor.
+- Material'ın seçicisindeki ÖÖ/ÖS kutusu Türkçede küçük harfle "öö/ös" çiziyor (kütüphanenin kendi metni); satır ICU'nun "ÖÖ"sünü yazıyor.
+- api29 emülatörü, Bash arka plan görevinin 30 dk sınırında aracın kendisi tarafından kapatıldı (temiz değil); ölçümler kapanmadan önce bitmişti. Yeniden açılışta veri duruyordu, saat gerçek zamana dönmüştü. Sonrası `Start-Process` ile araçtan bağımsız başlatıldı.
+- `TESTING.md`'ye bu fazın maddeleri eklenmedi (istenmedi).
+
+### Ortam (tur sonu)
+
+- api29: başta SubTrack yoktu; debug kaldırıldı; `auto_time 1`, `auto_time_zone 1`, `time_12_24` silindi (başta boştu); `sync` + `reboot -p`.
+- api24: başta SubTrack yoktu; debug kaldırıldı; dil en-US (eklenen Türkçe kaldırıldı), `time_12_24 12` (başta 12), `auto_time 1`, `adb unroot`; `sync` + `reboot -p`.
+- Fiziksel telefona dokunulmadı (bağlı değildi).
+
+**Değişen dosyalar**
+- `domain/repository/SettingsRepository.kt`, `data/repository/SettingsRepositoryImpl.kt` (`setReminderTime`); `domain/usecase/ReminderSchedule.kt` (`runAfterTimeChange`)
+- `reminder/ReminderTimeChanger.kt` (yeni), `reminder/PaymentReminderScheduler.kt`, `di/ReminderModule.kt`; `ui/common/TimeFormatSupport.kt`, `ui/common/AndroidTimeFormatSupport.kt`, `di/FormatModule.kt`, `ui/common/TimeOfDayFormatter.kt` (yeni)
+- `ui/common/SettingsRow.kt` (`enabled`), `ui/common/SettingsSwitchRow.kt` (`atContentAlpha` internal); `ui/settings/ReminderSettingsSection.kt`, `ReminderTimeDialog.kt` (yeni), `SettingsDialogs.kt` (yeni, taşındı), `SettingsScreen.kt`, `SettingsUiState.kt`, `ReminderScreenState.kt`, `SettingsViewModel.kt`; `values/strings.xml`, `values-tr/strings.xml`
+- Testler: `SettingsViewModelReminderTimeTest`, `ReminderTimeChangeTest`, `FakeReminderTimeChanger`, `FakeTimeFormatSupport` (yeni); `SettingsRepositoryImplTest`, `FakeSettingsRepository`, dört `SettingsViewModel*Test` (kurucu); `androidTest/…/PaymentReminderSchedulerTest` (kurucu)
+- `docs/ARCHITECTURE.md` (§18), `docs/PROJECT_SPEC.md` (hatırlatma satırı), `docs/ROADMAP.md` (not, Faz 16 1.0.5, Faz 19), `docs/PROGRESS.md` (bu kayıt)
+
+**Commit'ler**
+- `f61b7d4` feat: add a reminder time row and picker to settings
+- `4a91080` feat: move the reminder job as soon as a new time is saved
+- (bu kayıt) docs: record phase 16aa and the reminder time picker
+
+**Sonraki faz için not**
+- 16ab: aboneliğe ayrı saat (ilk migration, `app/schemas/` ve `version` artışı) ve ödeme başına bildirim; "aynı gün ikinci bildirim çıkmaz" kuralı ve bildirim içeriği orada ele alınacak. Ayarlar'daki saat o fazda "varsayılan saat" olarak kalacak.
+- 16ac: 1.0.5 sürüm turu.
+
+---
+
 ## [Faz iOS-0] iOS — Ortak Kod Envanteri ve Plan — 2026-10-02
 
 **Durum:** Tamamlandı. Yalnızca belge; kod, Gradle dosyaları ve `app/schemas/`

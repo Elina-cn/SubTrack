@@ -67,7 +67,7 @@ entegrasyonu isteyen kullanıcılar.
 | Para birimi seçimi | Abonelik başına TRY / USD / EUR / GBP |
 | Kur yönetimi | Sabit varsayılan kurlar, ayarlardan elle düzenlenebilir (canlı kur yok) |
 | Yenileme tarihi | Sonraki ödeme tarihi + "X gün kaldı" göstergesi; ödeme günü geçince bir sonraki döneme kendiliğinden ilerler |
-| Hatırlatma | Ödemeden bir gün önce ve ödeme günü yerel bildirim; günde en fazla bir bildirim (sunucu yok) |
+| Hatırlatma | Ödemeden bir gün önce ve ödeme günü yerel bildirim; saati kullanıcı seçer, varsayılan 09:00; günde en fazla bir bildirim (sunucu yok) |
 | Kategoriler | Eğlence / Üretkenlik / Sağlık / Diğer + kategoriye göre filtreleme |
 | Ödeme periyodu | Aylık / yıllık / haftalık; aylık maliyete normalize edilerek toplanır |
 | Geçmiş takibi | Aylık toplamın anlık görüntüleri, zaman içindeki değişim |

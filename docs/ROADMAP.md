@@ -25,6 +25,10 @@ geçilmez. Tüm çalışma `Elina` branch'inde yapılır; branch açılmaz. Faz 
 > hatırlatma saatinin seçimi. Açık test kararı: ilk üretim sürümünden önce açık
 > test yok; v1.1'den itibaren her yeni sürüm önce açık teste, sonra üretime
 > çıkar (`PROJECT_SPEC.md` §5 "Açık test").
+>
+> **Not (2026-10-02):** Hatırlatma saatinin seçimi v1.2'den (Faz 19) 1.0.5'e,
+> üretimden önceye alındı (kullanıcı kararı): 16aa Ayarlar'da varsayılan saat,
+> 16ab aboneliğe ayrı saat ve ödeme başına bildirim, 16ac sürüm turu.
 
 ---
 
@@ -784,6 +788,11 @@ Aylık toplamın zaman içindeki anlık görüntüleri. `PROJECT_SPEC.md` §1'de
       **Açık kalan:** kapalı teste yükleme, aynı AAB'nin App Bundle
       kitaplığından dahili teste eklenmesi (PROGRESS 16r, "Karar — sürüm
       yayınlama sırası") ve etiket — kullanıcıda.
+- [ ] Sürüm 1.0.5 — hatırlatma saati, üretimden önce (karar 02.10.2026):
+  - [x] 16aa — Ayarlar'da varsayılan hatırlatma saati; kayıttan hemen sonra iş
+        yeni saate kuruluyor (PROGRESS 16aa)
+  - [ ] 16ab — aboneliğe ayrı saat (ilk migration) ve ödeme başına bildirim
+  - [ ] 16ac — sürüm turu
 - [ ] Üretim erişimi ve yayın — 12 testçi 14 gün kesintisiz katılımda kalınca
       başvurulacak (Faz 16k).
 
@@ -884,11 +893,11 @@ Kapsam `PROJECT_SPEC.md` §4 "v1.2 — Kolaylıklar".
       yedeğine girer (Auto Backup)
 - [ ] Listeyi bir sonraki ödeme tarihine göre sıralama (kapalı test önerisi,
       PROGRESS 16w)
-- [ ] Hatırlatma saatini kullanıcı seçer; varsayılan 09:00. Depo anahtarı ve
-      zamanlama hazır (`ARCHITECTURE.md` §18 "Hedef saat tek kaynaktan
-      gelir", 16x); eksik olan seçici ve yazan
 
-**Bitti:** Beş madde çalışıyor; toplamlarda kuruş hatası yok.
+> Hatırlatma saatinin seçimi bu fazdan çıkarıldı: 1.0.5'e taşındı (Faz 16aa,
+> 16ab; karar 02.10.2026).
+
+**Bitti:** Dört madde çalışıyor; toplamlarda kuruş hatası yok.
 
 **Sürüm:** v1.2 bu fazdan sonra, 1.0.1/1.0.2'deki gibi bir sürüm turuyla
 çıkar (PROGRESS 16n, 16r) — önce açık test, sonra üretim.

@@ -1227,8 +1227,9 @@ giriyor ve Play bu izni gerçekten saniyesi önemli işler için istiyor. Bir
 abonelik hatırlatması o eşiği hak etmiyor.
 
 **Bedeli açıkça kabul edildi:** WorkManager dakika garantisi vermez. Hedef
-yerel 09:00'dır, taahhüt değil — Doze altında saatlerce kayabilir. Hatırlatma
-için bu kabul edilebilir; ödeme anına bağlı bir iş olsaydı olmazdı.
+kullanıcının seçtiği yerel saattir (varsayılan 09:00; 16aa), taahhüt değil —
+Doze altında saatlerce kayabilir. Hatırlatma için bu kabul edilebilir; ödeme
+anına bağlı bir iş olsaydı olmazdı.
 
 ### Alarm yolu neden seçilmedi (16x, 16w ölçümüyle)
 
@@ -1330,7 +1331,72 @@ da boşta cihaz da gerekmiyor. Herhangi birini istemek yalnızca geciktirirdi.
 `SettingsRepository.observeReminderTime()`: ayarlar deposunda
 `reminder_time_minutes` (gece yarısından sonraki dakika, `Int`); kayıt yoksa ya
 da gün dışındaysa `ReminderSchedule.DEFAULT_TIME` = 09:00. Zamanlayıcı başka
-yerden okumaz. Yazan yok: saat seçici v1.2'de gelecek (ROADMAP Faz 19).
+yerden okumaz; Ayarlar ekranı aynı kaynağı yalnızca gösterir. 16aa'dan beri tek
+yazanı Ayarlar'daki saat seçicidir ve o da depoya doğrudan değil zamanlayıcı
+üzerinden yazar (aşağıda "Saat seçici ve kayıttan sonra yeniden kurma").
+
+### Saat seçici ve kayıttan sonra yeniden kurma (16aa)
+
+**Satır.** Ayarlar'da "Ödeme hatırlatmaları"nın hemen altında "Hatırlatma
+saati" durur; not (Teslim uyarıları) onun altına iner, böylece not gelip
+gidince saat satırı yer değiştirmez. Satır kayıtlı saati telefonun 24/12 saat
+ayarıyla yazar: ayar platformdan okunur (`TimeFormatSupport`; ViewModel
+kurulurken ve ekran `ON_START`/`ON_RESUME`'da, bildirim durumu gibi), metni
+`TimeOfDayFormatter` üretir (platformun dile göre en iyi kalıbı +
+`SimpleDateFormat`; java.time'ın tanımadığı kalıp harflerine karşı). Kayıtlı
+saat okunmadan satırın değer satırı boştur, 09:00 yazmaz (§29).
+
+**Kapalıyken.** Hatırlatmalar `ENABLED` değilken satır soluk, dokunulamaz ve
+"devre dışı" diye okunur, ama kayıtlı saati göstermeye devam eder. İzin durumu
+henüz `null` iken de kapalıdır: `null` yalnızca bildirimlerin görünmediği
+platformdan bilindiğinde kalır (soru yalnızca hangi yoldan açılacağıdır), yani
+soluk satır ilk karede de doğrudur. ViewModel, kapalı satırdan gelen bir
+dokunuşu da reddeder.
+
+**Seçici.** Material 3 `TimePickerDialog` + `TimePicker`, telefonun 24/12
+biçiminde ve kayıtlı saatte açılır; kayıtlı saat bilinmeden açılmaz (tema
+seçicisiyle aynı kural). Kaydet yazar; Vazgeç, dışarı dokunma ve Geri hiçbir
+şey yazmaz. Kayıtlı saatin aynısı kaydedilirse yazım yok: hiç seçilmemiş
+varsayılan anahtar olarak yazılmaz (§15'teki sıfırlama kuralının gerekçesi).
+
+**Yazım ve yeniden kurma tek yerde.** Ekran `ReminderTimeChanger`'ı çağırır;
+gerçeklemesi `PaymentReminderScheduler`. Zamanlayıcı, açılış kontrolü ve
+çalışma sonu sabitlemesiyle **aynı kilit altında** saati tek `edit`'le yazar,
+depodan geri okur ve işi yeniden kurar. Arada başka bir kontrol eski saati
+okuyamaz; uygulamanın yeniden açılması beklenmez.
+
+Nereye kurulacağını `ReminderSchedule.runAfterTimeChange` söyler ("bugün" =
+sistem dilimindeki takvim günü, kayıt `reminder_last_notified_day`):
+
+| Durum | Hedef |
+|---|---|
+| Yeni saat bugün geçti, bugün bildirim gösterilmedi | **şimdi** — bugünün hatırlatması hâlâ borç |
+| Yeni saat bugün geçti, bugün bildirim gösterildi | yarın yeni saatte |
+| Yeni saat bugün henüz gelmedi | bugün yeni saatte; bugün bildirim gösterildiyse o çalışma sessiz kalır (karar `DailyReminder`'da, takvimde değil) |
+
+Hedef sonra açılıştaki `needsReschedule`'dan geçer: çalışan ya da zamanı
+gelmiş iş dokunulmaz (çalışan iş, bitişte sabitlerken yeni saati depodan
+okur), bekleyen iş hedefe `UPDATE` ile çekilir, iş yoksa `KEEP` ile kurulur.
+Bu, açılıştaki "zamanı gelmiş iş hemen koşar, yarına taşınmaz" ilkesinin yeni
+saate uygulanmasıdır. Açılış kontrolünün kendisi (`ensureScheduled`)
+**değişmedi**: geçmiş bir yeni saati olduğu gibi yarına taşırdı ve bugünün
+borcunu düşürürdü; "şimdi" hedefini yalnızca kayıt anı üretir.
+
+**WorkManager'ın 15 dk sınırı burada da geçerli.** Sabitlenen an son
+çalışmanın bitişinden en az 15 dk sonra olur. Ölçüldü (16aa, api29): 17:51:27'de
+biten çalışmadan sonra 17:55 seçilince iş 18:06:27'ye kuruldu. "Şimdi" hedefi de
+bu sınıra tabidir. **KABUL EDİLEN BEDEL:** son 15 dk içinde bildirim
+göstermeden biten bir çalışma varken geçmiş bir saat seçilir ve uygulama o
+sınırdan önce yeniden öne gelirse, açılış kontrolü bekleyen işi yeni saatin bir
+sonraki oluşumuna taşır; o günün yeniden çalışması düşer. O 15 dk içinde bir
+çalışma o günü zaten kontrol etmiş ve gösterecek bir şey bulmamıştır.
+
+Emülatörde ölçüldü (api29 ve api24, süreç ölüyken JobScheduler yolu; PROGRESS
+16aa): saat birkaç dakika sonrasına alınınca iş aynı WorkManager kimliğiyle o
+dakikaya kuruldu ve bildirim o saatte düştü; bugünün bildirimi gösterildikten
+sonra saat ileri alınınca iş koştu, ikinci bildirim çıkmadı; bugün bildirim
+yokken geçmiş bir saat seçilince bildirim aynı saniye içinde düştü. Her
+çalışmadan sonra sonraki çalışma ertesi gün yeni saate sabitlendi.
 
 ### `InitializationProvider` paylaşılıyor
 
