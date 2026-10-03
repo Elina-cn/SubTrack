@@ -38,12 +38,38 @@ object ReminderSchedule {
     }
 
     /**
+     * When the job should run once the user has just chosen [time].
+     *
+     * The start-up rule for a job whose moment has come - it runs now rather than being moved to
+     * tomorrow - applied to the new moment. If [time] has already come today and no reminder has
+     * been shown today ([lastNotifiedDay], an epoch day), the answer is [now]: today's reminder is
+     * still owed. If one has been shown today the day is used up, and the answer is [time]'s next
+     * occurrence, tomorrow. Otherwise [time] is still ahead today and that is the answer, shown
+     * reminder or not: the day guard in [DailyReminder] keeps a second run silent, not the
+     * schedule.
+     *
+     * "Today" is the calendar day in [zone], the same zone the target is worked out in.
+     */
+    fun runAfterTimeChange(
+        now: Instant,
+        zone: ZoneId,
+        time: LocalTime,
+        lastNotifiedDay: Long?
+    ): Instant {
+        val today = now.atZone(zone).toLocalDate()
+        val todaysRun = ZonedDateTime.of(today, time, zone).toInstant()
+        val isTodayOwed = !todaysRun.isAfter(now) && lastNotifiedDay != today.toEpochDay()
+        return if (isTodayOwed) now else nextRunAfter(now, zone, time)
+    }
+
+    /**
      * Whether the queued job has to be set again for [target].
      *
      * Only a job that is waiting for a future moment other than [target] is moved: a time zone or
-     * target change, or a job left over from the 24-hour repeat. A job that is running, or whose
-     * moment has already come, is left alone - it runs now and sets the next target itself, and
-     * moving it to tomorrow would drop today's reminder. That is what makes this safe to ask on
+     * target change, or a job left over from the 24-hour repeat. A [target] of now - a new time
+     * whose reminder is still owed today - moves a waiting job to now. A job that is running, or
+     * whose moment has already come, is left alone - it runs now and sets the next target itself,
+     * and moving it to tomorrow would drop today's reminder. That is what makes this safe to ask on
      * every start: asking again on the same day gives the same [target], so nothing is pushed back.
      */
     fun needsReschedule(queued: QueuedReminder, now: Instant, target: Instant): Boolean =

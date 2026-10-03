@@ -7,6 +7,7 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.await
+import com.elinacn.subtrack.domain.repository.ReminderStateRepository
 import com.elinacn.subtrack.domain.repository.SettingsRepository
 import com.elinacn.subtrack.domain.usecase.QueuedReminder
 import com.elinacn.subtrack.domain.usecase.ReminderSchedule
@@ -30,21 +31,44 @@ import javax.inject.Singleton
  * [PeriodicWorkRequest.Builder.setNextScheduleTimeOverride]. The 24-hour period only matters if a
  * run ends without pinning - it keeps a next run queued whatever happens to one run, which a chain
  * of one-time jobs cannot promise. See ARCHITECTURE §18.
+ *
+ * It is also how the settings screen changes the reminder time ([ReminderTimeChanger]): a new time
+ * is stored and the job follows it under the same lock as every other change to the job.
  */
 @Singleton
 class PaymentReminderScheduler @Inject constructor(
     @param:ApplicationContext private val context: Context,
     private val settings: SettingsRepository,
+    private val reminderState: ReminderStateRepository,
     private val clock: Clock
 ) : ReminderTimeChanger {
 
-    /** One check at a time, so two starts close together cannot both enqueue. */
+    /**
+     * One change to the job at a time, so two starts close together cannot both enqueue, and a new
+     * time is stored and followed before any other check reads it.
+     */
     private val mutex = Mutex()
 
-    /** Stores the new time; under the same lock as every other change to the job. */
+    /**
+     * Stores the new time and moves the job to it at once, without waiting for the next start.
+     *
+     * Where the job goes is [ReminderSchedule.runAfterTimeChange]: now when the new time has
+     * already come today and no reminder has been shown today, otherwise the new time's next
+     * occurrence. A running job is left to finish; it pins its next run from the stored time,
+     * which by then is the new one. The time is read back from the store rather than taken from
+     * the caller, so the job follows exactly what the settings screen shows.
+     */
     override suspend fun change(time: LocalTime) {
         mutex.withLock {
             settings.setReminderTime(time)
+            val now = clock.instant()
+            val target = ReminderSchedule.runAfterTimeChange(
+                now = now,
+                zone = ZoneId.systemDefault(),
+                time = settings.observeReminderTime().first(),
+                lastNotifiedDay = reminderState.lastNotifiedDay()
+            )
+            moveIfNeeded(now, target)
         }
     }
 
@@ -60,22 +84,7 @@ class PaymentReminderScheduler @Inject constructor(
     suspend fun ensureScheduled() {
         mutex.withLock {
             val now = clock.instant()
-            val target = nextTarget(now)
-            val queued = queuedReminder()
-            if (!ReminderSchedule.needsReschedule(queued, now, target)) return
-
-            // Nothing queued: KEEP, which with nothing waiting or running clears any finished
-            // record under the name and enqueues this one, so exactly one job is left. Something
-            // waiting: update it in place, which never cancels a run that has just begun.
-            // CANCEL_AND_REENQUEUE would read more naturally for the first case, but WorkManager
-            // refuses a pinned next run with it - it throws, and the first launch after install
-            // crashed on the emulator in phase 16x until this said KEEP.
-            val policy = if (queued == QueuedReminder.None) {
-                ExistingPeriodicWorkPolicy.KEEP
-            } else {
-                ExistingPeriodicWorkPolicy.UPDATE
-            }
-            enqueue(target, policy)
+            moveIfNeeded(now, nextTarget(now))
         }
     }
 
@@ -104,6 +113,26 @@ class PaymentReminderScheduler @Inject constructor(
             zone = ZoneId.systemDefault(),
             time = settings.observeReminderTime().first()
         )
+
+    /**
+     * Queues the job for [target] unless [ReminderSchedule.needsReschedule] says to leave it.
+     *
+     * Nothing queued: KEEP, which with nothing waiting or running clears any finished record under
+     * the name and enqueues this one, so exactly one job is left. Something waiting: update it in
+     * place, which never cancels a run that has just begun. CANCEL_AND_REENQUEUE would read more
+     * naturally for the first case, but WorkManager refuses a pinned next run with it - it throws,
+     * and the first launch after install crashed on the emulator in phase 16x until this said KEEP.
+     */
+    private suspend fun moveIfNeeded(now: Instant, target: Instant) {
+        val queued = queuedReminder()
+        if (!ReminderSchedule.needsReschedule(queued, now, target)) return
+        val policy = if (queued == QueuedReminder.None) {
+            ExistingPeriodicWorkPolicy.KEEP
+        } else {
+            ExistingPeriodicWorkPolicy.UPDATE
+        }
+        enqueue(target, policy)
+    }
 
     private suspend fun queuedReminder(): QueuedReminder {
         val work = WorkManager.getInstance(context)

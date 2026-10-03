@@ -4,6 +4,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
+import com.elinacn.subtrack.data.repository.ReminderStateRepositoryImpl
 import com.elinacn.subtrack.data.repository.SettingsRepositoryImpl
 import com.elinacn.subtrack.debug.PreferencesStoreEntryPoint
 import com.elinacn.subtrack.domain.usecase.ReminderSchedule
@@ -36,13 +37,18 @@ class PaymentReminderSchedulerTest {
 
     private val workManager = WorkManager.getInstance(context)
 
-    private val settings = SettingsRepositoryImpl(
-        EntryPointAccessors
-            .fromApplication(context.applicationContext, PreferencesStoreEntryPoint::class.java)
-            .preferencesDataStore()
-    )
+    private val store = EntryPointAccessors
+        .fromApplication(context.applicationContext, PreferencesStoreEntryPoint::class.java)
+        .preferencesDataStore()
 
-    private val scheduler = PaymentReminderScheduler(context, settings, Clock.systemDefaultZone())
+    private val settings = SettingsRepositoryImpl(store)
+
+    private val scheduler = PaymentReminderScheduler(
+        context,
+        settings,
+        ReminderStateRepositoryImpl(store),
+        Clock.systemDefaultZone()
+    )
 
     /** Starts from no job at all, as a fresh install does. */
     @Before

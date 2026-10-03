@@ -176,8 +176,8 @@ class SettingsRepositoryImplTest {
     }
 
     /**
-     * Written straight into the file: nothing in the app writes the key until the v1.2 time
-     * picker, and this pins the format that picker will have to write - minutes after midnight.
+     * Written straight into the file, as 1.0.4 would have found it: this pins the format the
+     * key has had since phase 16x - minutes after midnight.
      */
     @Test
     fun observeReminderTime_storedMinutes_areReadAsTheTimeOfDay() = runTest {
@@ -193,6 +193,50 @@ class SettingsRepositoryImplTest {
         store.edit { it[intPreferencesKey("reminder_time_minutes")] = 24 * 60 }
 
         assertEquals(ReminderSchedule.DEFAULT_TIME, SettingsRepositoryImpl(store).observeReminderTime().first())
+    }
+
+    @Test
+    fun setReminderTime_writesMinutesUnderTheExistingKey() = runTest {
+        val store = dataStore()
+
+        SettingsRepositoryImpl(store).setReminderTime(LocalTime.of(20, 30))
+
+        // The key and format 1.0.4 already reads, so no migration is involved.
+        assertEquals(20 * 60 + 30, store.data.first()[intPreferencesKey("reminder_time_minutes")])
+    }
+
+    @Test
+    fun setReminderTime_readBackAfterTheStoreIsClosed_survivesOnDisk() = runTest {
+        val file = temporaryFolder.newFile("settings.preferences_pb")
+        val firstScope = CoroutineScope(UnconfinedTestDispatcher(testScheduler) + Job())
+        SettingsRepositoryImpl(dataStore(file, firstScope)).setReminderTime(LocalTime.of(0, 5))
+        firstScope.cancel()
+
+        val reopened = SettingsRepositoryImpl(dataStore(file))
+
+        assertEquals(LocalTime.of(0, 5), reopened.observeReminderTime().first())
+    }
+
+    @Test
+    fun setReminderTime_secondsAreDropped() = runTest {
+        val repository = SettingsRepositoryImpl(dataStore())
+
+        repository.setReminderTime(LocalTime.of(7, 30, 59))
+
+        assertEquals(LocalTime.of(7, 30), repository.observeReminderTime().first())
+    }
+
+    @Test
+    fun setReminderTime_leavesEveryOtherSettingAsItWas() = runTest {
+        val repository = SettingsRepositoryImpl(dataStore())
+        repository.setMainCurrency(Currency.EUR)
+        repository.setThemeMode(ThemeMode.DARK)
+
+        repository.setReminderTime(LocalTime.of(23, 59))
+
+        assertEquals(Currency.EUR, repository.observeMainCurrency().first())
+        assertEquals(ThemeMode.DARK, repository.observeThemeMode().first())
+        assertEquals(LocalTime.of(23, 59), repository.observeReminderTime().first())
     }
 
     private fun TestScope.dataStore(
